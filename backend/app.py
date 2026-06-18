@@ -1,41 +1,17 @@
-import os
-from datetime import datetime, timezone
-
-from flask import Flask, jsonify, request
+from flask import Flask
 from flask_cors import CORS
+
+from config import get_frontend_origins
+from routes.coze import coze_bp
+from routes.system import system_bp
 
 
 def create_app():
     app = Flask(__name__)
 
-    allowed_origins = os.getenv(
-        "FRONTEND_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173",
-    ).split(",")
-
-    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
-
-    @app.get("/api/health")
-    def health():
-        return jsonify(
-            {
-                "status": "ok",
-                "service": "flask-backend",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-
-    @app.post("/api/echo")
-    def echo():
-        data = request.get_json(silent=True) or {}
-        message = data.get("message", "")
-
-        return jsonify(
-            {
-                "received": message,
-                "length": len(message),
-            }
-        )
+    CORS(app, resources={r"/api/*": {"origins": get_frontend_origins()}})
+    app.register_blueprint(system_bp, url_prefix="/api")
+    app.register_blueprint(coze_bp, url_prefix="/api/coze")
 
     return app
 
