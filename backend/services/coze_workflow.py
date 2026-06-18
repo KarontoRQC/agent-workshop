@@ -18,6 +18,7 @@ from services.recommended_agents_stream import RecommendedAgentsStreamEmitter
 
 KNOWLEDGE_GRAPH_STAGE = "knowledge_graph"
 AGENT_RECOMMENDATION_STAGE = "agent_recommendation"
+DIRECT_REPLY_TYPE = "DIRECT_REPLY"
 graph_path_resolver = GraphPathResolver()
 
 
@@ -60,12 +61,22 @@ def _iter_chat_workflow_stream(
     agent_names,
 ):
     route_sections = defaultdict(str)
+    direct_reply_parts = []
 
     yield _workflow_event("workflow.started")
     yield _stage_event("workflow.stage.started", KNOWLEDGE_GRAPH_STAGE)
 
-    for event in iter_tagged_events(route_upstream, section_tags=ROUTE_PLANNER_TAGS):
+    for event in iter_tagged_events(
+        route_upstream,
+        section_tags=ROUTE_PLANNER_TAGS,
+        untagged_type=DIRECT_REPLY_TYPE,
+    ):
         if event.get("event") == "content.delta":
+            if event.get("type") == DIRECT_REPLY_TYPE:
+                direct_reply_parts.append(event.get("content", ""))
+                yield format_sse_event(_with_stage(event, KNOWLEDGE_GRAPH_STAGE))
+                continue
+
             route_sections[event.get("type")] += event.get("content", "")
 
         if event.get("event") in {"chat.completed", "message.completed", "done"}:
@@ -75,6 +86,27 @@ def _iter_chat_workflow_stream(
 
     selected_route = route_sections.get("KG_PATH", "").strip()
     route_explanation = route_sections.get("EXPLANATION", "").strip()
+
+    if not selected_route:
+        direct_reply = "".join(direct_reply_parts).strip()
+
+        if direct_reply:
+            yield format_sse_event(
+                _with_stage(content_event("content.completed", {"type": DIRECT_REPLY_TYPE}), KNOWLEDGE_GRAPH_STAGE)
+            )
+
+        yield _stage_event(
+            "workflow.stage.completed",
+            KNOWLEDGE_GRAPH_STAGE,
+            selected_route=selected_route,
+            route_explanation=route_explanation,
+            direct_reply=direct_reply,
+            route_matched=False,
+        )
+        yield _workflow_event("chat.completed", status="completed", route_matched=False)
+        yield _workflow_event("workflow.completed", status="completed", route_matched=False)
+        return
+
     graph_path = graph_path_resolver.resolve(selected_route)
 
     for node in graph_path["nodes"]:

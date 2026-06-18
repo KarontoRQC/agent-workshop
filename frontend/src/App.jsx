@@ -25,6 +25,7 @@ function createEmptyAgentWorkflow() {
   return {
     knowledgeGraph: {
       ACK: "",
+      DIRECT_REPLY: "",
       KG_PATH: "",
       EXPLANATION: "",
       graphPath: null,
@@ -445,7 +446,7 @@ export function App() {
 }
 
 function getWorkflowSection(event) {
-  if (event.stage === "knowledge_graph" && ["ACK", "KG_PATH", "EXPLANATION"].includes(event.type)) {
+  if (event.stage === "knowledge_graph" && ["ACK", "DIRECT_REPLY", "KG_PATH", "EXPLANATION"].includes(event.type)) {
     return "knowledgeGraph";
   }
 

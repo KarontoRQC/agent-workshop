@@ -89,6 +89,7 @@ function ChatTurn({ turn, currentStatus }) {
   const knowledgeGraph = turn.workflow?.knowledgeGraph || {};
   const agentRecommendation = turn.workflow?.agentRecommendation || {};
   const ack = knowledgeGraph.ACK;
+  const directReply = (knowledgeGraph.DIRECT_REPLY || "").trimStart();
   const path = knowledgeGraph.KG_PATH;
   const explanation = knowledgeGraph.EXPLANATION;
   const recommendationAck = agentRecommendation.ACK;
@@ -97,6 +98,7 @@ function ChatTurn({ turn, currentStatus }) {
   const isStreaming = turn.status === "streaming" && currentStatus === "streaming";
   const hasAssistantContent =
     ack ||
+    directReply ||
     path ||
     explanation ||
     recommendationAck ||
@@ -123,6 +125,7 @@ function ChatTurn({ turn, currentStatus }) {
             {isStreaming && <em>生成中</em>}
           </div>
 
+          {directReply && <AssistantText>{directReply}</AssistantText>}
           {ack && <AssistantText>{ack}</AssistantText>}
           {path && (
             <ToolCall
@@ -209,6 +212,7 @@ function getRecommendedAgentKey(agent, index) {
 function TypingLine() {
   return (
     <div className="agent-typing" aria-label="智能助手正在思考">
+      <strong>正在思考</strong>
       <span />
       <span />
       <span />

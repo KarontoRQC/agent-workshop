@@ -10,10 +10,11 @@
   "nodes": [
     {
       "id": "root-brief",
-      "label": "行业智能体作战图谱",
+      "label": "业务关系索引",
+      "displayLabel": "业务关系索引",
       "type": "brief",
-      "summary": "先从行业场景进入，再沿痛点、能力、动作逐层展开；60 个智能体作为推荐调用资源挂在语义节点后面。",
-      "insight": "开端节点负责点亮行业积累。真正的作战路径从选中某个行业后开始收束，而不是直接把智能体按功能分类摊开。",
+      "summary": "直接从具体业务关系进入，例如“本地生活-团购转化”；60 个智能体会根据当前关系节点推荐可调用能力。",
+      "insight": "这个索引用于组织数据，不作为前端画布中的总节点展示。",
       "parent": null,
       "children": [
         "industry-baijiu",
@@ -30,8 +31,8 @@
         "industry-highend-service"
       ],
       "agents": [
-        "agent-006",
         "agent-054",
+        "agent-006",
         "agent-030",
         "agent-047",
         "agent-001",
@@ -43,8 +44,9 @@
     {
       "id": "industry-baijiu",
       "label": "白酒行业招商获客",
+      "displayLabel": "白酒行业招商获客",
       "type": "industry",
-      "summary": "围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立行业作战图谱。",
+      "summary": "围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立业务关系路径。",
       "insight": "白酒行业招商获客 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "root-brief",
       "children": [
@@ -69,9 +71,10 @@
     {
       "id": "baijiu-target",
       "label": "目标洞察",
+      "displayLabel": "白酒行业招商获客-目标洞察",
       "type": "problem",
       "summary": "先识别招商对象、代理画像、市场机会和决策理由。",
-      "insight": "目标洞察 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-目标洞察 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "baijiu-market",
@@ -93,9 +96,10 @@
     {
       "id": "baijiu-market",
       "label": "市场分析",
+      "displayLabel": "目标洞察-市场分析",
       "type": "variable",
       "summary": "判断区域市场容量、竞品和进入切口。",
-      "insight": "市场分析 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "目标洞察-市场分析 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-target",
       "children": [],
       "agents": [
@@ -112,9 +116,10 @@
     {
       "id": "baijiu-avatar",
       "label": "客户画像",
+      "displayLabel": "目标洞察-客户画像",
       "type": "variable",
       "summary": "拆出代理商画像、动机和顾虑。",
-      "insight": "客户画像 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "目标洞察-客户画像 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-target",
       "children": [],
       "agents": [
@@ -131,9 +136,10 @@
     {
       "id": "baijiu-demand",
       "label": "需求挖掘",
+      "displayLabel": "目标洞察-需求挖掘",
       "type": "action",
       "summary": "把模糊咨询转成可跟进的真实需求。",
-      "insight": "需求挖掘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "目标洞察-需求挖掘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-target",
       "children": [],
       "agents": [
@@ -143,16 +149,17 @@
         "agent-021",
         "agent-049",
         "agent-008",
-        "agent-007"
+        "agent-002"
       ],
       "count": 0
     },
     {
       "id": "baijiu-decision",
       "label": "决策分析",
+      "displayLabel": "目标洞察-决策分析",
       "type": "variable",
       "summary": "识别谁拍板、谁影响、谁反对。",
-      "insight": "决策分析 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "目标洞察-决策分析 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-target",
       "children": [],
       "agents": [
@@ -161,17 +168,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "baijiu-leads",
       "label": "线索获取",
+      "displayLabel": "白酒行业招商获客-线索获取",
       "type": "problem",
       "summary": "处理线索来源、渠道评估、客户优先级和线索质量。",
-      "insight": "线索获取 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-线索获取 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "lead-source",
@@ -185,17 +193,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 4
     },
     {
       "id": "lead-source",
       "label": "线索来源识别",
+      "displayLabel": "线索获取-线索来源识别",
       "type": "variable",
       "summary": "判断线索来自公域、私域、转介绍还是活动。",
-      "insight": "线索来源识别 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "线索获取-线索来源识别 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-leads",
       "children": [],
       "agents": [
@@ -212,9 +221,10 @@
     {
       "id": "lead-channel",
       "label": "渠道评估",
+      "displayLabel": "线索获取-渠道评估",
       "type": "variable",
       "summary": "比较渠道质量、成本和转化潜力。",
-      "insight": "渠道评估 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "线索获取-渠道评估 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-leads",
       "children": [],
       "agents": [
@@ -223,17 +233,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "lead-clean",
       "label": "线索清洗",
+      "displayLabel": "线索获取-线索清洗",
       "type": "action",
       "summary": "去掉低质、重复和无效线索。",
-      "insight": "线索清洗 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "线索获取-线索清洗 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-leads",
       "children": [],
       "agents": [
@@ -241,18 +252,19 @@
         "agent-008",
         "agent-058",
         "agent-059",
-        "agent-007",
-        "agent-030",
-        "agent-035"
+        "agent-057",
+        "agent-060",
+        "agent-007"
       ],
       "count": 0
     },
     {
       "id": "lead-score",
       "label": "线索评分",
+      "displayLabel": "线索获取-线索评分",
       "type": "variable",
       "summary": "按意向、预算、区域、资源给线索分层。",
-      "insight": "线索评分 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "线索获取-线索评分 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-leads",
       "children": [],
       "agents": [
@@ -261,17 +273,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "baijiu-content",
       "label": "内容触达",
+      "displayLabel": "白酒行业招商获客-内容触达",
       "type": "capability",
       "summary": "用朋友圈、小红书、公众号和短视频承接陌生信任。",
-      "insight": "内容触达 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-内容触达 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "content-moments",
@@ -293,9 +306,10 @@
     {
       "id": "content-moments",
       "label": "朋友圈内容",
+      "displayLabel": "内容触达-朋友圈内容",
       "type": "asset",
       "summary": "生成能维持人设和成交线索的朋友圈。",
-      "insight": "朋友圈内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "内容触达-朋友圈内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-content",
       "children": [],
       "agents": [
@@ -312,9 +326,10 @@
     {
       "id": "content-xhs",
       "label": "小红书种草",
+      "displayLabel": "内容触达-小红书种草",
       "type": "asset",
       "summary": "把行业场景转成小红书种草内容。",
-      "insight": "小红书种草 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "内容触达-小红书种草 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-content",
       "children": [],
       "agents": [
@@ -331,9 +346,10 @@
     {
       "id": "content-article",
       "label": "公众号图文",
+      "displayLabel": "内容触达-公众号图文",
       "type": "asset",
       "summary": "生成招商说明、案例和长图文。",
-      "insight": "公众号图文 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "内容触达-公众号图文 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-content",
       "children": [],
       "agents": [
@@ -350,9 +366,10 @@
     {
       "id": "content-video",
       "label": "短视频口播",
+      "displayLabel": "内容触达-短视频口播",
       "type": "asset",
       "summary": "把卖点变成短视频口播脚本。",
-      "insight": "短视频口播 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "内容触达-短视频口播 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-content",
       "children": [],
       "agents": [
@@ -369,9 +386,10 @@
     {
       "id": "baijiu-follow",
       "label": "销售跟进",
+      "displayLabel": "白酒行业招商获客-销售跟进",
       "type": "capability",
       "summary": "围绕客户阶段生成话术、节奏、异议处理和下一步动作。",
-      "insight": "销售跟进 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-销售跟进 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "follow-script",
@@ -384,18 +402,19 @@
         "agent-008",
         "agent-009",
         "agent-012",
-        "agent-007",
-        "agent-030",
-        "agent-035"
+        "agent-013",
+        "agent-052",
+        "agent-007"
       ],
       "count": 4
     },
     {
       "id": "follow-script",
       "label": "邀约话术",
+      "displayLabel": "销售跟进-邀约话术",
       "type": "action",
       "summary": "生成破冰、邀约和二次触达话术。",
-      "insight": "邀约话术 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "销售跟进-邀约话术 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-follow",
       "children": [],
       "agents": [
@@ -412,9 +431,10 @@
     {
       "id": "follow-strategy",
       "label": "跟进策略",
+      "displayLabel": "销售跟进-跟进策略",
       "type": "action",
       "summary": "给不同意向客户安排跟进节奏。",
-      "insight": "跟进策略 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "销售跟进-跟进策略 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-follow",
       "children": [],
       "agents": [
@@ -423,17 +443,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "follow-objection",
       "label": "异议处理",
+      "displayLabel": "销售跟进-异议处理",
       "type": "action",
       "summary": "把拒绝点翻译成下一步回应。",
-      "insight": "异议处理 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "销售跟进-异议处理 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-follow",
       "children": [],
       "agents": [
@@ -450,9 +471,10 @@
     {
       "id": "follow-deal",
       "label": "成交促单",
+      "displayLabel": "销售跟进-成交促单",
       "type": "action",
       "summary": "生成临门一脚的促单理由和动作。",
-      "insight": "成交促单 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "销售跟进-成交促单 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-follow",
       "children": [],
       "agents": [
@@ -469,9 +491,10 @@
     {
       "id": "baijiu-private",
       "label": "私域沉淀",
+      "displayLabel": "白酒行业招商获客-私域沉淀",
       "type": "capability",
       "summary": "把线索沉淀成可复访、可养熟、可转化的关系资产。",
-      "insight": "私域沉淀 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-私域沉淀 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "private-tag",
@@ -493,9 +516,10 @@
     {
       "id": "private-tag",
       "label": "客户标签",
+      "displayLabel": "私域沉淀-客户标签",
       "type": "variable",
       "summary": "记录客户阶段、兴趣点和资源能力。",
-      "insight": "客户标签 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "私域沉淀-客户标签 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-private",
       "children": [],
       "agents": [
@@ -503,18 +527,19 @@
         "agent-003",
         "agent-004",
         "agent-009",
+        "agent-002",
         "agent-012",
-        "agent-006",
-        "agent-030"
+        "agent-013"
       ],
       "count": 0
     },
     {
       "id": "private-nurture",
       "label": "养熟内容",
+      "displayLabel": "私域沉淀-养熟内容",
       "type": "asset",
       "summary": "按客户状态推送不同内容。",
-      "insight": "养熟内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "私域沉淀-养熟内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-private",
       "children": [],
       "agents": [
@@ -531,18 +556,19 @@
     {
       "id": "private-community",
       "label": "社群承接",
+      "displayLabel": "私域沉淀-社群承接",
       "type": "action",
       "summary": "设计入群、激活和成交承接动作。",
-      "insight": "社群承接 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "私域沉淀-社群承接 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-private",
       "children": [],
       "agents": [
         "agent-009",
         "agent-012",
-        "agent-030",
-        "agent-035",
         "agent-013",
         "agent-052",
+        "agent-030",
+        "agent-035",
         "agent-001"
       ],
       "count": 0
@@ -550,9 +576,10 @@
     {
       "id": "private-rebuy",
       "label": "复购提醒",
+      "displayLabel": "私域沉淀-复购提醒",
       "type": "action",
       "summary": "把一次成交变成长期关系。",
-      "insight": "复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "私域沉淀-复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-private",
       "children": [],
       "agents": [
@@ -560,18 +587,19 @@
         "agent-008",
         "agent-009",
         "agent-012",
-        "agent-007",
-        "agent-030",
-        "agent-035"
+        "agent-013",
+        "agent-052",
+        "agent-007"
       ],
       "count": 0
     },
     {
       "id": "baijiu-review",
       "label": "数据复盘",
+      "displayLabel": "白酒行业招商获客-数据复盘",
       "type": "capability",
       "summary": "把触达、线索、内容和成交过程转成可复盘指标。",
-      "insight": "数据复盘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "白酒行业招商获客-数据复盘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-baijiu",
       "children": [
         "review-metrics",
@@ -585,17 +613,18 @@
         "agent-004",
         "agent-058",
         "agent-059",
-        "agent-006",
-        "agent-030"
+        "agent-002",
+        "agent-057"
       ],
       "count": 4
     },
     {
       "id": "review-metrics",
       "label": "指标看板",
+      "displayLabel": "数据复盘-指标看板",
       "type": "variable",
       "summary": "看线索量、有效率、转化率和成交周期。",
-      "insight": "指标看板 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "数据复盘-指标看板 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-review",
       "children": [],
       "agents": [
@@ -604,36 +633,38 @@
         "agent-004",
         "agent-058",
         "agent-059",
-        "agent-006",
-        "agent-030"
+        "agent-002",
+        "agent-057"
       ],
       "count": 0
     },
     {
       "id": "review-source",
       "label": "来源归因",
+      "displayLabel": "数据复盘-来源归因",
       "type": "variable",
       "summary": "判断哪类渠道和内容最值得继续投。",
-      "insight": "来源归因 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "数据复盘-来源归因 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-review",
       "children": [],
       "agents": [
         "agent-001",
         "agent-003",
         "agent-004",
+        "agent-002",
         "agent-006",
         "agent-030",
-        "agent-035",
-        "agent-002"
+        "agent-035"
       ],
       "count": 0
     },
     {
       "id": "review-dropoff",
       "label": "转化漏斗",
+      "displayLabel": "数据复盘-转化漏斗",
       "type": "variable",
       "summary": "识别客户在哪一步流失。",
-      "insight": "转化漏斗 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "数据复盘-转化漏斗 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-review",
       "children": [],
       "agents": [
@@ -642,17 +673,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "review-next",
       "label": "下一步动作",
+      "displayLabel": "数据复盘-下一步动作",
       "type": "action",
       "summary": "把复盘结果变成下一轮行动。",
-      "insight": "下一步动作 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "数据复盘-下一步动作 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "baijiu-review",
       "children": [],
       "agents": [
@@ -661,14 +693,15 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "industry-catering",
       "label": "餐饮连锁",
+      "displayLabel": "餐饮连锁",
       "type": "industry",
       "summary": "围绕门店选址、加盟转化、外卖增长和复购运营展开。",
       "insight": "餐饮连锁 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -693,9 +726,10 @@
     {
       "id": "catering-location",
       "label": "选址判断",
+      "displayLabel": "餐饮连锁-选址判断",
       "type": "problem",
       "summary": "判断商圈、客流和门店模型是否匹配。",
-      "insight": "选址判断 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "餐饮连锁-选址判断 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-catering",
       "children": [],
       "agents": [
@@ -705,16 +739,17 @@
         "agent-004",
         "agent-032",
         "agent-033",
-        "agent-006"
+        "agent-002"
       ],
       "count": 0
     },
     {
       "id": "catering-franchise",
       "label": "加盟转化",
+      "displayLabel": "餐饮连锁-加盟转化",
       "type": "problem",
       "summary": "把品牌模型、投入回报和案例证据说清楚。",
-      "insight": "加盟转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "餐饮连锁-加盟转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-catering",
       "children": [],
       "agents": [
@@ -731,9 +766,10 @@
     {
       "id": "catering-takeaway",
       "label": "外卖增长",
+      "displayLabel": "餐饮连锁-外卖增长",
       "type": "capability",
       "summary": "拆解平台流量、套餐设计和复购提醒。",
-      "insight": "外卖增长 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "餐饮连锁-外卖增长 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-catering",
       "children": [],
       "agents": [
@@ -750,18 +786,19 @@
     {
       "id": "catering-repeat",
       "label": "会员复购",
+      "displayLabel": "餐饮连锁-会员复购",
       "type": "capability",
       "summary": "把一次到店变成可持续触达的人群。",
-      "insight": "会员复购 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "餐饮连锁-会员复购 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-catering",
       "children": [],
       "agents": [
         "agent-009",
         "agent-012",
-        "agent-030",
-        "agent-035",
         "agent-013",
         "agent-052",
+        "agent-030",
+        "agent-035",
         "agent-001"
       ],
       "count": 0
@@ -769,6 +806,7 @@
     {
       "id": "industry-beauty",
       "label": "美业门店",
+      "displayLabel": "美业门店",
       "type": "industry",
       "summary": "拆解到店转化、项目包装、顾问话术、会员复购和私域养熟。",
       "insight": "美业门店 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -793,9 +831,10 @@
     {
       "id": "beauty-trust",
       "label": "信任建立",
+      "displayLabel": "美业门店-信任建立",
       "type": "problem",
       "summary": "用案例、顾问表达和客户证据降低陌生感。",
-      "insight": "信任建立 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "美业门店-信任建立 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-beauty",
       "children": [],
       "agents": [
@@ -812,9 +851,10 @@
     {
       "id": "beauty-package",
       "label": "项目包装",
+      "displayLabel": "美业门店-项目包装",
       "type": "capability",
       "summary": "把项目价值、适用人群和效果边界讲清楚。",
-      "insight": "项目包装 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "美业门店-项目包装 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-beauty",
       "children": [],
       "agents": [
@@ -831,9 +871,10 @@
     {
       "id": "beauty-consultant",
       "label": "顾问话术",
+      "displayLabel": "美业门店-顾问话术",
       "type": "action",
       "summary": "把咨询过程拆成可执行话术。",
-      "insight": "顾问话术 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "美业门店-顾问话术 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-beauty",
       "children": [],
       "agents": [
@@ -850,9 +891,10 @@
     {
       "id": "beauty-private",
       "label": "私域养熟",
+      "displayLabel": "美业门店-私域养熟",
       "type": "capability",
       "summary": "按客户状态安排内容和跟进。",
-      "insight": "私域养熟 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "美业门店-私域养熟 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-beauty",
       "children": [],
       "agents": [
@@ -869,6 +911,7 @@
     {
       "id": "industry-education",
       "label": "教育培训",
+      "displayLabel": "教育培训",
       "type": "industry",
       "summary": "围绕试听课、家长沟通、转介绍、续费和课程价值证明展开。",
       "insight": "教育培训 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -893,9 +936,10 @@
     {
       "id": "edu-trial",
       "label": "试听转化",
+      "displayLabel": "教育培训-试听转化",
       "type": "problem",
       "summary": "把试听体验转成报名理由。",
-      "insight": "试听转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "教育培训-试听转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-education",
       "children": [],
       "agents": [
@@ -912,9 +956,10 @@
     {
       "id": "edu-parent",
       "label": "家长沟通",
+      "displayLabel": "教育培训-家长沟通",
       "type": "action",
       "summary": "回应家长期待、焦虑和价格顾虑。",
-      "insight": "家长沟通 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "教育培训-家长沟通 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-education",
       "children": [],
       "agents": [
@@ -931,9 +976,10 @@
     {
       "id": "edu-renewal",
       "label": "续费提醒",
+      "displayLabel": "教育培训-续费提醒",
       "type": "action",
       "summary": "根据学习进展生成续费沟通。",
-      "insight": "续费提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "教育培训-续费提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-education",
       "children": [],
       "agents": [
@@ -941,18 +987,19 @@
         "agent-008",
         "agent-009",
         "agent-012",
-        "agent-007",
-        "agent-030",
-        "agent-035"
+        "agent-013",
+        "agent-052",
+        "agent-007"
       ],
       "count": 0
     },
     {
       "id": "edu-proof",
       "label": "结果证明",
+      "displayLabel": "教育培训-结果证明",
       "type": "asset",
       "summary": "沉淀案例、反馈和成果展示。",
-      "insight": "结果证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "教育培训-结果证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-education",
       "children": [],
       "agents": [
@@ -969,6 +1016,7 @@
     {
       "id": "industry-local-life",
       "label": "本地生活",
+      "displayLabel": "本地生活",
       "type": "industry",
       "summary": "处理团购转化、到店核销、评价沉淀、商圈竞争和复购提醒。",
       "insight": "本地生活 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -993,9 +1041,10 @@
     {
       "id": "local-groupbuy",
       "label": "团购转化",
+      "displayLabel": "本地生活-团购转化",
       "type": "problem",
       "summary": "把低价流量转成到店和复购。",
-      "insight": "团购转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "本地生活-团购转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-local-life",
       "children": [],
       "agents": [
@@ -1012,9 +1061,10 @@
     {
       "id": "local-review",
       "label": "评价沉淀",
+      "displayLabel": "本地生活-评价沉淀",
       "type": "asset",
       "summary": "把真实评价变成信任素材。",
-      "insight": "评价沉淀 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "本地生活-评价沉淀 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-local-life",
       "children": [],
       "agents": [
@@ -1031,18 +1081,19 @@
     {
       "id": "local-repeat",
       "label": "复购提醒",
+      "displayLabel": "本地生活-复购提醒",
       "type": "action",
       "summary": "在合适时间提醒二次消费。",
-      "insight": "复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "本地生活-复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-local-life",
       "children": [],
       "agents": [
         "agent-009",
         "agent-012",
-        "agent-030",
-        "agent-035",
         "agent-013",
         "agent-052",
+        "agent-030",
+        "agent-035",
         "agent-001"
       ],
       "count": 0
@@ -1050,9 +1101,10 @@
     {
       "id": "local-competition",
       "label": "商圈竞争",
+      "displayLabel": "本地生活-商圈竞争",
       "type": "variable",
       "summary": "识别周边竞品和差异化切口。",
-      "insight": "商圈竞争 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "本地生活-商圈竞争 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-local-life",
       "children": [],
       "agents": [
@@ -1069,6 +1121,7 @@
     {
       "id": "industry-enterprise",
       "label": "企服获客",
+      "displayLabel": "企服获客",
       "type": "industry",
       "summary": "从线索评分、顾问式销售、方案生成、决策链和交付证明展开。",
       "insight": "企服获客 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1085,17 +1138,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 4
     },
     {
       "id": "b2b-score",
       "label": "线索评分",
+      "displayLabel": "企服获客-线索评分",
       "type": "problem",
       "summary": "识别客户预算、场景和优先级。",
-      "insight": "线索评分 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "企服获客-线索评分 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-enterprise",
       "children": [],
       "agents": [
@@ -1104,17 +1158,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "b2b-solution",
       "label": "方案生成",
+      "displayLabel": "企服获客-方案生成",
       "type": "asset",
       "summary": "把需求转成客户能看懂的方案。",
-      "insight": "方案生成 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "企服获客-方案生成 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-enterprise",
       "children": [],
       "agents": [
@@ -1131,9 +1186,10 @@
     {
       "id": "b2b-decision",
       "label": "决策链识别",
+      "displayLabel": "企服获客-决策链识别",
       "type": "variable",
       "summary": "识别使用者、影响者和拍板者。",
-      "insight": "决策链识别 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "企服获客-决策链识别 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-enterprise",
       "children": [],
       "agents": [
@@ -1142,17 +1198,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "b2b-delivery",
       "label": "交付证明",
+      "displayLabel": "企服获客-交付证明",
       "type": "asset",
       "summary": "用案例和数据证明可交付。",
-      "insight": "交付证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "企服获客-交付证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-enterprise",
       "children": [],
       "agents": [
@@ -1169,6 +1226,7 @@
     {
       "id": "industry-tourism",
       "label": "文旅招商",
+      "displayLabel": "文旅招商",
       "type": "industry",
       "summary": "把目的地内容、渠道合作、活动招商和游客转化串成路径。",
       "insight": "文旅招商 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1193,9 +1251,10 @@
     {
       "id": "tour-content",
       "label": "目的地内容",
+      "displayLabel": "文旅招商-目的地内容",
       "type": "asset",
       "summary": "把资源、故事和体验转成内容资产。",
-      "insight": "目的地内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "文旅招商-目的地内容 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-tourism",
       "children": [],
       "agents": [
@@ -1212,9 +1271,10 @@
     {
       "id": "tour-channel",
       "label": "渠道合作",
+      "displayLabel": "文旅招商-渠道合作",
       "type": "action",
       "summary": "匹配旅行社、达人和异业渠道。",
-      "insight": "渠道合作 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "文旅招商-渠道合作 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-tourism",
       "children": [],
       "agents": [
@@ -1223,17 +1283,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "tour-event",
       "label": "活动招商",
+      "displayLabel": "文旅招商-活动招商",
       "type": "action",
       "summary": "围绕活动设计招商话术和权益。",
-      "insight": "活动招商 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "文旅招商-活动招商 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-tourism",
       "children": [],
       "agents": [
@@ -1250,9 +1311,10 @@
     {
       "id": "tour-conversion",
       "label": "游客转化",
+      "displayLabel": "文旅招商-游客转化",
       "type": "problem",
       "summary": "把流量转成咨询、到访和复购。",
-      "insight": "游客转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "文旅招商-游客转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-tourism",
       "children": [],
       "agents": [
@@ -1261,14 +1323,15 @@
         "agent-008",
         "agent-009",
         "agent-012",
-        "agent-007",
-        "agent-030"
+        "agent-013",
+        "agent-052"
       ],
       "count": 0
     },
     {
       "id": "industry-medical-beauty",
       "label": "医美私域",
+      "displayLabel": "医美私域",
       "type": "industry",
       "summary": "围绕项目认知、咨询转化、案例证明、复诊提醒和合规边界展开。",
       "insight": "医美私域 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1293,9 +1356,10 @@
     {
       "id": "med-project",
       "label": "项目认知",
+      "displayLabel": "医美私域-项目认知",
       "type": "asset",
       "summary": "把复杂项目讲得清楚、克制、合规。",
-      "insight": "项目认知 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "医美私域-项目认知 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-medical-beauty",
       "children": [],
       "agents": [
@@ -1312,9 +1376,10 @@
     {
       "id": "med-consult",
       "label": "咨询转化",
+      "displayLabel": "医美私域-咨询转化",
       "type": "action",
       "summary": "从咨询问题进入顾虑处理。",
-      "insight": "咨询转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "医美私域-咨询转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-medical-beauty",
       "children": [],
       "agents": [
@@ -1331,9 +1396,10 @@
     {
       "id": "med-case",
       "label": "案例证明",
+      "displayLabel": "医美私域-案例证明",
       "type": "asset",
       "summary": "用案例降低决策风险。",
-      "insight": "案例证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "医美私域-案例证明 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-medical-beauty",
       "children": [],
       "agents": [
@@ -1350,9 +1416,10 @@
     {
       "id": "med-compliance",
       "label": "合规边界",
+      "displayLabel": "医美私域-合规边界",
       "type": "variable",
       "summary": "避免夸大承诺和不合规表达。",
-      "insight": "合规边界 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "医美私域-合规边界 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-medical-beauty",
       "children": [],
       "agents": [
@@ -1362,13 +1429,14 @@
         "agent-004",
         "agent-032",
         "agent-033",
-        "agent-006"
+        "agent-002"
       ],
       "count": 0
     },
     {
       "id": "industry-realestate",
       "label": "房产渠道",
+      "displayLabel": "房产渠道",
       "type": "industry",
       "summary": "拆解渠道经纪、客户画像、案场邀约、异议处理和成交复盘。",
       "insight": "房产渠道 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1385,17 +1453,18 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 4
     },
     {
       "id": "real-agent",
       "label": "渠道经纪",
+      "displayLabel": "房产渠道-渠道经纪",
       "type": "variable",
       "summary": "判断经纪人资源和合作价值。",
-      "insight": "渠道经纪 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "房产渠道-渠道经纪 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-realestate",
       "children": [],
       "agents": [
@@ -1412,9 +1481,10 @@
     {
       "id": "real-invite",
       "label": "案场邀约",
+      "displayLabel": "房产渠道-案场邀约",
       "type": "action",
       "summary": "生成邀约理由和到访动作。",
-      "insight": "案场邀约 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "房产渠道-案场邀约 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-realestate",
       "children": [],
       "agents": [
@@ -1431,9 +1501,10 @@
     {
       "id": "real-objection",
       "label": "异议处理",
+      "displayLabel": "房产渠道-异议处理",
       "type": "action",
       "summary": "处理预算、位置、时机和信任问题。",
-      "insight": "异议处理 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "房产渠道-异议处理 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-realestate",
       "children": [],
       "agents": [
@@ -1450,9 +1521,10 @@
     {
       "id": "real-review",
       "label": "成交复盘",
+      "displayLabel": "房产渠道-成交复盘",
       "type": "capability",
       "summary": "复盘客户阶段和下一步跟进。",
-      "insight": "成交复盘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "房产渠道-成交复盘 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-realestate",
       "children": [],
       "agents": [
@@ -1461,14 +1533,15 @@
         "agent-004",
         "agent-005",
         "agent-008",
-        "agent-006",
-        "agent-007"
+        "agent-002",
+        "agent-006"
       ],
       "count": 0
     },
     {
       "id": "industry-agriculture",
       "label": "农特产招商",
+      "displayLabel": "农特产招商",
       "type": "industry",
       "summary": "围绕产地故事、渠道分销、品鉴转化、达人内容和复购展开。",
       "insight": "农特产招商 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1493,9 +1566,10 @@
     {
       "id": "agri-origin",
       "label": "产地故事",
+      "displayLabel": "农特产招商-产地故事",
       "type": "asset",
       "summary": "把产地、品控和信任来源讲清楚。",
-      "insight": "产地故事 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "农特产招商-产地故事 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-agriculture",
       "children": [],
       "agents": [
@@ -1512,9 +1586,10 @@
     {
       "id": "agri-channel",
       "label": "分销渠道",
+      "displayLabel": "农特产招商-分销渠道",
       "type": "action",
       "summary": "匹配渠道和分销话术。",
-      "insight": "分销渠道 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "农特产招商-分销渠道 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-agriculture",
       "children": [],
       "agents": [
@@ -1531,9 +1606,10 @@
     {
       "id": "agri-sample",
       "label": "品鉴转化",
+      "displayLabel": "农特产招商-品鉴转化",
       "type": "action",
       "summary": "把试吃试饮转成购买理由。",
-      "insight": "品鉴转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "农特产招商-品鉴转化 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-agriculture",
       "children": [],
       "agents": [
@@ -1550,18 +1626,19 @@
     {
       "id": "agri-repeat",
       "label": "复购提醒",
+      "displayLabel": "农特产招商-复购提醒",
       "type": "action",
       "summary": "设计复购节奏和提醒内容。",
-      "insight": "复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "农特产招商-复购提醒 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-agriculture",
       "children": [],
       "agents": [
         "agent-009",
         "agent-012",
-        "agent-030",
-        "agent-035",
         "agent-013",
         "agent-052",
+        "agent-030",
+        "agent-035",
         "agent-001"
       ],
       "count": 0
@@ -1569,6 +1646,7 @@
     {
       "id": "industry-franchise",
       "label": "品牌加盟",
+      "displayLabel": "品牌加盟",
       "type": "industry",
       "summary": "围绕招商页、咨询承接、加盟证据、门店模型和跟进节奏展开。",
       "insight": "品牌加盟 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1593,9 +1671,10 @@
     {
       "id": "franchise-page",
       "label": "招商页面",
+      "displayLabel": "品牌加盟-招商页面",
       "type": "asset",
       "summary": "把加盟优势、投入模型和案例呈现出来。",
-      "insight": "招商页面 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "品牌加盟-招商页面 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-franchise",
       "children": [],
       "agents": [
@@ -1612,9 +1691,10 @@
     {
       "id": "franchise-proof",
       "label": "加盟证据",
+      "displayLabel": "品牌加盟-加盟证据",
       "type": "asset",
       "summary": "沉淀门店案例和收益证据。",
-      "insight": "加盟证据 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "品牌加盟-加盟证据 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-franchise",
       "children": [],
       "agents": [
@@ -1631,9 +1711,10 @@
     {
       "id": "franchise-model",
       "label": "门店模型",
+      "displayLabel": "品牌加盟-门店模型",
       "type": "variable",
       "summary": "解释面积、人员、成本和回本逻辑。",
-      "insight": "门店模型 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "品牌加盟-门店模型 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-franchise",
       "children": [],
       "agents": [
@@ -1643,16 +1724,17 @@
         "agent-004",
         "agent-032",
         "agent-033",
-        "agent-006"
+        "agent-002"
       ],
       "count": 0
     },
     {
       "id": "franchise-follow",
       "label": "跟进节奏",
+      "displayLabel": "品牌加盟-跟进节奏",
       "type": "action",
       "summary": "安排从咨询到签约的触达节奏。",
-      "insight": "跟进节奏 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "品牌加盟-跟进节奏 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-franchise",
       "children": [],
       "agents": [
@@ -1669,6 +1751,7 @@
     {
       "id": "industry-highend-service",
       "label": "高端服务",
+      "displayLabel": "高端服务",
       "type": "industry",
       "summary": "处理客资筛选、私密沟通、顾问信任、服务证明和长期关系。",
       "insight": "高端服务 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
@@ -1685,17 +1768,18 @@
         "agent-033",
         "agent-009",
         "agent-012",
-        "agent-035",
-        "agent-013"
+        "agent-013",
+        "agent-031"
       ],
       "count": 4
     },
     {
       "id": "high-filter",
       "label": "客资筛选",
+      "displayLabel": "高端服务-客资筛选",
       "type": "variable",
       "summary": "判断客户真实需求和匹配度。",
-      "insight": "客资筛选 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "高端服务-客资筛选 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-highend-service",
       "children": [],
       "agents": [
@@ -1704,17 +1788,18 @@
         "agent-008",
         "agent-032",
         "agent-033",
-        "agent-007",
-        "agent-035"
+        "agent-031",
+        "agent-054"
       ],
       "count": 0
     },
     {
       "id": "high-private",
       "label": "私密沟通",
+      "displayLabel": "高端服务-私密沟通",
       "type": "action",
       "summary": "设计克制、高质量的私密沟通。",
-      "insight": "私密沟通 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "高端服务-私密沟通 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-highend-service",
       "children": [],
       "agents": [
@@ -1722,18 +1807,19 @@
         "agent-008",
         "agent-009",
         "agent-012",
-        "agent-007",
-        "agent-030",
-        "agent-035"
+        "agent-013",
+        "agent-052",
+        "agent-007"
       ],
       "count": 0
     },
     {
       "id": "high-trust",
       "label": "顾问信任",
+      "displayLabel": "高端服务-顾问信任",
       "type": "problem",
       "summary": "建立专业感和长期信任。",
-      "insight": "顾问信任 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "高端服务-顾问信任 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-highend-service",
       "children": [],
       "agents": [
@@ -1750,18 +1836,19 @@
     {
       "id": "high-relation",
       "label": "长期关系",
+      "displayLabel": "高端服务-长期关系",
       "type": "capability",
       "summary": "把服务过程沉淀成持续关系。",
-      "insight": "长期关系 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
+      "insight": "高端服务-长期关系 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。",
       "parent": "industry-highend-service",
       "children": [],
       "agents": [
         "agent-009",
         "agent-012",
-        "agent-030",
-        "agent-035",
         "agent-013",
         "agent-052",
+        "agent-030",
+        "agent-035",
         "agent-001"
       ],
       "count": 0
@@ -1773,7 +1860,7 @@
       "source": "root-brief",
       "target": "industry-baijiu",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "白酒行业招商获客",
       "sortOrder": 1
     },
     {
@@ -1781,7 +1868,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-target",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "白酒行业招商获客-目标洞察",
       "sortOrder": 1
     },
     {
@@ -1789,7 +1876,7 @@
       "source": "baijiu-target",
       "target": "baijiu-market",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "目标洞察-市场分析",
       "sortOrder": 1
     },
     {
@@ -1797,7 +1884,7 @@
       "source": "baijiu-target",
       "target": "baijiu-avatar",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "目标洞察-客户画像",
       "sortOrder": 2
     },
     {
@@ -1805,7 +1892,7 @@
       "source": "baijiu-target",
       "target": "baijiu-demand",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "目标洞察-需求挖掘",
       "sortOrder": 3
     },
     {
@@ -1813,7 +1900,7 @@
       "source": "baijiu-target",
       "target": "baijiu-decision",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "目标洞察-决策分析",
       "sortOrder": 4
     },
     {
@@ -1821,7 +1908,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-leads",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "白酒行业招商获客-线索获取",
       "sortOrder": 2
     },
     {
@@ -1829,7 +1916,7 @@
       "source": "baijiu-leads",
       "target": "lead-source",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "线索获取-线索来源识别",
       "sortOrder": 1
     },
     {
@@ -1837,7 +1924,7 @@
       "source": "baijiu-leads",
       "target": "lead-channel",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "线索获取-渠道评估",
       "sortOrder": 2
     },
     {
@@ -1845,7 +1932,7 @@
       "source": "baijiu-leads",
       "target": "lead-clean",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "线索获取-线索清洗",
       "sortOrder": 3
     },
     {
@@ -1853,7 +1940,7 @@
       "source": "baijiu-leads",
       "target": "lead-score",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "线索获取-线索评分",
       "sortOrder": 4
     },
     {
@@ -1861,7 +1948,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-content",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "白酒行业招商获客-内容触达",
       "sortOrder": 3
     },
     {
@@ -1869,7 +1956,7 @@
       "source": "baijiu-content",
       "target": "content-moments",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "内容触达-朋友圈内容",
       "sortOrder": 1
     },
     {
@@ -1877,7 +1964,7 @@
       "source": "baijiu-content",
       "target": "content-xhs",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "内容触达-小红书种草",
       "sortOrder": 2
     },
     {
@@ -1885,7 +1972,7 @@
       "source": "baijiu-content",
       "target": "content-article",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "内容触达-公众号图文",
       "sortOrder": 3
     },
     {
@@ -1893,7 +1980,7 @@
       "source": "baijiu-content",
       "target": "content-video",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "内容触达-短视频口播",
       "sortOrder": 4
     },
     {
@@ -1901,7 +1988,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-follow",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "白酒行业招商获客-销售跟进",
       "sortOrder": 4
     },
     {
@@ -1909,7 +1996,7 @@
       "source": "baijiu-follow",
       "target": "follow-script",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "销售跟进-邀约话术",
       "sortOrder": 1
     },
     {
@@ -1917,7 +2004,7 @@
       "source": "baijiu-follow",
       "target": "follow-strategy",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "销售跟进-跟进策略",
       "sortOrder": 2
     },
     {
@@ -1925,7 +2012,7 @@
       "source": "baijiu-follow",
       "target": "follow-objection",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "销售跟进-异议处理",
       "sortOrder": 3
     },
     {
@@ -1933,7 +2020,7 @@
       "source": "baijiu-follow",
       "target": "follow-deal",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "销售跟进-成交促单",
       "sortOrder": 4
     },
     {
@@ -1941,7 +2028,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-private",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "白酒行业招商获客-私域沉淀",
       "sortOrder": 5
     },
     {
@@ -1949,7 +2036,7 @@
       "source": "baijiu-private",
       "target": "private-tag",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "私域沉淀-客户标签",
       "sortOrder": 1
     },
     {
@@ -1957,7 +2044,7 @@
       "source": "baijiu-private",
       "target": "private-nurture",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "私域沉淀-养熟内容",
       "sortOrder": 2
     },
     {
@@ -1965,7 +2052,7 @@
       "source": "baijiu-private",
       "target": "private-community",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "私域沉淀-社群承接",
       "sortOrder": 3
     },
     {
@@ -1973,7 +2060,7 @@
       "source": "baijiu-private",
       "target": "private-rebuy",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "私域沉淀-复购提醒",
       "sortOrder": 4
     },
     {
@@ -1981,7 +2068,7 @@
       "source": "industry-baijiu",
       "target": "baijiu-review",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "白酒行业招商获客-数据复盘",
       "sortOrder": 6
     },
     {
@@ -1989,7 +2076,7 @@
       "source": "baijiu-review",
       "target": "review-metrics",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "数据复盘-指标看板",
       "sortOrder": 1
     },
     {
@@ -1997,7 +2084,7 @@
       "source": "baijiu-review",
       "target": "review-source",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "数据复盘-来源归因",
       "sortOrder": 2
     },
     {
@@ -2005,7 +2092,7 @@
       "source": "baijiu-review",
       "target": "review-dropoff",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "数据复盘-转化漏斗",
       "sortOrder": 3
     },
     {
@@ -2013,7 +2100,7 @@
       "source": "baijiu-review",
       "target": "review-next",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "数据复盘-下一步动作",
       "sortOrder": 4
     },
     {
@@ -2021,7 +2108,7 @@
       "source": "root-brief",
       "target": "industry-catering",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "餐饮连锁",
       "sortOrder": 2
     },
     {
@@ -2029,7 +2116,7 @@
       "source": "industry-catering",
       "target": "catering-location",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "餐饮连锁-选址判断",
       "sortOrder": 1
     },
     {
@@ -2037,7 +2124,7 @@
       "source": "industry-catering",
       "target": "catering-franchise",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "餐饮连锁-加盟转化",
       "sortOrder": 2
     },
     {
@@ -2045,7 +2132,7 @@
       "source": "industry-catering",
       "target": "catering-takeaway",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "餐饮连锁-外卖增长",
       "sortOrder": 3
     },
     {
@@ -2053,7 +2140,7 @@
       "source": "industry-catering",
       "target": "catering-repeat",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "餐饮连锁-会员复购",
       "sortOrder": 4
     },
     {
@@ -2061,7 +2148,7 @@
       "source": "root-brief",
       "target": "industry-beauty",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "美业门店",
       "sortOrder": 3
     },
     {
@@ -2069,7 +2156,7 @@
       "source": "industry-beauty",
       "target": "beauty-trust",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "美业门店-信任建立",
       "sortOrder": 1
     },
     {
@@ -2077,7 +2164,7 @@
       "source": "industry-beauty",
       "target": "beauty-package",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "美业门店-项目包装",
       "sortOrder": 2
     },
     {
@@ -2085,7 +2172,7 @@
       "source": "industry-beauty",
       "target": "beauty-consultant",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "美业门店-顾问话术",
       "sortOrder": 3
     },
     {
@@ -2093,7 +2180,7 @@
       "source": "industry-beauty",
       "target": "beauty-private",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "美业门店-私域养熟",
       "sortOrder": 4
     },
     {
@@ -2101,7 +2188,7 @@
       "source": "root-brief",
       "target": "industry-education",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "教育培训",
       "sortOrder": 4
     },
     {
@@ -2109,7 +2196,7 @@
       "source": "industry-education",
       "target": "edu-trial",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "教育培训-试听转化",
       "sortOrder": 1
     },
     {
@@ -2117,7 +2204,7 @@
       "source": "industry-education",
       "target": "edu-parent",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "教育培训-家长沟通",
       "sortOrder": 2
     },
     {
@@ -2125,7 +2212,7 @@
       "source": "industry-education",
       "target": "edu-renewal",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "教育培训-续费提醒",
       "sortOrder": 3
     },
     {
@@ -2133,7 +2220,7 @@
       "source": "industry-education",
       "target": "edu-proof",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "教育培训-结果证明",
       "sortOrder": 4
     },
     {
@@ -2141,7 +2228,7 @@
       "source": "root-brief",
       "target": "industry-local-life",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "本地生活",
       "sortOrder": 5
     },
     {
@@ -2149,7 +2236,7 @@
       "source": "industry-local-life",
       "target": "local-groupbuy",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "本地生活-团购转化",
       "sortOrder": 1
     },
     {
@@ -2157,7 +2244,7 @@
       "source": "industry-local-life",
       "target": "local-review",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "本地生活-评价沉淀",
       "sortOrder": 2
     },
     {
@@ -2165,7 +2252,7 @@
       "source": "industry-local-life",
       "target": "local-repeat",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "本地生活-复购提醒",
       "sortOrder": 3
     },
     {
@@ -2173,7 +2260,7 @@
       "source": "industry-local-life",
       "target": "local-competition",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "本地生活-商圈竞争",
       "sortOrder": 4
     },
     {
@@ -2181,7 +2268,7 @@
       "source": "root-brief",
       "target": "industry-enterprise",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "企服获客",
       "sortOrder": 6
     },
     {
@@ -2189,7 +2276,7 @@
       "source": "industry-enterprise",
       "target": "b2b-score",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "企服获客-线索评分",
       "sortOrder": 1
     },
     {
@@ -2197,7 +2284,7 @@
       "source": "industry-enterprise",
       "target": "b2b-solution",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "企服获客-方案生成",
       "sortOrder": 2
     },
     {
@@ -2205,7 +2292,7 @@
       "source": "industry-enterprise",
       "target": "b2b-decision",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "企服获客-决策链识别",
       "sortOrder": 3
     },
     {
@@ -2213,7 +2300,7 @@
       "source": "industry-enterprise",
       "target": "b2b-delivery",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "企服获客-交付证明",
       "sortOrder": 4
     },
     {
@@ -2221,7 +2308,7 @@
       "source": "root-brief",
       "target": "industry-tourism",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "文旅招商",
       "sortOrder": 7
     },
     {
@@ -2229,7 +2316,7 @@
       "source": "industry-tourism",
       "target": "tour-content",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "文旅招商-目的地内容",
       "sortOrder": 1
     },
     {
@@ -2237,7 +2324,7 @@
       "source": "industry-tourism",
       "target": "tour-channel",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "文旅招商-渠道合作",
       "sortOrder": 2
     },
     {
@@ -2245,7 +2332,7 @@
       "source": "industry-tourism",
       "target": "tour-event",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "文旅招商-活动招商",
       "sortOrder": 3
     },
     {
@@ -2253,7 +2340,7 @@
       "source": "industry-tourism",
       "target": "tour-conversion",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "文旅招商-游客转化",
       "sortOrder": 4
     },
     {
@@ -2261,7 +2348,7 @@
       "source": "root-brief",
       "target": "industry-medical-beauty",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "医美私域",
       "sortOrder": 8
     },
     {
@@ -2269,7 +2356,7 @@
       "source": "industry-medical-beauty",
       "target": "med-project",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "医美私域-项目认知",
       "sortOrder": 1
     },
     {
@@ -2277,7 +2364,7 @@
       "source": "industry-medical-beauty",
       "target": "med-consult",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "医美私域-咨询转化",
       "sortOrder": 2
     },
     {
@@ -2285,7 +2372,7 @@
       "source": "industry-medical-beauty",
       "target": "med-case",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "医美私域-案例证明",
       "sortOrder": 3
     },
     {
@@ -2293,7 +2380,7 @@
       "source": "industry-medical-beauty",
       "target": "med-compliance",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "医美私域-合规边界",
       "sortOrder": 4
     },
     {
@@ -2301,7 +2388,7 @@
       "source": "root-brief",
       "target": "industry-realestate",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "房产渠道",
       "sortOrder": 9
     },
     {
@@ -2309,7 +2396,7 @@
       "source": "industry-realestate",
       "target": "real-agent",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "房产渠道-渠道经纪",
       "sortOrder": 1
     },
     {
@@ -2317,7 +2404,7 @@
       "source": "industry-realestate",
       "target": "real-invite",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "房产渠道-案场邀约",
       "sortOrder": 2
     },
     {
@@ -2325,7 +2412,7 @@
       "source": "industry-realestate",
       "target": "real-objection",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "房产渠道-异议处理",
       "sortOrder": 3
     },
     {
@@ -2333,7 +2420,7 @@
       "source": "industry-realestate",
       "target": "real-review",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "房产渠道-成交复盘",
       "sortOrder": 4
     },
     {
@@ -2341,7 +2428,7 @@
       "source": "root-brief",
       "target": "industry-agriculture",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "农特产招商",
       "sortOrder": 10
     },
     {
@@ -2349,7 +2436,7 @@
       "source": "industry-agriculture",
       "target": "agri-origin",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "农特产招商-产地故事",
       "sortOrder": 1
     },
     {
@@ -2357,7 +2444,7 @@
       "source": "industry-agriculture",
       "target": "agri-channel",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "农特产招商-分销渠道",
       "sortOrder": 2
     },
     {
@@ -2365,7 +2452,7 @@
       "source": "industry-agriculture",
       "target": "agri-sample",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "农特产招商-品鉴转化",
       "sortOrder": 3
     },
     {
@@ -2373,7 +2460,7 @@
       "source": "industry-agriculture",
       "target": "agri-repeat",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "农特产招商-复购提醒",
       "sortOrder": 4
     },
     {
@@ -2381,7 +2468,7 @@
       "source": "root-brief",
       "target": "industry-franchise",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "品牌加盟",
       "sortOrder": 11
     },
     {
@@ -2389,7 +2476,7 @@
       "source": "industry-franchise",
       "target": "franchise-page",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "品牌加盟-招商页面",
       "sortOrder": 1
     },
     {
@@ -2397,7 +2484,7 @@
       "source": "industry-franchise",
       "target": "franchise-proof",
       "relationType": "decomposes_to_asset",
-      "relationLabel": "素材资产",
+      "relationLabel": "品牌加盟-加盟证据",
       "sortOrder": 2
     },
     {
@@ -2405,7 +2492,7 @@
       "source": "industry-franchise",
       "target": "franchise-model",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "品牌加盟-门店模型",
       "sortOrder": 3
     },
     {
@@ -2413,7 +2500,7 @@
       "source": "industry-franchise",
       "target": "franchise-follow",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "品牌加盟-跟进节奏",
       "sortOrder": 4
     },
     {
@@ -2421,7 +2508,7 @@
       "source": "root-brief",
       "target": "industry-highend-service",
       "relationType": "starts_from_industry",
-      "relationLabel": "行业场景",
+      "relationLabel": "高端服务",
       "sortOrder": 12
     },
     {
@@ -2429,7 +2516,7 @@
       "source": "industry-highend-service",
       "target": "high-filter",
       "relationType": "decomposes_to_variable",
-      "relationLabel": "变量拆解",
+      "relationLabel": "高端服务-客资筛选",
       "sortOrder": 1
     },
     {
@@ -2437,7 +2524,7 @@
       "source": "industry-highend-service",
       "target": "high-private",
       "relationType": "decomposes_to_action",
-      "relationLabel": "动作拆解",
+      "relationLabel": "高端服务-私密沟通",
       "sortOrder": 2
     },
     {
@@ -2445,7 +2532,7 @@
       "source": "industry-highend-service",
       "target": "high-trust",
       "relationType": "decomposes_to_problem",
-      "relationLabel": "痛点拆解",
+      "relationLabel": "高端服务-顾问信任",
       "sortOrder": 3
     },
     {
@@ -2453,7 +2540,7 @@
       "source": "industry-highend-service",
       "target": "high-relation",
       "relationType": "maps_to_capability",
-      "relationLabel": "能力映射",
+      "relationLabel": "高端服务-长期关系",
       "sortOrder": 4
     }
   ],
@@ -2476,13 +2563,13 @@
       "agentKey": "agent-002",
       "name": "第一性原理挖掘",
       "role": "第一性原理挖掘 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e08b81d68c81919b4a114fd312484e-di-yi-xing-yuan-li-wa-jue-zhi-neng-ti",
+      "score": 86,
       "functionLabel": "管理",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-003",
@@ -2603,13 +2690,13 @@
       "agentKey": "agent-011",
       "name": "爆款公众号文章改写专家",
       "role": "爆款公众号文章改写专家 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e08c73eed481918cf4a33ba054ef1d-bao-kuan-gong-zhong-hao-wen-zhang-gai-xie-zhuan-jia",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-012",
@@ -2629,13 +2716,13 @@
       "agentKey": "agent-013",
       "name": "朋友圈智能体指令集",
       "role": "朋友圈智能体指令集 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e08a1c81bc8191afa5337c8b50b438-peng-you-quan-zhi-neng-ti",
+      "score": 86,
       "functionLabel": "私域",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-014",
@@ -2748,13 +2835,13 @@
       "agentKey": "agent-022",
       "name": "数字曹老师",
       "role": "数字曹老师 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0860f1d8c8191b0d64cfdd05e4bf5-shu-zi-ren-cao-lao-shi-zhi-neng-ti",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-023",
@@ -2787,39 +2874,39 @@
       "agentKey": "agent-025",
       "name": "数字朱佳航",
       "role": "数字朱佳航 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0855655cc8191b08f5139f90a0bbf-shu-zi-zhu-jia-hang",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-026",
       "agentKey": "agent-026",
       "name": "暴力拆解文案公式智能体提示词",
       "role": "暴力拆解文案公式智能体提示词 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e084a00034819194b3cfaaa9f9e26c-bao-li-chai-jie-wen-an-gong-shi-zhi-neng-ji-qi-ren",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-027",
       "agentKey": "agent-027",
       "name": "通过聊天输出口播文案大纲",
       "role": "通过聊天输出口播文案大纲 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0832e210881919035bc74919c410e-liao-tian-dui-hua-shu-chu-wei-kou-bo-wen-an-da-gang-zhi-neng-ti",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-028",
@@ -2869,13 +2956,13 @@
       "agentKey": "agent-031",
       "name": "造课大师3.0",
       "role": "造课大师3.0 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0a2b66ae881918a913dd42bbefd66-zao-ke-da-shi-3-0",
+      "score": 86,
       "functionLabel": "专家",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-032",
@@ -2962,13 +3049,13 @@
       "agentKey": "agent-038",
       "name": "访谈大师2.0",
       "role": "访谈大师2.0 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e090f1592081918ca55a0aa25a81b8-fang-tan-da-shi-2-0",
+      "score": 86,
       "functionLabel": "IP",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-039",
@@ -3144,78 +3231,78 @@
       "agentKey": "agent-052",
       "name": "视频评论区运营策略",
       "role": "视频评论区运营策略 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e08d5b9e8c819189c870dabd26b8a4-shi-pin-ping-lun-qu-yun-ying-ce-lue-zhu-shou",
+      "score": 86,
       "functionLabel": "私域",
       "typeLabel": "直用提示词",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-053",
       "agentKey": "agent-053",
       "name": "口语化风格优化指南",
       "role": "口语化风格优化指南 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e09293dedc8191a138042dc3e130b5-kou-yu-hua-feng-ge-you-hua-zhi-nan-zhu-shou",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "直用提示词",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-054",
       "agentKey": "agent-054",
       "name": "信息流营销策略专家智能体",
       "role": "信息流营销策略专家智能体 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0916f54a881919087e943788a236e-xin-xi-liu-ying-xiao-ce-lue-zhuan-jia-zhi-neng-ti",
+      "score": 86,
       "functionLabel": "专家",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-055",
       "agentKey": "agent-055",
       "name": "分镜头脚本提示词",
       "role": "分镜头脚本提示词 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0930a62f881919c7ac30f4d9c99fb-fen-jing-tou-jiao-ben-zhu-shou",
+      "score": 86,
       "functionLabel": "文案",
       "typeLabel": "直用提示词",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-056",
       "agentKey": "agent-056",
       "name": "知识萃取大师",
       "role": "知识萃取大师 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e095caf6ac8191aff434234dfc89a6-zhi-shi-cui-qu-da-shi",
+      "score": 86,
       "functionLabel": "专家",
       "typeLabel": "直用提示词",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-057",
       "agentKey": "agent-057",
       "name": "会议总结提示词",
       "role": "会议总结提示词 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0962e7e808191b785a2dbb2fe9fe8-hui-yi-zong-jie-zhu-shou",
+      "score": 86,
       "functionLabel": "功能类",
       "typeLabel": "直用提示词",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     },
     {
       "id": "agent-058",
@@ -3248,13 +3335,13 @@
       "agentKey": "agent-060",
       "name": "AI 提示优化专家",
       "role": "AI 提示优化专家 是当前智能体库中的可调用能力。",
-      "provider": "local",
-      "endpoint": "/api/agent-gateway/chat",
-      "score": 80,
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/g-69e0a076224c81918f4126f81bd0f034-ai-ti-shi-you-hua-zhuan-jia",
+      "score": 86,
       "functionLabel": "功能类",
       "typeLabel": "智能体",
       "knowledge": [],
-      "status": "draft"
+      "status": "linked"
     }
   ]
 }

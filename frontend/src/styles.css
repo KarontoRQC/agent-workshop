@@ -729,9 +729,16 @@ button {
 .agent-typing {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   width: fit-content;
   padding: 8px 0 2px;
+}
+
+.agent-typing strong {
+  color: rgba(235, 227, 209, 0.74);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .agent-typing span {

@@ -15,10 +15,17 @@ RECOMMENDER_TAGS = {
 
 
 class TaggedContentParser:
-    def __init__(self, section_tags=None, section_emitters=None, section_stream_emitters=None):
+    def __init__(
+        self,
+        section_tags=None,
+        section_emitters=None,
+        section_stream_emitters=None,
+        untagged_type=None,
+    ):
         self.section_tags = section_tags or ROUTE_PLANNER_TAGS
         self.section_emitters = section_emitters or {}
         self.section_stream_emitters = section_stream_emitters or {}
+        self.untagged_type = untagged_type
         self.buffer = ""
         self.current_type = None
         self.current_buffer = None
@@ -38,10 +45,13 @@ class TaggedContentParser:
                 match = self._find_next_opening_tag()
 
                 if match is None:
-                    self._keep_possible_opening_tag(final)
+                    yield from self._keep_possible_opening_tag(final)
                     return
 
                 tag_index, section_type, open_tag = match
+                if tag_index > 0:
+                    yield from self._untagged_delta(self.buffer[:tag_index])
+
                 self.buffer = self.buffer[tag_index + len(open_tag) :]
                 self.current_type = section_type
                 self.current_buffer = "" if section_type in self.section_emitters else None
@@ -84,6 +94,10 @@ class TaggedContentParser:
         return min(matches, default=None, key=lambda match: match[0])
 
     def _keep_possible_opening_tag(self, final):
+        if self.untagged_type:
+            yield from self._emit_untagged_or_keep_possible_tag(final)
+            return
+
         if final:
             self.buffer = ""
             return
@@ -91,6 +105,32 @@ class TaggedContentParser:
         opening_tags = [open_tag for open_tag, _ in self.section_tags.values()]
         keep_length = _longest_suffix_that_starts_tag(self.buffer, opening_tags)
         self.buffer = self.buffer[-keep_length:] if keep_length else ""
+
+    def _emit_untagged_or_keep_possible_tag(self, final):
+        if final:
+            content = self.buffer.rstrip()
+            self.buffer = ""
+            yield from self._untagged_delta(content)
+            return
+
+        opening_tags = [open_tag for open_tag, _ in self.section_tags.values()]
+        keep_length = _longest_suffix_that_starts_tag(self.buffer, opening_tags)
+        content = self.buffer[:-keep_length] if keep_length else self.buffer
+        self.buffer = self.buffer[-keep_length:] if keep_length else ""
+        yield from self._untagged_delta(content)
+
+    def _untagged_delta(self, content):
+        if not self.untagged_type or not content or not content.strip():
+            return
+
+        yield content_event(
+            "content.delta",
+            {
+                "type": self.untagged_type,
+                "content_type": "text",
+                "content": content,
+            },
+        )
 
     def _content_delta(self, content):
         if self.at_section_start:
@@ -135,11 +175,18 @@ class TaggedContentParser:
         self.at_section_start = False
 
 
-def iter_tagged_events(upstream, section_tags=None, section_emitters=None, section_stream_emitters=None):
+def iter_tagged_events(
+    upstream,
+    section_tags=None,
+    section_emitters=None,
+    section_stream_emitters=None,
+    untagged_type=None,
+):
     parser = TaggedContentParser(
         section_tags=section_tags,
         section_emitters=section_emitters,
         section_stream_emitters=section_stream_emitters,
+        untagged_type=untagged_type,
     )
 
     for event_name, data in iter_sse_frames(upstream):
