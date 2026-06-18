@@ -148,11 +148,7 @@ function ChatTurn({ turn, currentStatus }) {
 }
 
 function AssistantText({ children }) {
-  return (
-    <p className="agent-assistant-text">
-      {children}
-    </p>
-  );
+  return <p className="agent-assistant-text">{children}</p>;
 }
 
 function ToolCall({ icon, label, value, active }) {
@@ -182,7 +178,7 @@ function AgentRecommendationCall({ agents, active }) {
       </div>
       <div className="agent-recommendation-list">
         {agents.map((agent, index) => (
-          <article className="agent-recommendation-item" key={`${agent.rank || index}-${agent.agent_name}`}>
+          <article className="agent-recommendation-item" key={`${agent.rank || index}-${agent.agent_name || agent.name}`}>
             <span>{agent.rank || index + 1}</span>
             <div>
               <strong>{agent.agent_name || agent.name || "未命名智能体"}</strong>

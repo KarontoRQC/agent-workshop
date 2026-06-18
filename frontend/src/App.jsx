@@ -9,6 +9,8 @@ import {
   askRoutingAgent,
   getAgentPackage,
   graphModel,
+  hasChildren,
+  libraryStats,
   ROOT_ID,
 } from "./agentAdapter.js";
 import { AgentDock } from "./components/AgentDock.jsx";
@@ -48,7 +50,7 @@ function TopBar({ mode, setMode }) {
       <nav className="top-pills" aria-label="系统状态">
         <span>
           <Network size={15} />
-          66 智能体库
+          {libraryStats.agentCount} 智能体库
         </span>
         <span>
           <PlugsConnected size={15} />
@@ -104,7 +106,7 @@ export function App() {
 
   function focusNode(id) {
     setSelectedId(id);
-    if (graphModel[id]) {
+    if (graphModel[id] && hasChildren(id)) {
       setFocusId(id);
       setMode(id === ROOT_ID ? "atlas" : "path");
     }

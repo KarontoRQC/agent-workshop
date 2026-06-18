@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, GitBranch, Graph } from "@phosphor-icons/react";
-import { getNode, graphModel } from "../agentAdapter.js";
+import { getNode, hasChildren, libraryStats } from "../agentAdapter.js";
 import { buildGraphLayout, makeAmbientField, makeAmbientLinks } from "../graphLayout.js";
+
+function focusModeLabel(node) {
+  if (node.type === "brief") return "行业开端 / 场景积累";
+  if (node.type === "industry") return "行业节点 / 痛点展开";
+  if (node.type === "problem") return "痛点节点 / 变量拆解";
+  if (node.type === "capability") return "能力节点 / 动作拆解";
+  if (node.type === "action" || node.type === "asset" || node.type === "variable") {
+    return "叶子节点 / 路径选中";
+  }
+  return "语义节点 / 关系聚焦";
+}
 
 export function KnowledgeGraph({
   focusId,
@@ -15,7 +26,7 @@ export function KnowledgeGraph({
   const mountRef = useRef(null);
   const engineRef = useRef(null);
   const [hoveredId, setHoveredId] = useState(null);
-  const ambientNodes = useMemo(() => makeAmbientField(1180), []);
+  const ambientNodes = useMemo(() => makeAmbientField(980), []);
   const ambientLinks = useMemo(() => makeAmbientLinks(ambientNodes), [ambientNodes]);
   const layout = useMemo(() => buildGraphLayout({ focusId, depth, mode }), [focusId, depth, mode]);
   const focus = getNode(focusId);
@@ -27,32 +38,34 @@ export function KnowledgeGraph({
     const mount = mountRef.current;
     if (!mount) return undefined;
 
-    import("../pixiGraphEngine.js").then(({ createPixiGraphEngine }) =>
-      createPixiGraphEngine(mount, {
-        onHover: setHoveredId,
-        onNodeClick(node) {
-          onSelect(node.id);
-          if (graphModel[node.id]) onFocus(node.id);
-        },
-      }),
-    ).then((engine) => {
-      if (cancelled) {
-        engine.destroy();
-        return;
-      }
-      engineRef.current = engine;
-      engine.update({
-        ambientNodes,
-        ambientLinks,
-        layout,
-        focusId,
-        selectedId,
-        hoveredId,
-        showLabels,
-        mode,
-        transitionKey,
+    import("../pixiGraphEngine.js")
+      .then(({ createPixiGraphEngine }) =>
+        createPixiGraphEngine(mount, {
+          onHover: setHoveredId,
+          onNodeClick(node) {
+            onSelect(node.id);
+            if (hasChildren(node.id)) onFocus(node.id);
+          },
+        }),
+      )
+      .then((engine) => {
+        if (cancelled) {
+          engine.destroy();
+          return;
+        }
+        engineRef.current = engine;
+        engine.update({
+          ambientNodes,
+          ambientLinks,
+          layout,
+          focusId,
+          selectedId,
+          hoveredId,
+          showLabels,
+          mode,
+          transitionKey,
+        });
       });
-    });
 
     return () => {
       cancelled = true;
@@ -82,9 +95,9 @@ export function KnowledgeGraph({
   }, []);
 
   return (
-    <section className={`graph-panel graph-mode-${mode}`} aria-label="智能体知识图谱">
+    <section className={`graph-panel graph-mode-${mode}`} aria-label="行业智能体知识图谱">
       <div className="graph-summary">
-        <span>{focusId === "root-brief" ? "开端 / 行业积累" : "行业聚焦 / 逐圈展开"}</span>
+        <span>{focusModeLabel(focus)}</span>
         <strong>{focus.label}</strong>
         <p>{focus.summary}</p>
       </div>
@@ -93,11 +106,11 @@ export function KnowledgeGraph({
         <div className="graph-status">
           <span>
             <Graph size={15} />
-            1180+ nodes
+            {libraryStats.agentCount} agents
           </span>
           <span>
             <GitBranch size={15} />
-            local depth {depth}
+            depth {depth}
           </span>
           <span>
             <Crosshair size={15} />

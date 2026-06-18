@@ -1,22 +1,29 @@
-import { BracketsCurly, PlugsConnected, SealCheck } from "@phosphor-icons/react";
+import { ArrowSquareOut, BracketsCurly, PlugsConnected, SealCheck } from "@phosphor-icons/react";
 import { buildJumpPayload, getAgentPackage, getNode, invokeAgentJump } from "../agentAdapter.js";
 
 export function RecommendationRail({ focusId, selectedId, onToast }) {
-  const focus = getNode(selectedId || focusId);
-  const agents = getAgentPackage(focus.id);
-  const payload = buildJumpPayload(focus.id, "inspector");
+  const focus = getNode(focusId);
+  const selected = getNode(selectedId || focusId);
+  const contextNode = selected || focus;
+  const agents = getAgentPackage(contextNode.id);
+  const payload = buildJumpPayload(contextNode.id, "inspector");
+  const isLeafSelection = contextNode.id !== focus.id;
 
   function handleJump(agent) {
-    const result = invokeAgentJump(agent, focus.id);
+    const result = invokeAgentJump(agent, contextNode.id);
     onToast(result.message);
   }
 
   return (
-    <aside className="recommendation-rail" aria-label="推荐智能体">
+    <aside className="recommendation-rail" aria-label="推荐智能体组合">
       <div className="rail-heading">
         <span className="mono">inspector</span>
-        <h2>推荐作战包</h2>
-        <p>当前焦点：{focus.label}</p>
+        <h2>推荐智能体组合</h2>
+        <p>
+          {isLeafSelection
+            ? `当前选中：${contextNode.label} / 焦点：${focus.label}`
+            : `当前焦点：${focus.label}`}
+        </p>
       </div>
 
       <div className="confidence-block">
@@ -32,7 +39,7 @@ export function RecommendationRail({ focusId, selectedId, onToast }) {
             <span className="agent-dot" />
             <span className="agent-copy">
               <strong>{agent.name}</strong>
-              <small>{agent.role}</small>
+              <small>{agent.functionLabel} / {agent.typeLabel}</small>
             </span>
             <span className="score">{agent.score}</span>
           </button>
@@ -42,14 +49,19 @@ export function RecommendationRail({ focusId, selectedId, onToast }) {
       <div className="api-panel">
         <div>
           <BracketsCurly size={18} />
-          <strong>API Layer Mock</strong>
+          <strong>Graph Context</strong>
         </div>
         <pre>{JSON.stringify(payload.recommendedAgents.slice(0, 3), null, 2)}</pre>
       </div>
 
-      <button type="button" className="rail-action" onClick={() => onToast("接口调用方案已生成，等待接入 Flask。")}>
+      <button
+        type="button"
+        className="rail-action"
+        onClick={() => onToast("调用方案已生成：前端传 agentKey 和 graphContext，后端再决定走 Coze / GPTs / 本地代理。")}
+      >
         <PlugsConnected size={18} weight="fill" />
         生成调用方案
+        <ArrowSquareOut size={15} />
       </button>
     </aside>
   );

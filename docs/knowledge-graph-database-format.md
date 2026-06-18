@@ -1,161 +1,119 @@
-# Knowledge Graph Database Format
+# Knowledge Graph Data Format
 
 这份格式给后端和 Agent 使用，只存业务语义，不存前端显示样式。
 
-不要把这些字段写进数据库：
+不要把这些视觉字段写进数据库：`x`、`y`、`radius`、`color`、`fan`、`ring`、`opacity`、`labelMode`、`kind`。它们属于前端布局渲染层，由 `src/graphLayout.js` 动态计算。
 
-- `x`
-- `y`
-- `radius`
-- `color`
-- `fan`
-- `ring`
-- `opacity`
-- `labelMode`
-- `kind`
+## 当前数据流
 
-这些都属于前端布局渲染层，由 `graphLayout.js` 动态计算。
+- 原始智能体全集：`data/source_agents_full.json`
+- 编译脚本：`scripts/build-agent-graph-pack.mjs`
+- 前端运行图谱包：`data/agent_graph_pack.json`
+- 前端适配层：`src/agentAdapter.js`
 
-## Tables
+这版没有把数据塞进 vault。原因是智能体 JSON 已经有稳定字段，直接编译成图谱包更轻。vault 以后可以作为导出镜像，而不是运行时数据库。
+
+## Graph Pack
+
+`agent_graph_pack.json` 的顶层结构：
+
+```json
+{
+  "rootId": "root-brief",
+  "stats": {},
+  "nodes": [],
+  "edges": [],
+  "agents": []
+}
+```
 
 ### nodes
 
-存所有业务节点。行业、痛点、能力、变量、小任务都在这张表里。
+节点只描述语义和层级：
 
 ```json
 {
-  "id": "problem-leads",
-  "title": "线索获取",
-  "node_type": "problem",
-  "parent_id": "industry-baijiu",
-  "level": 2,
-  "summary": "从线索来源、客户画像、首轮触达和招商理由四个方向拆解。",
-  "insight": "线索问题不能只问流量，要问谁值得跟、为什么现在跟、下一句说什么。",
-  "status": "active",
-  "is_leaf": false,
-  "sort_order": 1
+  "id": "function-copywriting-agent",
+  "label": "文案 / 智能体",
+  "type": "bucket",
+  "summary": "20 个智能体归入「文案」能力区。",
+  "parent": "function-copywriting",
+  "children": ["agent-010", "agent-011"],
+  "agents": ["agent-010", "agent-011"],
+  "count": 20
 }
 ```
 
-字段说明：
+当前节点类型：
 
-- `id`: 稳定节点 ID，前端、后端、Agent 都用这个做引用。
-- `title`: 节点显示名，也是 Agent 可读名称。
-- `node_type`: 节点类型。当前有 `brief`、`industry`、`problem`、`capability`、`问题`、`动作`、`素材`、`数据`、`变量` 等。
-- `parent_id`: 默认父节点。根节点为 `null`。
-- `level`: 从根节点开始的层级。根节点是 `0`。
-- `summary`: 给用户看的短摘要。
-- `insight`: 给 Agent 的判断提示，通常比 `summary` 更适合写进提示词。
-- `status`: 是否启用。
-- `is_leaf`: 是否末端节点。
-- `sort_order`: 在同级节点中的排序。
+- `brief`：总入口。
+- `function`：功能母节点，例如文案、IP、管理。
+- `bucket`：功能 + 类型的中间层，例如文案 / 智能体。
+- `agent`：叶子智能体，只选中，不再作为母节点放大。
 
 ### edges
 
-存节点之间的关系。
+边只描述关系，不描述曲线样式：
 
 ```json
 {
-  "id": "industry-baijiu->problem-leads",
-  "source_node_id": "industry-baijiu",
-  "target_node_id": "problem-leads",
-  "relation_type": "decomposes_to_business_node",
-  "relation_label": "行业拆解",
-  "sort_order": 1
+  "id": "function-copywriting->function-copywriting-agent",
+  "source": "function-copywriting",
+  "target": "function-copywriting-agent",
+  "relation": "groups_type",
+  "weight": 20
 }
 ```
-
-字段说明：
-
-- `source_node_id`: 起点。
-- `target_node_id`: 终点。
-- `relation_type`: 机器可读关系类型。
-- `relation_label`: 人能看懂的关系名称。
-- `sort_order`: 同一父节点下关系排序。
 
 ### agents
 
-存可调用智能体定义。这里不要放 Coze 的 `bot_id` 明文，前端只传 `agent_key`，后端做映射。
+智能体调用信息单独存，后面接 Coze 时建议前端只传 `agentKey`，后端再映射真实 `bot_id` 或密钥。
 
 ```json
 {
-  "id": "agent-lead-mining",
-  "agent_key": "lead_mining",
-  "name": "线索挖掘智能体",
-  "role": "判断线索来源和客户优先级",
-  "provider": "coze",
-  "endpoint": "/api/agent-gateway/chat",
-  "score": 92,
-  "status": "active"
+  "id": "agent-010",
+  "agentKey": "agent-010",
+  "name": "公众号生成器",
+  "functionLabel": "文案",
+  "typeLabel": "智能体",
+  "provider": "chatgpt-gpt",
+  "endpoint": "https://chatgpt.com/g/...",
+  "knowledgeBase": "",
+  "description": "",
+  "score": 91
 }
 ```
 
-### node_agents
+## Agent Context
 
-存节点和智能体的推荐关系。
-
-```json
-{
-  "id": "problem-leads:agent-lead-mining",
-  "node_id": "problem-leads",
-  "agent_id": "agent-lead-mining",
-  "priority": 1,
-  "relation_type": "recommended_agent"
-}
-```
-
-## Agent Context Shape
-
-给 Coze 或后端 Agent 时，建议不要把整张图一次塞进去，而是按当前焦点节点组一个小上下文：
+给 Coze 或后端 Agent 时，不要一次塞整张图。建议按当前选中节点生成小上下文：
 
 ```json
 {
-  "focus_node": {
-    "id": "problem-leads",
-    "title": "线索获取",
-    "node_type": "problem",
-    "summary": "从线索来源、客户画像、首轮触达和招商理由四个方向拆解。",
-    "insight": "线索问题不能只问流量，要问谁值得跟、为什么现在跟、下一句说什么。"
-  },
-  "parent_node": {
-    "id": "industry-baijiu",
-    "title": "白酒行业"
-  },
-  "children": [
-    { "id": "lead-source", "title": "线索来源", "node_type": "问题" },
-    { "id": "dealer-avatar", "title": "代理画像", "node_type": "人群" },
-    { "id": "invite-script", "title": "邀约话术", "node_type": "动作" }
+  "focusId": "function-copywriting-agent",
+  "focusLabel": "文案 / 智能体",
+  "focusType": "bucket",
+  "path": [
+    { "id": "root-brief", "label": "智能体合集", "type": "brief" },
+    { "id": "function-copywriting", "label": "文案", "type": "function" },
+    { "id": "function-copywriting-agent", "label": "文案 / 智能体", "type": "bucket" }
   ],
-  "recommended_agents": [
+  "recommendedAgents": [
     {
-      "agent_key": "lead_mining",
-      "name": "线索挖掘智能体",
-      "role": "判断线索来源和客户优先级"
+      "name": "公众号生成器",
+      "agentKey": "agent-010",
+      "provider": "chatgpt-gpt",
+      "endpoint": "https://chatgpt.com/g/..."
     }
   ]
 }
 ```
 
-## Prompt Guidance
+## 后端建议
 
-Agent 调教时重点读：
+Flask 可以先只暴露两个接口：
 
-- 当前节点的 `title`
-- 当前节点的 `node_type`
-- 当前节点的 `summary`
-- 当前节点的 `insight`
-- 父节点 `parent_node`
-- 子节点列表 `children`
-- 推荐智能体列表 `recommended_agents`
+- `GET /api/graph-pack`：返回 `agent_graph_pack.json`。
+- `POST /api/agent-gateway/chat`：接收 `agentKey + graphContext + message`，后端决定走 Coze、GPTs 链接还是本地代理。
 
-不要让 Agent 关心前端星图怎么画。Agent 只需要理解：
-
-1. 当前业务语义是什么。
-2. 当前节点在整张图里的位置是什么。
-3. 下一层可以继续问什么、拆什么、调用什么智能体。
-
-## Files
-
-- Seed JSON: `data/knowledge_graph_seed.json`
-- SQL schema: `data/knowledge_graph_schema.sql`
-- Export script: `scripts/export-knowledge-graph-db.mjs`
+这样前端改视觉和动画时，不会影响智能体跳转逻辑。

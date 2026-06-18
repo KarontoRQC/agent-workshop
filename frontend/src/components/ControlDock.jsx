@@ -10,7 +10,7 @@ import { makeAmbientField } from "../graphLayout.js";
 const minimapNodes = makeAmbientField(72);
 
 const modes = [
-  { id: "atlas", label: "全域星图", desc: "先展示规模感" },
+  { id: "atlas", label: "全域星图", desc: "先展示行业规模感" },
   { id: "path", label: "路径聚焦", desc: "高亮当前语义链" },
   { id: "step", label: "逐层推进", desc: "适合现场讲解" },
 ];
@@ -24,7 +24,7 @@ export function ControlDock({ mode, setMode, depth, setDepth, showLabels, setSho
           视角
         </h3>
         <div className="icon-buttons">
-          <button type="button" onClick={onReset} aria-label="回到母节点">
+          <button type="button" onClick={onReset} aria-label="回到开端节点">
             <ArrowsOutSimple size={18} />
           </button>
           <button type="button" aria-label="路径聚焦" onClick={() => setMode("path")}>

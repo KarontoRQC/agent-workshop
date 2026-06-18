@@ -81,7 +81,7 @@ button {
     "bottom bottom";
   width: 100vw;
   height: 100vh;
-  min-height: 800px;
+  min-height: 720px;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 245, 210, 0.035), transparent 26%),
@@ -219,13 +219,163 @@ button {
 .agent-dock {
   position: absolute;
   left: 22px;
-  bottom: 116px;
+  bottom: 138px;
   z-index: 12;
   display: grid;
-  grid-template-rows: auto minmax(156px, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 9px;
+  width: 236px;
+  padding: 12px;
+  background: rgba(17, 17, 15, 0.78);
+  border: 1px solid rgba(215, 169, 54, 0.22);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.dock-title,
+.rail-heading .mono {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.dock-title,
+.agent-input div,
+.rail-action,
+.api-panel > div,
+.control-cluster h3,
+.graph-toolbar,
+.confidence-block {
+  display: flex;
+  align-items: center;
+}
+
+.dock-title {
+  justify-content: space-between;
+  height: 28px;
+}
+
+.dock-title span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(235, 227, 209, 0.78);
+}
+
+.dock-title em {
+  position: relative;
+  color: rgba(124, 199, 128, 0.92);
+  font-size: 11px;
+  font-style: normal;
+  padding-left: 12px;
+}
+
+.dock-title em::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #72c979;
+  box-shadow: 0 0 10px rgba(114, 201, 121, 0.65);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.agent-orb {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.agent-orb > svg {
+  display: grid;
+  place-items: center;
+  color: var(--amber);
+}
+
+.agent-orb strong,
+.agent-orb span {
+  display: block;
+}
+
+.agent-orb strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.agent-orb span {
+  margin-top: 3px;
+  color: rgba(124, 199, 128, 0.88);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.agent-input {
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(235, 227, 209, 0.08);
+  padding-top: 9px;
+}
+
+.agent-input textarea {
+  width: 100%;
+  color: var(--text);
+  outline: none;
+}
+
+.agent-input textarea {
+  min-height: 34px;
+  height: 34px;
+  resize: none;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  background: rgba(10, 10, 9, 0.58);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+.agent-input textarea:focus {
+  border-color: rgba(215, 169, 54, 0.56);
+}
+
+.agent-input div {
+  justify-content: center;
+}
+
+.agent-input div span {
+  display: none;
+}
+
+.agent-input button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #15110a;
+  border: 0;
+  background: var(--amber);
+}
+
+.agent-dock {
+  position: absolute;
+  left: 22px;
+  bottom: 138px;
+  z-index: 12;
+  display: grid;
+  grid-template-rows: auto minmax(96px, 1fr) auto;
   gap: 0;
-  width: min(390px, calc(100vw - 44px));
-  max-height: min(650px, calc(100vh - 152px));
+  width: min(360px, calc(100vw - 44px));
+  max-height: min(470px, calc(100vh - 174px));
+  padding: 0;
   border: 1px solid rgba(235, 227, 209, 0.13);
   border-radius: 8px;
   background:
@@ -236,20 +386,6 @@ button {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(22px);
   overflow: hidden;
-}
-
-.rail-heading .mono {
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.rail-action,
-.api-panel > div,
-.control-cluster h3,
-.graph-toolbar,
-.confidence-block {
-  display: flex;
-  align-items: center;
 }
 
 .agent-header {
@@ -354,7 +490,7 @@ button {
   display: grid;
   justify-items: center;
   align-content: center;
-  min-height: 168px;
+  min-height: 116px;
   gap: 10px;
   color: rgba(235, 227, 209, 0.54);
   text-align: center;
@@ -675,7 +811,7 @@ button {
   0%,
   80%,
   100% {
-    opacity: 0.32;
+    opacity: 0.3;
     transform: translateY(0);
   }
 
@@ -1076,7 +1212,7 @@ button {
   font-size: 13px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1100px) {
   body {
     overflow: auto;
   }
