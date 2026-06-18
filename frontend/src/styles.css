@@ -848,10 +848,10 @@ button {
 
 .graph-summary {
   position: absolute;
-  left: 22px;
+  left: clamp(300px, 30vw, 410px);
   top: 18px;
   z-index: 4;
-  width: min(360px, calc(100% - 48px));
+  width: min(360px, calc(100% - 430px));
   pointer-events: none;
 }
 
@@ -884,7 +884,7 @@ button {
 .graph-toolbar {
   position: absolute;
   top: 14px;
-  left: 18px;
+  left: clamp(300px, 30vw, 410px);
   right: 18px;
   z-index: 4;
   justify-content: flex-end;
@@ -1526,6 +1526,15 @@ button {
   .agent-dock {
     left: 16px;
     bottom: 134px;
+  }
+
+  .graph-summary,
+  .graph-toolbar {
+    left: 18px;
+  }
+
+  .graph-summary {
+    width: min(360px, calc(100% - 48px));
   }
 
   .control-dock {

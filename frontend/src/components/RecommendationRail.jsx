@@ -7,7 +7,7 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
   const focus = getNode(focusId);
   const selected = getNode(selectedId || focusId);
   const contextNode = selected || focus;
-  const isLeafSelection = contextNode.id !== focus.id;
+  const isLeafSelection = Boolean(focus && contextNode && contextNode.id !== focus.id);
   const agents = recommendedAgents.map(enrichRecommendedAgent);
   const hasAgents = agents.length > 0;
   const launchTargets = getAgentLaunchTargets(agents);
@@ -37,7 +37,7 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
         <p>
           {isLeafSelection
             ? `当前选中：${contextNode.label} / 焦点：${focus.label}`
-            : `当前焦点：${focus.label}`}
+            : `当前焦点：${focus?.label || "行业智能体作战图谱"}`}
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
       <div className="rail-package">
         <button type="button" className="rail-action" onClick={handlePackageAgents} disabled={!launchTargets.length}>
           <Package size={16} weight="bold" />
-          <span>{launchTargets.length ? "打包智能体" : "暂无可跳转智能体"}</span>
+          <span>{launchTargets.length ? "一键打开智能体" : "暂无可跳转智能体"}</span>
           {launchTargets.length > 0 && <em>{launchTargets.length}</em>}
         </button>
       </div>
@@ -112,13 +112,14 @@ function FlipAgentCard({ agent, index }) {
 
 function enrichRecommendedAgent(agent) {
   const name = agent.agent_name || agent.name || "智能体生成中";
-  const catalogAgent = findCatalogAgent(name);
-  const endpoint = agent.endpoint || catalogAgent?.endpoint || "";
+  const agentKey = agent.agent_key || agent.agentKey || agent.id;
+  const catalogAgent = findCatalogAgent(name, agentKey);
+  const endpoint = agent.endpoint || agent.url || agent.link || agent.jump_url || catalogAgent?.endpoint || "";
   const metaLabel = catalogAgent
     ? `${catalogAgent.functionLabel} / ${catalogAgent.typeLabel}`
     : agent.stage || "推荐生成中";
   const stageLabel = agent.stage || catalogAgent?.functionLabel || "推荐";
-  const scoreLabel = catalogAgent?.score || (agent.streamStatus === "completed" ? "完成" : "生成中");
+  const scoreLabel = catalogAgent?.score || agent.score || (agent.streamStatus === "completed" ? "完成" : "生成中");
   const fallbackReason = catalogAgent?.role || "等待智能体补全推荐理由。";
   const launchTarget = getAgentLaunchTarget(endpoint);
 
@@ -126,6 +127,7 @@ function enrichRecommendedAgent(agent) {
     ...agent,
     name,
     endpoint,
+    canOpen: Boolean(launchTarget?.href),
     metaLabel,
     stageLabel,
     scoreLabel,
@@ -136,8 +138,8 @@ function enrichRecommendedAgent(agent) {
   };
 }
 
-function findCatalogAgent(name) {
-  const direct = catalogAgents.find((item) => item.name === name);
+function findCatalogAgent(name, agentKey) {
+  const direct = catalogAgents.find((item) => item.name === name || item.id === agentKey || item.agentKey === agentKey);
 
   if (direct) return direct;
 
@@ -170,7 +172,7 @@ function getAgentLaunchTargets(agents) {
 function getAgentLaunchTarget(endpoint) {
   const href = String(endpoint || "").trim();
 
-  if (!href) return null;
+  if (!/^https?:\/\//i.test(href)) return null;
 
   return {
     href,

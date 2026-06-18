@@ -242,9 +242,11 @@ function applyLayoutTransition(params, fromNodes, startedAt) {
 }
 
 function layoutScene(scene, bounds, params) {
-  const base = Math.min(bounds.width / VIEWBOX.width, bounds.height / VIEWBOX.height);
+  const leftReserve = bounds.width >= 840 ? Math.min(260, Math.max(140, bounds.width * 0.18)) : 0;
+  const usableWidth = Math.max(420, bounds.width - leftReserve * 0.66);
+  const base = Math.min(usableWidth / VIEWBOX.width, bounds.height / VIEWBOX.height);
   const scale = base * 1.02;
-  const offsetX = (bounds.width - VIEWBOX.width * scale) / 2;
+  const offsetX = (bounds.width - VIEWBOX.width * scale) / 2 + leftReserve * 0.55;
   const offsetY = (bounds.height - VIEWBOX.height * scale) / 2 + 8;
   scene.position.set(offsetX, offsetY);
   scene.scale.set(scale);
