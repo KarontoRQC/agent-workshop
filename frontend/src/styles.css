@@ -371,17 +371,21 @@ button {
 
 .agent-dock {
   position: absolute;
-  left: 22px;
-  bottom: 138px;
+  left: 0;
+  top: 58px;
+  bottom: 122px;
   z-index: 12;
   display: grid;
   grid-template-rows: auto minmax(96px, 1fr) auto;
   gap: 0;
-  width: min(360px, calc(100vw - 44px));
-  max-height: min(470px, calc(100vh - 174px));
+  width: min(360px, calc(100vw - 35px));
+  height: auto;
+  max-height: none;
   padding: 0;
   border: 1px solid rgba(235, 227, 209, 0.13);
-  border-radius: 8px;
+  border-left: 0;
+  border-top: 0;
+  border-radius: 0 8px 8px 0;
   background:
     linear-gradient(180deg, rgba(26, 26, 24, 0.96), rgba(13, 13, 12, 0.94)),
     rgba(15, 15, 14, 0.94);
@@ -394,8 +398,8 @@ button {
 
 .app-mode-path .agent-dock,
 .app-mode-step .agent-dock {
-  width: min(340px, calc(100vw - 44px));
-  max-height: min(420px, calc(100vh - 174px));
+  width: min(360px, calc(100vw - 35px));
+  max-height: none;
 }
 
 .agent-header {
@@ -1524,13 +1528,14 @@ button {
   }
 
   .agent-dock {
-    left: 16px;
-    bottom: 134px;
+    left: 0;
+    top: 62px;
+    bottom: 122px;
   }
 
   .graph-summary,
   .graph-toolbar {
-    left: 18px;
+    left: min(384px, calc(100vw - 64px));
   }
 
   .graph-summary {
@@ -1558,10 +1563,12 @@ button {
 
   .agent-dock {
     position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
-    width: auto;
+    left: 0;
+    right: auto;
+    top: 62px;
+    bottom: 122px;
+    width: min(360px, calc(100vw - 35px));
+    max-height: none;
   }
 
   .graph-panel {
