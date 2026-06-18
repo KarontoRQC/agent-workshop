@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import {
   ChatCircleText,
   GitBranch,
@@ -134,9 +134,17 @@ function ChatTurn({ turn, currentStatus }) {
           )}
           {explanation && <AssistantText>{explanation}</AssistantText>}
           {recommendationAck && <AssistantText>{recommendationAck}</AssistantText>}
-          {recommendedAgents.length > 0 && (
-            <AgentRecommendationCall agents={recommendedAgents} active={isStreaming && !summary} />
-          )}
+          {recommendedAgents.map((agent, index) => {
+            const agentKey = getRecommendedAgentKey(agent, index);
+            const active = isStreaming && agent.streamStatus !== "completed";
+
+            return (
+              <Fragment key={agentKey}>
+                <AgentRecommendationCard agent={agent} index={index} active={active} />
+                {agent.reason ? <AssistantText>{agent.reason}</AssistantText> : active && <TypingLine />}
+              </Fragment>
+            );
+          })}
           {summary && <AssistantText>{summary}</AssistantText>}
           {isStreaming && !hasAssistantContent && <TypingLine />}
 
@@ -166,30 +174,36 @@ function ToolCall({ icon, label, value, active }) {
   );
 }
 
-function AgentRecommendationCall({ agents, active }) {
+function AgentRecommendationCard({ agent, index, active }) {
+  const rank = agent.rank || index + 1;
+  const name = agent.agent_name || agent.name || "智能体生成中";
+
   return (
-    <div className={`agent-tool-call agent-recommendation-call ${active ? "is-running" : ""}`}>
+    <div className={`agent-tool-call agent-recommendation-card ${active ? "is-running" : ""}`}>
       <div className="agent-tool-call-head">
         <span>
           <Sparkle size={13} weight="bold" />
-          推荐智能体
+          推荐智能体 {String(rank).padStart(2, "0")}
         </span>
         <em>{active ? "运行中" : "完成"}</em>
       </div>
-      <div className="agent-recommendation-list">
-        {agents.map((agent, index) => (
-          <article className="agent-recommendation-item" key={`${agent.rank || index}-${agent.agent_name || agent.name}`}>
-            <span>{agent.rank || index + 1}</span>
-            <div>
-              <strong>{agent.agent_name || agent.name || "未命名智能体"}</strong>
-              {agent.stage && <em>{agent.stage}</em>}
-              {agent.reason && <p>{agent.reason}</p>}
-            </div>
-          </article>
-        ))}
-      </div>
+      <article className="agent-recommendation-item">
+        <span>{rank}</span>
+        <div>
+          <strong>{name}</strong>
+          {agent.stage && <em>{agent.stage}</em>}
+        </div>
+      </article>
     </div>
   );
+}
+
+function getRecommendedAgentKey(agent, index) {
+  if (agent.agent_index !== undefined && agent.agent_index !== null) {
+    return `agent-index-${agent.agent_index}`;
+  }
+
+  return `${agent.rank || index}-${agent.agent_name || agent.name || "pending"}`;
 }
 
 function TypingLine() {

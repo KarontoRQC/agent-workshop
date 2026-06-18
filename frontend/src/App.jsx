@@ -19,6 +19,8 @@ import { KnowledgeGraph } from "./components/KnowledgeGraph.jsx";
 import { RecommendationRail } from "./components/RecommendationRail.jsx";
 import { streamCozeChat } from "./cozeChatClient.js";
 
+const GRAPH_PATH_STEP_MS = 980;
+
 function createEmptyAgentWorkflow() {
   return {
     knowledgeGraph: {
@@ -85,7 +87,6 @@ export function App() {
   const [mode, setMode] = useState("atlas");
   const [showLabels, setShowLabels] = useState(false);
   const [draft, setDraft] = useState("");
-  const [toast, setToast] = useState("");
   const [agentStream, setAgentStream] = useState({
     status: "idle",
     lastMessage: "",
@@ -94,15 +95,19 @@ export function App() {
   });
   const [agentTurns, setAgentTurns] = useState([]);
   const agentRequestRef = useRef(null);
+  const graphPathAnimationRef = useRef({
+    queue: [],
+    seen: new Set(),
+    timer: null,
+    playing: false,
+  });
+  const hasRecommendedAgents = agentStream.workflow.agentRecommendation.agents.length > 0;
 
   useEffect(() => {
-    if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(""), 2600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
-    return () => agentRequestRef.current?.abort();
+    return () => {
+      agentRequestRef.current?.abort();
+      clearGraphPathAnimation();
+    };
   }, []);
 
   function focusNode(id) {
@@ -127,7 +132,59 @@ export function App() {
     setMode(nodeId === ROOT_ID ? "atlas" : "path");
   }
 
+  function clearGraphPathAnimation() {
+    const animation = graphPathAnimationRef.current;
+
+    if (animation.timer) {
+      window.clearTimeout(animation.timer);
+    }
+
+    animation.queue = [];
+    animation.seen = new Set();
+    animation.timer = null;
+    animation.playing = false;
+  }
+
+  function enqueueGraphPathNode(node) {
+    const nodeId = node?.id;
+
+    if (!nodeId || !graphModel[nodeId]) return;
+
+    const animation = graphPathAnimationRef.current;
+    if (animation.seen.has(nodeId)) return;
+
+    animation.seen.add(nodeId);
+    animation.queue.push(node);
+    playNextGraphPathNode();
+  }
+
+  function enqueueGraphPathNodes(nodes) {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => enqueueGraphPathNode(node));
+  }
+
+  function playNextGraphPathNode() {
+    const animation = graphPathAnimationRef.current;
+
+    if (animation.playing || animation.timer) return;
+
+    const node = animation.queue.shift();
+    if (!node) {
+      animation.playing = false;
+      return;
+    }
+
+    animation.playing = true;
+    moveGraphToNode(node);
+    animation.timer = window.setTimeout(() => {
+      animation.timer = null;
+      animation.playing = false;
+      playNextGraphPathNode();
+    }, GRAPH_PATH_STEP_MS);
+  }
+
   function resetGraph() {
+    clearGraphPathAnimation();
     setFocusId(ROOT_ID);
     setSelectedId(ROOT_ID);
     setMode("atlas");
@@ -144,6 +201,7 @@ export function App() {
     const agentNames = getAgentPackage(targetFocusId).map((agent) => agent.name);
 
     agentRequestRef.current?.abort();
+    clearGraphPathAnimation();
     agentRequestRef.current = controller;
 
     setDraft("");
@@ -165,7 +223,6 @@ export function App() {
     });
 
     if (response.focusId) focusNode(response.focusId);
-    setToast(response.text);
 
     try {
       await streamCozeChat(text, {
@@ -191,19 +248,69 @@ export function App() {
             ),
           );
         },
-        onRecommendedAgent(agent) {
-          if (!agent) return;
+        onRecommendedAgentStarted(event) {
+          const agent = { agent_index: event.agent_index };
 
           setAgentStream((current) => ({
             ...current,
-            workflow: appendRecommendedAgent(current.workflow, agent),
+            workflow: upsertRecommendedAgent(current.workflow, agent, { streamStatus: "streaming" }),
           }));
           setAgentTurns((current) =>
             current.map((turn) =>
               turn.id === turnId
                 ? {
                     ...turn,
-                    workflow: appendRecommendedAgent(turn.workflow, agent),
+                    workflow: upsertRecommendedAgent(turn.workflow, agent, { streamStatus: "streaming" }),
+                  }
+                : turn,
+            ),
+          );
+        },
+        onRecommendedAgent(agent, event) {
+          if (!agent) return;
+
+          const activeField = event?.delta?.field || null;
+
+          setAgentStream((current) => ({
+            ...current,
+            workflow: upsertRecommendedAgent(current.workflow, agent, {
+              activeField,
+              streamStatus: "streaming",
+            }),
+          }));
+          setAgentTurns((current) =>
+            current.map((turn) =>
+              turn.id === turnId
+                ? {
+                    ...turn,
+                    workflow: upsertRecommendedAgent(turn.workflow, agent, {
+                      activeField,
+                      streamStatus: "streaming",
+                    }),
+                  }
+                : turn,
+            ),
+          );
+        },
+        onRecommendedAgentCompleted(agent) {
+          if (!agent) return;
+
+          setAgentStream((current) => ({
+            ...current,
+            workflow: upsertRecommendedAgent(current.workflow, agent, {
+              streamStatus: "completed",
+              activeField: null,
+            }),
+          }));
+          setAgentTurns((current) =>
+            current.map((turn) =>
+              turn.id === turnId
+                ? {
+                    ...turn,
+                    workflow: upsertRecommendedAgent(turn.workflow, agent, {
+                      streamStatus: "completed",
+                      activeField: null,
+                    }),
                   }
                 : turn,
             ),
@@ -226,11 +333,10 @@ export function App() {
           );
         },
         onGraphNode(node) {
-          moveGraphToNode(node);
+          enqueueGraphPathNode(node);
         },
         onGraphPathResolved(event) {
           const nodes = Array.isArray(event.nodes) ? event.nodes : [];
-          const target = [...nodes].reverse().find((node) => node?.id && graphModel[node.id]);
 
           setAgentStream((current) => ({
             ...current,
@@ -247,7 +353,7 @@ export function App() {
             ),
           );
 
-          moveGraphToNode(target);
+          enqueueGraphPathNodes(nodes);
         },
         onWorkflowError(event) {
           const message = formatWorkflowError(event);
@@ -301,7 +407,7 @@ export function App() {
   }
 
   return (
-    <main className={`app-shell app-mode-${mode}`}>
+    <main className={`app-shell app-mode-${mode} ${hasRecommendedAgents ? "" : "rail-collapsed"}`}>
       <TopBar mode={mode} setMode={setMode} />
       <AgentDock
         draft={draft}
@@ -319,7 +425,12 @@ export function App() {
         onFocus={focusNode}
         onSelect={setSelectedId}
       />
-      <RecommendationRail focusId={focusId} selectedId={selectedId} onToast={setToast} />
+      <RecommendationRail
+        focusId={focusId}
+        selectedId={selectedId}
+        recommendedAgents={agentStream.workflow.agentRecommendation.agents}
+        status={agentStream.status}
+      />
       <ControlDock
         mode={mode}
         setMode={setMode}
@@ -329,11 +440,6 @@ export function App() {
         setShowLabels={setShowLabels}
         onReset={resetGraph}
       />
-      {toast && (
-        <button type="button" className="toast" onClick={() => setToast("")}>
-          {toast}
-        </button>
-      )}
     </main>
   );
 }
@@ -360,31 +466,67 @@ function appendWorkflowContent(workflow, section, type, content) {
   };
 }
 
-function appendRecommendedAgent(workflow, agent) {
+function upsertRecommendedAgent(workflow, agent, options = {}) {
   const currentAgents = workflow.agentRecommendation.agents || [];
-  const key = getRecommendedAgentKey(agent);
+  const normalizedAgent = normalizeRecommendedAgent(agent);
+  const key = getRecommendedAgentKey(normalizedAgent);
+  const existingIndex = currentAgents.findIndex((item) => getRecommendedAgentKey(item) === key);
+  const hasActiveFieldOption = Object.hasOwn(options, "activeField");
 
-  if (currentAgents.some((item) => getRecommendedAgentKey(item) === key)) {
-    return workflow;
+  if (existingIndex >= 0) {
+    return {
+      ...workflow,
+      agentRecommendation: {
+        ...workflow.agentRecommendation,
+        agents: currentAgents.map((item, index) =>
+          index === existingIndex
+            ? {
+                ...item,
+                ...normalizedAgent,
+                streamStatus: options.streamStatus || item.streamStatus || "streaming",
+                activeField: hasActiveFieldOption ? options.activeField : item.activeField ?? null,
+              }
+            : item,
+        ),
+      },
+    };
   }
 
   return {
     ...workflow,
     agentRecommendation: {
       ...workflow.agentRecommendation,
-      agents: [...currentAgents, agent],
+      agents: [
+        ...currentAgents,
+        {
+          ...normalizedAgent,
+          streamStatus: options.streamStatus || "streaming",
+          activeField: hasActiveFieldOption ? options.activeField : null,
+        },
+      ],
     },
   };
 }
 
 function replaceRecommendedAgents(workflow, agents) {
   if (!Array.isArray(agents)) return workflow;
+  const currentAgents = workflow.agentRecommendation.agents || [];
 
   return {
     ...workflow,
     agentRecommendation: {
       ...workflow.agentRecommendation,
-      agents,
+      agents: agents.map((agent, index) => {
+        const normalizedAgent = normalizeRecommendedAgent(agent, index);
+        const existing = currentAgents.find((item) => getRecommendedAgentKey(item) === getRecommendedAgentKey(normalizedAgent));
+
+        return {
+          ...existing,
+          ...normalizedAgent,
+          streamStatus: "completed",
+          activeField: null,
+        };
+      }),
     },
   };
 }
@@ -400,7 +542,22 @@ function setWorkflowGraphPath(workflow, graphPath) {
 }
 
 function getRecommendedAgentKey(agent) {
+  if (agent.agent_index !== undefined && agent.agent_index !== null) {
+    return `agent-index-${agent.agent_index}`;
+  }
+
   return `${agent.rank || ""}-${agent.agent_name || agent.name || ""}`;
+}
+
+function normalizeRecommendedAgent(agent, fallbackIndex = null) {
+  if (!agent) return {};
+  if (agent.agent_index !== undefined && agent.agent_index !== null) return agent;
+  if (fallbackIndex === null) return agent;
+
+  return {
+    agent_index: fallbackIndex,
+    ...agent,
+  };
 }
 
 function formatWorkflowError(event) {

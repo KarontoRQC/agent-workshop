@@ -71,6 +71,18 @@ function emitSseFrame(frame, handlers) {
     handlers.onRecommendedAgent?.(event.agent, event);
   }
 
+  if (event.event === "recommended_agent.started") {
+    handlers.onRecommendedAgentStarted?.(event);
+  }
+
+  if (event.event === "recommended_agent.field.completed") {
+    handlers.onRecommendedAgentFieldCompleted?.(event);
+  }
+
+  if (event.event === "recommended_agent.completed") {
+    handlers.onRecommendedAgentCompleted?.(event.agent, event);
+  }
+
   if (event.event === "recommended_agents.completed") {
     handlers.onRecommendedAgentsCompleted?.(event.agents || [], event);
   }
