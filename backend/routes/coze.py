@@ -5,8 +5,8 @@ from services.coze_client import (
     CozeConfigurationError,
     CozeConnectionError,
     CozeUpstreamError,
-    iter_stream_chunks,
 )
+from services.coze_workflow import start_chat_workflow_stream
 
 
 coze_bp = Blueprint("coze", __name__)
@@ -22,10 +22,12 @@ def stream_chat():
         return jsonify({"error": "message is required"}), 400
 
     try:
-        upstream = coze_client.stream_single_turn_chat(
+        stream = start_chat_workflow_stream(
+            coze_client=coze_client,
             message=message,
             parameters=_get_parameters(data),
             user_id=data.get("user_id"),
+            agent_names=data.get("agent_names"),
         )
     except CozeConfigurationError as exc:
         return jsonify({"error": str(exc)}), 500
@@ -44,8 +46,8 @@ def stream_chat():
         )
 
     return Response(
-        stream_with_context(iter_stream_chunks(upstream)),
-        content_type=upstream.headers.get("Content-Type", "text/event-stream"),
+        stream_with_context(stream),
+        content_type="text/event-stream; charset=utf-8",
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",

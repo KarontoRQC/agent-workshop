@@ -23,16 +23,18 @@ class CozeClient:
         self.settings_factory = settings_factory
         self.post = post
 
-    def stream_single_turn_chat(self, message, parameters=None, user_id=None):
+    def stream_single_turn_chat(self, message, parameters=None, user_id=None, bot_id=None):
         settings = self.settings_factory()
+        selected_bot_id = bot_id or settings.bot_id
 
         if not settings.api_token:
             raise CozeConfigurationError("COZE_API_TOKEN is not configured")
-        if not settings.bot_id:
+        if not selected_bot_id:
             raise CozeConfigurationError("COZE_BOT_ID is not configured")
 
         payload = self._build_single_turn_payload(
             settings=settings,
+            bot_id=selected_bot_id,
             message=message,
             parameters=parameters,
             user_id=user_id,
@@ -58,12 +60,17 @@ class CozeClient:
             upstream.close()
             raise CozeUpstreamError(upstream.status_code, detail)
 
+        if not _is_event_stream_response(upstream):
+            detail = _read_error_detail(upstream)
+            upstream.close()
+            raise CozeUpstreamError(502, detail)
+
         return upstream
 
     @staticmethod
-    def _build_single_turn_payload(settings, message, parameters=None, user_id=None):
+    def _build_single_turn_payload(settings, bot_id, message, parameters=None, user_id=None):
         return {
-            "bot_id": settings.bot_id,
+            "bot_id": bot_id,
             "user_id": str(user_id or settings.user_id),
             "stream": True,
             "additional_messages": [
@@ -78,17 +85,13 @@ class CozeClient:
         }
 
 
-def iter_stream_chunks(upstream):
-    try:
-        for chunk in upstream.iter_content(chunk_size=8192):
-            if chunk:
-                yield chunk
-    finally:
-        upstream.close()
-
-
 def _read_error_detail(upstream):
     try:
         return upstream.json()
     except ValueError:
         return upstream.text
+
+
+def _is_event_stream_response(upstream):
+    content_type = upstream.headers.get("Content-Type", "")
+    return "text/event-stream" in content_type.lower()
