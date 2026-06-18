@@ -98,7 +98,10 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"KG_PATH","conte
 | `content.completed` | `content.completed` | 某个标签内容段结束。 |
 | `graph.node.delta` | `graph.node.delta` | 第一阶段路径节点增量，用于点亮/渲染图谱节点。 |
 | `graph.path.resolved` | `graph.path.resolved` | 第一阶段路径解析完成，返回完整节点和边。 |
-| `recommended_agents.delta` | `recommended_agents.delta` | 推荐智能体增量，JSON 对象。 |
+| `recommended_agent.started` | `recommended_agent.started` | 单个推荐智能体开始。 |
+| `recommended_agents.delta` | `recommended_agents.delta` | 推荐智能体字段增量，JSON 对象；同一个 `agent_index` 需要 merge。 |
+| `recommended_agent.field.completed` | `recommended_agent.field.completed` | 单个推荐智能体字段结束。 |
+| `recommended_agent.completed` | `recommended_agent.completed` | 单个推荐智能体结束。 |
 | `recommended_agents.completed` | `recommended_agents.completed` | 推荐智能体列表完成。 |
 | `chat.completed` | `chat.completed` | 两个阶段都完成。 |
 | `workflow.completed` | `workflow.completed` | 整个流程完成。 |
@@ -173,20 +176,42 @@ data: {"event":"content.delta","stage":"agent_recommendation","type":"ACK","cont
 
 ### RECOMMENDED_AGENTS
 
-推荐智能体不会作为 XML 字符串返回，而是结构化 JSON。
+推荐智能体不会作为 XML 字符串返回，而是结构化 JSON，并且字段是流式增量输出。
 
-单个推荐智能体：
+同一个智能体会通过稳定的 `agent_index` 持续更新，前端需要把相同 `agent_index` 的 `agent` 对象 merge 到同一张卡片上。尤其是 `reason` 字段会边生成边增长。
+
+单个推荐智能体开始：
+
+```text
+event: recommended_agent.started
+data: {"event":"recommended_agent.started","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent_index":0}
+```
+
+字段增量：
 
 ```text
 event: recommended_agents.delta
-data: {"event":"recommended_agents.delta","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent":{"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，明确落地路径"}}
+data: {"event":"recommended_agents.delta","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent":{"agent_index":0,"rank":1,"agent_name":"①战略专家"},"delta":{"agent_index":0,"field":"agent_name","content":"①战略专家"}}
+
+event: recommended_agents.delta
+data: {"event":"recommended_agents.delta","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent":{"agent_index":0,"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，"},"delta":{"agent_index":0,"field":"reason","content":"制定白酒信任证明整体策略，"}}
+
+event: recommended_agents.delta
+data: {"event":"recommended_agents.delta","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent":{"agent_index":0,"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，明确落地路径"},"delta":{"agent_index":0,"field":"reason","content":"明确落地路径"}}
+```
+
+单个智能体完成：
+
+```text
+event: recommended_agent.completed
+data: {"event":"recommended_agent.completed","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agent":{"agent_index":0,"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，明确落地路径"}}
 ```
 
 推荐列表完成：
 
 ```text
 event: recommended_agents.completed
-data: {"event":"recommended_agents.completed","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agents":[{"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，明确落地路径"}]}
+data: {"event":"recommended_agents.completed","stage":"agent_recommendation","type":"RECOMMENDED_AGENTS","content_type":"json","agents":[{"agent_index":0,"rank":1,"agent_name":"①战略专家","stage":"策略规划","reason":"制定白酒信任证明整体策略，明确落地路径"}]}
 ```
 
 ### SUMMARY
@@ -201,7 +226,7 @@ data: {"event":"content.delta","stage":"agent_recommendation","type":"SUMMARY","
 前端主要处理：
 
 - `content.delta`：按 `stage + type` 追加文本。
-- `recommended_agents.delta`：追加单个推荐智能体卡片。
+- `recommended_agents.delta`：按 `agent_index` merge 智能体卡片，`reason` 会流式增长。
 - `recommended_agents.completed`：得到完整推荐列表。
 - `workflow.completed`：结束 loading。
 - `workflow.error`：展示错误。
@@ -333,7 +358,19 @@ await streamCozeChat('我想优化白酒行业销售转化', {
     render(state)
   },
   onRecommendedAgent(agent) {
-    state.agentRecommendation.agents.push(agent)
+    const index = state.agentRecommendation.agents.findIndex(
+      (item) => item.agent_index === agent.agent_index,
+    )
+
+    if (index >= 0) {
+      state.agentRecommendation.agents[index] = {
+        ...state.agentRecommendation.agents[index],
+        ...agent,
+      }
+    } else {
+      state.agentRecommendation.agents.push(agent)
+    }
+
     render(state)
   },
   onGraphPathResolved(event) {

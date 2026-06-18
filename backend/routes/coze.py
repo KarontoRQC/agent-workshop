@@ -1,4 +1,4 @@
-from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
 from services.coze_client import (
     CozeClient,
@@ -6,6 +6,7 @@ from services.coze_client import (
     CozeConnectionError,
     CozeUpstreamError,
 )
+from services.coze_stream_transformer import content_event, format_sse_event
 from services.coze_workflow import start_chat_workflow_stream
 
 
@@ -46,7 +47,7 @@ def stream_chat():
         )
 
     return Response(
-        stream_with_context(stream),
+        stream_with_context(_guard_stream_errors(stream)),
         content_type="text/event-stream; charset=utf-8",
         headers={
             "Cache-Control": "no-cache",
@@ -58,3 +59,22 @@ def stream_chat():
 def _get_parameters(data):
     parameters = data.get("parameters")
     return parameters if isinstance(parameters, dict) else {}
+
+
+def _guard_stream_errors(stream):
+    try:
+        yield from stream
+    except GeneratorExit:
+        raise
+    except Exception as exc:
+        current_app.logger.exception("Unhandled Coze stream error")
+        yield format_sse_event(
+            content_event(
+                "workflow.error",
+                {
+                    "error": "Backend stream failed",
+                    "detail": str(exc),
+                },
+            )
+        )
+        yield format_sse_event(content_event("workflow.failed", {"status": "failed"}))

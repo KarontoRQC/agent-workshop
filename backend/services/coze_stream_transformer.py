@@ -15,12 +15,14 @@ RECOMMENDER_TAGS = {
 
 
 class TaggedContentParser:
-    def __init__(self, section_tags=None, section_emitters=None):
+    def __init__(self, section_tags=None, section_emitters=None, section_stream_emitters=None):
         self.section_tags = section_tags or ROUTE_PLANNER_TAGS
         self.section_emitters = section_emitters or {}
+        self.section_stream_emitters = section_stream_emitters or {}
         self.buffer = ""
         self.current_type = None
         self.current_buffer = None
+        self.current_stream_emitter = None
         self.at_section_start = False
 
     def feed(self, content):
@@ -43,6 +45,8 @@ class TaggedContentParser:
                 self.buffer = self.buffer[tag_index + len(open_tag) :]
                 self.current_type = section_type
                 self.current_buffer = "" if section_type in self.section_emitters else None
+                stream_emitter = self.section_stream_emitters.get(section_type)
+                self.current_stream_emitter = stream_emitter() if stream_emitter else None
                 self.at_section_start = True
                 yield content_event("content.started", {"type": section_type})
                 continue
@@ -101,6 +105,10 @@ class TaggedContentParser:
             self.current_buffer += content
             return
 
+        if self.current_stream_emitter is not None:
+            yield from self.current_stream_emitter.feed(content)
+            return
+
         yield content_event(
             "content.delta",
             {
@@ -117,16 +125,21 @@ class TaggedContentParser:
             if emitter:
                 yield from emitter(self.current_buffer.strip())
 
+        if self.current_stream_emitter is not None:
+            yield from self.current_stream_emitter.flush()
+
         yield content_event("content.completed", {"type": self.current_type})
         self.current_type = None
         self.current_buffer = None
+        self.current_stream_emitter = None
         self.at_section_start = False
 
 
-def iter_tagged_events(upstream, section_tags=None, section_emitters=None):
+def iter_tagged_events(upstream, section_tags=None, section_emitters=None, section_stream_emitters=None):
     parser = TaggedContentParser(
         section_tags=section_tags,
         section_emitters=section_emitters,
+        section_stream_emitters=section_stream_emitters,
     )
 
     for event_name, data in iter_sse_frames(upstream):

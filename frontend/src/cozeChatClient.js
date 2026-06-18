@@ -1,4 +1,5 @@
-const COZE_CHAT_STREAM_URL = "/api/coze/chat/stream";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
 
 export async function streamCozeChat(message, handlers = {}) {
   const body = {

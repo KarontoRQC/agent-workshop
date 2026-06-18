@@ -1,4 +1,3 @@
-import re
 from collections import defaultdict
 
 from services.coze_client import (
@@ -14,6 +13,7 @@ from services.coze_stream_transformer import (
     iter_tagged_events,
 )
 from services.graph_path_resolver import GraphPathResolver
+from services.recommended_agents_stream import RecommendedAgentsStreamEmitter
 
 
 KNOWLEDGE_GRAPH_STAGE = "knowledge_graph"
@@ -129,7 +129,7 @@ def _iter_chat_workflow_stream(
     for event in iter_tagged_events(
         recommendation_upstream,
         section_tags=RECOMMENDER_TAGS,
-        section_emitters={"RECOMMENDED_AGENTS": emit_recommended_agents},
+        section_stream_emitters={"RECOMMENDED_AGENTS": RecommendedAgentsStreamEmitter},
     ):
         if event.get("event") == "content.delta" and event.get("type") == "SUMMARY":
             summary += event.get("content", "")
@@ -159,70 +159,6 @@ def build_recommender_message(selected_route, agent_names, original_message):
             f"可能包含业务需求、学习目标或任务描述：{original_message}",
         ]
     )
-
-
-def emit_recommended_agents(content):
-    agents = parse_recommended_agents(content)
-
-    for agent in agents:
-        yield content_event(
-            "recommended_agents.delta",
-            {
-                "type": "RECOMMENDED_AGENTS",
-                "content_type": "json",
-                "agent": agent,
-            },
-        )
-
-    yield content_event(
-        "recommended_agents.completed",
-        {
-            "type": "RECOMMENDED_AGENTS",
-            "content_type": "json",
-            "agents": agents,
-        },
-    )
-
-
-def parse_recommended_agents(content):
-    agents = []
-
-    for match in re.finditer(r"<AGENT>\s*(.*?)\s*</AGENT>", content, flags=re.DOTALL):
-        block = match.group(1)
-        rank = _extract_tag(block, "RANK")
-        agent = {
-            "rank": _parse_rank(rank),
-            "agent_name": _extract_tag(block, "AGENT_NAME"),
-            "stage": _extract_tag(block, "STAGE"),
-            "reason": _extract_tag(block, "REASON"),
-        }
-        agents.append({key: value for key, value in agent.items() if value not in ("", None)})
-
-    return agents
-
-
-def _extract_tag(content, tag_name):
-    match = re.search(
-        rf"<{tag_name}>\s*(.*?)\s*</{tag_name}>",
-        content,
-        flags=re.DOTALL,
-    )
-
-    if not match:
-        return ""
-
-    return _strip_nested_tags(match.group(1)).strip()
-
-
-def _strip_nested_tags(value):
-    return re.sub(r"<[^>]+>", "", value)
-
-
-def _parse_rank(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return value
 
 
 def _with_stage(event, stage):
