@@ -431,19 +431,22 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
     group.addChild(aura, halo, ring, core, pin, hit);
     nodeLayer.addChild(group);
 
-    const labelVisible = shouldShowLabel(node, state, params);
+    const labelVisible = shouldShowLabel(node, state, { ...params, relation });
     if (labelVisible) labelLayer.addChild(makeLabel(node, state));
   });
 }
 
 function shouldShowLabel(node, state, params) {
+  const relation = params.relation;
+  const quietMode = relation?.hasHover || relation?.specificSelection;
   if (node.type === "agent" || node.kind === "leaf") {
     return (
       params.showLabels ||
       node.labelMode === "always" ||
       node.id === params.selectedId ||
       node.id === params.hoveredId ||
-      isMajorNode(node)
+      (!quietMode && isMajorNode(node)) ||
+      state.hot
     );
   }
 
@@ -452,7 +455,7 @@ function shouldShowLabel(node, state, params) {
     node.labelMode === "always" ||
     state.hot ||
     (state.related && node.ring <= 2) ||
-    isMajorNode(node)
+    (!quietMode && isMajorNode(node))
   );
 }
 
@@ -463,9 +466,9 @@ function getRelationState(params) {
   const nodeMap = new Map(layout.nodes.map((node) => [node.id, node]));
   const hoveredNode = hoveredId ? nodeMap.get(hoveredId) : null;
   const selectedNode = selectedId ? nodeMap.get(selectedId) : null;
-  const hoverIsRoute = Boolean(hoveredNode && hoveredId !== ROOT_ID && hoveredId !== focusId);
+  const hasHover = Boolean(hoveredNode);
+  const rootHover = hoveredId === ROOT_ID;
   const selectedIsRoute = Boolean(selectedNode && selectedId !== focusId);
-  const specificSelection = hoverIsRoute || selectedIsRoute;
 
   function addNode(id, isHot = false) {
     if (!id) return;
@@ -483,15 +486,41 @@ function getRelationState(params) {
     }
   }
 
+  function addChildren(id, isHot = false) {
+    layout.nodes.forEach((node) => {
+      if (node.parentId === id) addNode(node.id, isHot);
+    });
+  }
+
+  function addFocusedRoute(id) {
+    addAncestors(id, true);
+    addChildren(id, true);
+  }
+
+  if (rootHover) {
+    addNode(ROOT_ID, true);
+    addChildren(ROOT_ID, true);
+    return { related, hot, specificSelection: false, hasHover, rootHover };
+  }
+
+  if (hasHover) {
+    addFocusedRoute(hoveredId);
+    return { related, hot, specificSelection: true, hasHover, rootHover: false };
+  }
+
+  if (selectedIsRoute) {
+    addFocusedRoute(selectedId);
+    return { related, hot, specificSelection: true, hasHover: false, rootHover: false };
+  }
+
   addNode(focusId, true);
   addAncestors(focusId);
-  if (selectedIsRoute && !hoverIsRoute) addAncestors(selectedId, true);
 
   layout.nodes.forEach((node) => {
     if (node.isLineage || isMajorNode(node)) addNode(node.id, node.id === focusId || node.id === selectedId);
   });
 
-  if (focusId !== ROOT_ID && !specificSelection) {
+  if (focusId !== ROOT_ID) {
     addNode(ROOT_ID);
     layout.nodes.forEach((node) => {
       if (node.parentId === focusId) addNode(node.id, node.ring <= 2);
@@ -499,21 +528,13 @@ function getRelationState(params) {
     });
   }
 
-  if (hoveredId) {
-    addAncestors(hoveredId, true);
-    layout.nodes.forEach((node) => {
-      if (hoveredId === ROOT_ID && node.parentId === ROOT_ID) addNode(node.id, true);
-      if (node.parentId === hoveredId) addNode(node.id, true);
-    });
-  }
-
-  if (focusId === ROOT_ID && !hoveredId) {
+  if (focusId === ROOT_ID) {
     layout.nodes.forEach((node) => {
       if (node.parentId === ROOT_ID) addNode(node.id);
     });
   }
 
-  return { related, hot, specificSelection };
+  return { related, hot, specificSelection: false, hasHover: false, rootHover: false };
 }
 
 function getNodeState(node, relation, params, elapsed) {
@@ -521,17 +542,18 @@ function getNodeState(node, relation, params, elapsed) {
   const related = relation.related.has(node.id);
   const hot = relation.hot.has(node.id);
   const pinned = Boolean(node.dragged);
-  const rootHoverIndustry = params.hoveredId === ROOT_ID && node.parentId === ROOT_ID;
-  const highlight = Math.max(hot || rootHoverIndustry || pinned ? 1 : 0, related ? 0.62 : 0) * reveal;
+  const highlight = Math.max(hot || pinned ? 1 : 0, related ? 0.62 : 0) * reveal;
   const alphaBase = node.kind === "context" ? 0.42 : node.kind === "ghost" ? 0.56 : node.kind === "sibling" ? 0.72 : 1;
   const major = isMajorNode(node);
-  const dimmedAlpha = relation.specificSelection ? 0.18 : 0.46;
+  const quietMode = relation.hasHover || relation.specificSelection;
+  const dimmedAlpha = quietMode ? 0.13 : 0.46;
+  const keepMajorVisible = major && !quietMode;
 
   return {
     related,
-    hot: hot || rootHoverIndustry || pinned,
+    hot: hot || pinned,
     highlight,
-    alpha: related || major ? alphaBase : node.kind === "industry" ? alphaBase * 0.64 : dimmedAlpha,
+    alpha: related || keepMajorVisible ? alphaBase : node.kind === "industry" ? alphaBase * 0.5 : dimmedAlpha,
     aura: node.kind === "focus" ? 42 : node.kind === "anchor" ? 34 : node.kind === "origin" ? 30 : hot ? 22 : related ? 15 : 10,
     auraAlpha: major ? 0.07 + highlight * 0.09 : 0.016 + highlight * 0.12,
   };
@@ -541,16 +563,18 @@ function getLinkState(link, source, target, relation, params, elapsed) {
   const reveal = ringReveal(link.ring ?? Math.max(source.ring ?? 1, target.ring ?? 1), elapsed, params.mode);
   const hot = relation.hot.has(source.id) && relation.hot.has(target.id);
   const related = relation.related.has(source.id) && relation.related.has(target.id);
-  const rootHoverIndustry = params.hoveredId === ROOT_ID && source.id === ROOT_ID && target.parentId === ROOT_ID;
+  const rootHoverIndustry = relation.rootHover && source.id === ROOT_ID && target.parentId === ROOT_ID;
   const lineage = link.kind === "lineage";
-  const highlight = (lineage || hot || rootHoverIndustry ? 1 : related ? 0.62 : relation.specificSelection ? 0 : 0.12) * reveal;
-  const idleAlpha = relation.specificSelection ? 0.035 : 0.14;
+  const lineageHot = lineage && !relation.hasHover && !relation.specificSelection;
+  const quietMode = relation.hasHover || relation.specificSelection;
+  const highlight = (lineageHot || hot || rootHoverIndustry ? 1 : related ? 0.62 : quietMode ? 0 : 0.12) * reveal;
+  const idleAlpha = quietMode ? 0.018 : 0.14;
   return {
-    hot: lineage || hot || rootHoverIndustry,
+    hot: lineageHot || hot || rootHoverIndustry,
     highlight,
-    alpha: lineage ? 0.34 + highlight * 0.58 : link.kind === "leaf" ? idleAlpha + highlight * 0.52 : idleAlpha + highlight * 0.66,
+    alpha: lineageHot ? 0.34 + highlight * 0.58 : link.kind === "leaf" ? idleAlpha + highlight * 0.52 : idleAlpha + highlight * 0.66,
     width: lineage ? 1.35 + highlight * 1.45 : link.kind === "industry" ? 0.8 + highlight * 0.9 : link.kind === "main" ? 0.72 + highlight * 0.84 : 0.42 + highlight * 0.5,
-    flow: lineage ? reveal : hot && link.kind === "main" ? 0.45 * reveal : 0,
+    flow: lineageHot ? reveal : hot && link.kind === "main" ? 0.45 * reveal : 0,
   };
 }
 
