@@ -1,0 +1,687 @@
+export const ROOT_ID = "root-brief";
+
+export const graphModel = {
+  [ROOT_ID]: {
+    id: ROOT_ID,
+    label: "行业智能体开端",
+    type: "brief",
+    summary: "把一个模糊业务输入先落到行业语境，再沿痛点、任务和智能体能力逐圈展开。",
+    insight: "开端节点负责点亮行业积累，真正的作战路径从选中某个行业后开始收束。",
+    children: [
+      "industry-baijiu",
+      "industry-catering",
+      "industry-beauty",
+      "industry-education",
+      "industry-local-life",
+      "industry-enterprise",
+      "industry-tourism",
+      "industry-medical-beauty",
+      "industry-realestate",
+      "industry-agriculture",
+      "industry-franchise",
+      "industry-highend-service",
+    ],
+    agents: ["agent-strategy", "agent-lead-mining", "agent-position"],
+  },
+  "industry-baijiu": {
+    id: "industry-baijiu",
+    label: "白酒行业",
+    type: "industry",
+    summary: "围绕区域代理、招商会、渠道承接和私域复购建立行业场景。",
+    insight: "白酒招商不是单纯要流量，而是渠道信任、代理判断和转化承接的组合题。",
+    parent: ROOT_ID,
+    children: [
+      "problem-leads",
+      "problem-conversion",
+      "capability-content",
+      "capability-sales",
+      "capability-private",
+      "capability-review",
+      "baijiu-channel",
+      "baijiu-trust",
+    ],
+    agents: ["agent-industry-map", "agent-position", "agent-script"],
+  },
+  "industry-catering": {
+    id: "industry-catering",
+    label: "餐饮连锁",
+    type: "industry",
+    summary: "围绕门店选址、加盟转化、外卖增长和复购运营展开。",
+    insight: "餐饮的增长卡点通常不是缺活动，而是门店模型、品类记忆和加盟证据不够清楚。",
+    parent: ROOT_ID,
+    children: ["catering-location", "catering-franchise", "catering-takeaway", "catering-repeat", "catering-menu", "catering-review"],
+    agents: ["agent-strategy", "agent-content", "agent-review"],
+  },
+  "industry-beauty": {
+    id: "industry-beauty",
+    label: "美业门店",
+    type: "industry",
+    summary: "拆解到店转化、项目包装、顾问话术、会员复购和私域养熟。",
+    insight: "美业节点要重点处理信任和周期，不能只做低价引流。",
+    parent: ROOT_ID,
+    children: ["beauty-trust", "beauty-package", "beauty-consultant", "beauty-member", "beauty-private", "beauty-case"],
+    agents: ["agent-private-domain", "agent-script", "agent-content"],
+  },
+  "industry-education": {
+    id: "industry-education",
+    label: "教育培训",
+    type: "industry",
+    summary: "围绕试听课、家长沟通、转介绍、续费和课程价值证明展开。",
+    insight: "教育培训的核心是长期信任和结果证明，智能体要能沉淀家长决策链。",
+    parent: ROOT_ID,
+    children: ["edu-trial", "edu-parent", "edu-renewal", "edu-referral", "edu-result", "edu-teacher"],
+    agents: ["agent-follow-up", "agent-content", "agent-kpi"],
+  },
+  "industry-local-life": {
+    id: "industry-local-life",
+    label: "本地生活",
+    type: "industry",
+    summary: "处理团购转化、到店核销、评价沉淀、商圈竞争和复购提醒。",
+    insight: "本地生活需要把一次性流量变成可复访的人群资产。",
+    parent: ROOT_ID,
+    children: ["local-coupon", "local-store", "local-review", "local-repeat", "local-area", "local-private"],
+    agents: ["agent-data-review", "agent-private-domain", "agent-content"],
+  },
+  "industry-enterprise": {
+    id: "industry-enterprise",
+    label: "企服获客",
+    type: "industry",
+    summary: "从线索评分、顾问式销售、方案生成、决策链和交付证明展开。",
+    insight: "企服获客要让智能体理解客户组织，而不是只生成一套销售话术。",
+    parent: ROOT_ID,
+    children: ["b2b-lead-score", "b2b-solution", "b2b-decision", "b2b-proof", "b2b-procurement", "b2b-renewal"],
+    agents: ["agent-lead-mining", "agent-sales-sop", "agent-report"],
+  },
+  "industry-tourism": {
+    id: "industry-tourism",
+    label: "文旅招商",
+    type: "industry",
+    summary: "把目的地内容、渠道合作、活动招商和游客转化串成路径。",
+    insight: "文旅不是只做漂亮内容，还要把内容热度接到渠道和招商动作。",
+    parent: ROOT_ID,
+    children: ["tourism-story", "tourism-channel", "tourism-event", "tourism-dealer", "tourism-season", "tourism-route"],
+    agents: ["agent-content", "agent-industry-map", "agent-review"],
+  },
+  "industry-medical-beauty": {
+    id: "industry-medical-beauty",
+    label: "医美私域",
+    type: "industry",
+    summary: "围绕项目认知、咨询转化、案例证明、复诊提醒和合规边界展开。",
+    insight: "医美节点要同时处理信任、审美和合规，不能用普通促销逻辑硬推。",
+    parent: ROOT_ID,
+    children: ["medbeauty-consult", "medbeauty-case", "medbeauty-risk", "medbeauty-follow", "medbeauty-compliance", "medbeauty-content"],
+    agents: ["agent-private-domain", "agent-objection", "agent-content"],
+  },
+  "industry-realestate": {
+    id: "industry-realestate",
+    label: "房产渠道",
+    type: "industry",
+    summary: "拆解渠道经纪、客户画像、案场邀约、异议处理和成交复盘。",
+    insight: "房产渠道重在时机和信任，智能体要能判断客户阶段和下一触点。",
+    parent: ROOT_ID,
+    children: ["estate-channel", "estate-avatar", "estate-invite", "estate-objection", "estate-proof", "estate-follow"],
+    agents: ["agent-follow-up", "agent-objection", "agent-data-review"],
+  },
+  "industry-agriculture": {
+    id: "industry-agriculture",
+    label: "农特产招商",
+    type: "industry",
+    summary: "围绕产地故事、渠道分销、品鉴转化、达人内容和复购展开。",
+    insight: "农特产要把信任来源可视化，否则很容易只剩价格竞争。",
+    parent: ROOT_ID,
+    children: ["agri-origin", "agri-channel", "agri-sample", "agri-kol", "agri-repeat", "agri-pack"],
+    agents: ["agent-content", "agent-script", "agent-review"],
+  },
+  "industry-franchise": {
+    id: "industry-franchise",
+    label: "品牌加盟",
+    type: "industry",
+    summary: "围绕招商页、咨询承接、加盟证据、门店模型和跟进节奏展开。",
+    insight: "加盟节点最怕证据散，智能体要把模型、案例和跟进动作串起来。",
+    parent: ROOT_ID,
+    children: ["franchise-page", "franchise-consult", "franchise-proof", "franchise-store", "franchise-risk", "franchise-follow"],
+    agents: ["agent-position", "agent-script", "agent-sales-sop"],
+  },
+  "industry-highend-service": {
+    id: "industry-highend-service",
+    label: "高端服务",
+    type: "industry",
+    summary: "处理客资筛选、私密沟通、顾问信任、服务证明和长期关系。",
+    insight: "高端服务不能靠高频打扰，要靠精准判断和少量高质量触达。",
+    parent: ROOT_ID,
+    children: ["service-screening", "service-trust", "service-consult", "service-proof", "service-private", "service-renewal"],
+    agents: ["agent-brief", "agent-follow-up", "agent-private-domain"],
+  },
+  "problem-leads": {
+    id: "problem-leads",
+    label: "线索获取",
+    type: "problem",
+    summary: "从线索来源、客户画像、首轮触达和招商理由四个方向拆解。",
+    insight: "线索问题不能只问流量，要问谁值得跟、为什么现在跟、下一句说什么。",
+    parent: "industry-baijiu",
+    children: [
+      "lead-source",
+      "lead-quality",
+      "dealer-avatar",
+      "invite-script",
+      "event-hook",
+      "pain-mining",
+      "follow-up-rhythm",
+      "asset-pack",
+    ],
+    agents: ["agent-lead-mining", "agent-script", "agent-brief"],
+  },
+  "problem-conversion": {
+    id: "problem-conversion",
+    label: "转化提升",
+    type: "problem",
+    summary: "把成交阻力拆成异议、信任、利益、时机和下一步动作。",
+    insight: "转化不是催单，是把每次卡住的位置翻译成下一步动作。",
+    parent: "industry-baijiu",
+    children: [
+      "conversion-objection",
+      "conversion-proof",
+      "conversion-offer",
+      "conversion-sop",
+      "conversion-demo",
+      "conversion-urgency",
+    ],
+    agents: ["agent-objection", "agent-sales-sop", "agent-review"],
+  },
+  "capability-content": {
+    id: "capability-content",
+    label: "内容触达",
+    type: "capability",
+    summary: "用朋友圈、小红书、公众号图文把客户问题翻译成可发布内容。",
+    insight: "内容层负责让陌生人先相信你，而不是只负责把文字写漂亮。",
+    parent: "industry-baijiu",
+    children: [
+      "content-persona",
+      "content-hooks",
+      "content-photo",
+      "content-proof",
+      "content-series",
+      "content-polish",
+      "content-calendar",
+    ],
+    agents: ["agent-moments", "agent-xhs", "agent-image"],
+  },
+  "capability-sales": {
+    id: "capability-sales",
+    label: "销售跟进",
+    type: "capability",
+    summary: "围绕客户阶段生成话术、跟进节奏、成交动作和复盘建议。",
+    insight: "销售智能体不是替人聊天，而是让每一次跟进有理由、有节奏、有证据。",
+    parent: "industry-baijiu",
+    children: [
+      "sales-stage",
+      "sales-message",
+      "sales-meeting",
+      "sales-risk",
+      "sales-close",
+      "sales-crm",
+    ],
+    agents: ["agent-follow-up", "agent-objection", "agent-sales-sop"],
+  },
+  "capability-private": {
+    id: "capability-private",
+    label: "私域承接",
+    type: "capability",
+    summary: "把公域线索转成可追踪、可复访、可转化的私域资产。",
+    insight: "私域不是群发话术仓库，而是客户关系的状态机。",
+    parent: "industry-baijiu",
+    children: [
+      "private-tag",
+      "private-greeting",
+      "private-nurture",
+      "private-event",
+      "private-offer",
+      "private-rebuy",
+    ],
+    agents: ["agent-private-domain", "agent-follow-up", "agent-content"],
+  },
+  "capability-review": {
+    id: "capability-review",
+    label: "数据复盘",
+    type: "capability",
+    summary: "把每次触达、内容、线索和成交动作转成可复盘的改进线索。",
+    insight: "复盘层让智能体组合越用越准，而不是每次都从零开始猜。",
+    parent: "industry-baijiu",
+    children: [
+      "review-metrics",
+      "review-source",
+      "review-dropoff",
+      "review-script",
+      "review-next",
+    ],
+    agents: ["agent-data-review", "agent-kpi", "agent-report"],
+  },
+};
+
+const leafLabels = {
+  "baijiu-channel": ["渠道承接", "行业变量"],
+  "baijiu-trust": ["代理信任", "行业变量"],
+  "baijiu-dealer": ["代理画像", "人群"],
+  "baijiu-banquet": ["宴席场景", "场景"],
+  "baijiu-private": ["私域酒友", "场景"],
+  "baijiu-price": ["价格带", "变量"],
+  "baijiu-story": ["品牌故事", "素材"],
+  "baijiu-sample": ["品鉴邀约", "动作"],
+  "lead-source": ["线索来源", "问题"],
+  "lead-quality": ["线索质量", "问题"],
+  "dealer-avatar": ["代理画像", "人群"],
+  "invite-script": ["邀约话术", "动作"],
+  "event-hook": ["招商钩子", "素材"],
+  "pain-mining": ["痛点挖掘", "问题"],
+  "follow-up-rhythm": ["跟进节奏", "动作"],
+  "asset-pack": ["资料包", "素材"],
+  "conversion-objection": ["异议处理", "问题"],
+  "conversion-proof": ["信任证明", "素材"],
+  "conversion-offer": ["成交方案", "动作"],
+  "conversion-sop": ["销售 SOP", "流程"],
+  "conversion-demo": ["现场演示", "动作"],
+  "conversion-urgency": ["紧迫理由", "话术"],
+  "content-persona": ["人设文档", "知识库"],
+  "content-hooks": ["开头钩子", "文案"],
+  "content-photo": ["图片提示词", "素材"],
+  "content-proof": ["成交证明", "素材"],
+  "content-series": ["栏目系列", "内容"],
+  "content-polish": ["一键爆改", "工具"],
+  "content-calendar": ["发布节奏", "流程"],
+  "sales-stage": ["客户阶段", "判断"],
+  "sales-message": ["跟进消息", "话术"],
+  "sales-meeting": ["会前准备", "动作"],
+  "sales-risk": ["成交风险", "判断"],
+  "sales-close": ["逼单动作", "动作"],
+  "sales-crm": ["客户记录", "数据"],
+  "private-tag": ["客户标签", "数据"],
+  "private-greeting": ["入群欢迎", "话术"],
+  "private-nurture": ["养熟节奏", "流程"],
+  "private-event": ["活动承接", "动作"],
+  "private-offer": ["限时权益", "方案"],
+  "private-rebuy": ["复购提醒", "动作"],
+  "review-metrics": ["指标看板", "数据"],
+  "review-source": ["来源分析", "数据"],
+  "review-dropoff": ["流失节点", "问题"],
+  "review-script": ["话术复盘", "优化"],
+  "review-next": ["下一动作", "动作"],
+  "catering-location": ["选址判断", "痛点"],
+  "catering-franchise": ["加盟转化", "痛点"],
+  "catering-takeaway": ["外卖增长", "任务"],
+  "catering-repeat": ["会员复购", "任务"],
+  "catering-menu": ["菜单结构", "变量"],
+  "catering-review": ["门店复盘", "数据"],
+  "beauty-trust": ["信任建立", "痛点"],
+  "beauty-package": ["项目包装", "任务"],
+  "beauty-consultant": ["顾问话术", "任务"],
+  "beauty-member": ["会员复购", "任务"],
+  "beauty-private": ["私域养熟", "场景"],
+  "beauty-case": ["案例证明", "素材"],
+  "edu-trial": ["试听转化", "痛点"],
+  "edu-parent": ["家长沟通", "任务"],
+  "edu-renewal": ["续费节奏", "任务"],
+  "edu-referral": ["转介绍", "增长"],
+  "edu-result": ["结果证明", "素材"],
+  "edu-teacher": ["老师人设", "内容"],
+  "local-coupon": ["团购承接", "痛点"],
+  "local-store": ["到店核销", "任务"],
+  "local-review": ["评价沉淀", "数据"],
+  "local-repeat": ["复购提醒", "任务"],
+  "local-area": ["商圈竞争", "变量"],
+  "local-private": ["私域留存", "场景"],
+  "b2b-lead-score": ["线索评分", "判断"],
+  "b2b-solution": ["方案生成", "任务"],
+  "b2b-decision": ["决策链", "变量"],
+  "b2b-proof": ["交付证明", "素材"],
+  "b2b-procurement": ["采购阻力", "痛点"],
+  "b2b-renewal": ["续约复盘", "数据"],
+  "tourism-story": ["目的地故事", "内容"],
+  "tourism-channel": ["渠道合作", "增长"],
+  "tourism-event": ["活动招商", "任务"],
+  "tourism-dealer": ["代理承接", "痛点"],
+  "tourism-season": ["淡旺季", "变量"],
+  "tourism-route": ["线路设计", "方案"],
+  "medbeauty-consult": ["咨询转化", "痛点"],
+  "medbeauty-case": ["案例证明", "素材"],
+  "medbeauty-risk": ["风险解释", "合规"],
+  "medbeauty-follow": ["复诊提醒", "任务"],
+  "medbeauty-compliance": ["合规边界", "约束"],
+  "medbeauty-content": ["审美内容", "内容"],
+  "estate-channel": ["经纪渠道", "增长"],
+  "estate-avatar": ["客户画像", "判断"],
+  "estate-invite": ["案场邀约", "动作"],
+  "estate-objection": ["异议处理", "痛点"],
+  "estate-proof": ["成交证明", "素材"],
+  "estate-follow": ["跟进时机", "任务"],
+  "agri-origin": ["产地故事", "信任"],
+  "agri-channel": ["分销渠道", "增长"],
+  "agri-sample": ["品鉴转化", "动作"],
+  "agri-kol": ["达人内容", "内容"],
+  "agri-repeat": ["复购提醒", "任务"],
+  "agri-pack": ["包装卖点", "素材"],
+  "franchise-page": ["招商页面", "内容"],
+  "franchise-consult": ["咨询承接", "任务"],
+  "franchise-proof": ["加盟证据", "素材"],
+  "franchise-store": ["门店模型", "变量"],
+  "franchise-risk": ["投资顾虑", "痛点"],
+  "franchise-follow": ["跟进节奏", "任务"],
+  "service-screening": ["客资筛选", "判断"],
+  "service-trust": ["顾问信任", "痛点"],
+  "service-consult": ["私密沟通", "场景"],
+  "service-proof": ["服务证明", "素材"],
+  "service-private": ["关系维护", "任务"],
+  "service-renewal": ["长期复购", "增长"],
+};
+
+export const agentCatalog = {
+  "agent-strategy": {
+    name: "战略诊断智能体",
+    role: "把业务问题翻译成智能体作战方向",
+    score: 94,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "strategy",
+  },
+  "agent-position": {
+    name: "定位提炼智能体",
+    role: "提炼人群、卖点和差异化表达",
+    score: 91,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "positioning",
+  },
+  "agent-content": {
+    name: "图文内容智能体",
+    role: "生成朋友圈、小红书和公众号图文",
+    score: 89,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "content",
+  },
+  "agent-industry-map": {
+    name: "行业地图智能体",
+    role: "拆解行业链路、场景和关键变量",
+    score: 88,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "industry_map",
+  },
+  "agent-script": {
+    name: "招商话术智能体",
+    role: "生成邀约、破冰、跟进和成交话术",
+    score: 93,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "script",
+  },
+  "agent-lead-mining": {
+    name: "线索挖掘智能体",
+    role: "判断线索来源和客户优先级",
+    score: 92,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "lead_mining",
+  },
+  "agent-brief": {
+    name: "客户问诊智能体",
+    role: "通过提问收敛客户真实需求",
+    score: 90,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "brief",
+  },
+  "agent-objection": {
+    name: "异议处理智能体",
+    role: "把客户拒绝点转成下一步动作",
+    score: 87,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "objection",
+  },
+  "agent-sales-sop": {
+    name: "销售 SOP 智能体",
+    role: "按阶段生成跟进计划和动作清单",
+    score: 86,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "sales_sop",
+  },
+  "agent-review": {
+    name: "成交复盘智能体",
+    role: "分析卡点并给出改进建议",
+    score: 84,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "review",
+  },
+  "agent-moments": {
+    name: "朋友圈爆款智能体",
+    role: "围绕人设和成交场景生成朋友圈",
+    score: 95,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "moments",
+  },
+  "agent-xhs": {
+    name: "小红书图文智能体",
+    role: "输出小红书标题、正文和配图提示",
+    score: 88,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "xhs",
+  },
+  "agent-image": {
+    name: "配图审美智能体",
+    role: "把图片提示词从生硬拉到可信",
+    score: 82,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "image",
+  },
+  "agent-follow-up": {
+    name: "客户跟进智能体",
+    role: "生成下一次沟通策略和消息",
+    score: 89,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "follow_up",
+  },
+  "agent-private-domain": {
+    name: "私域承接智能体",
+    role: "设计入群、养熟和转化承接链路",
+    score: 85,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "private_domain",
+  },
+  "agent-data-review": {
+    name: "数据复盘智能体",
+    role: "从指标和过程记录中发现问题",
+    score: 83,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "data_review",
+  },
+  "agent-kpi": {
+    name: "指标设计智能体",
+    role: "把业务目标拆成可追踪指标",
+    score: 80,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "kpi",
+  },
+  "agent-report": {
+    name: "复盘报告智能体",
+    role: "输出老板能看懂的周报和复盘",
+    score: 81,
+    endpoint: "/api/agent-gateway/chat",
+    provider: "coze",
+    agentKey: "report",
+  },
+};
+
+export const defaultBrief =
+  "白酒行业招商获客，线索质量不高，转化效率低，缺乏可复制的增长体系。";
+
+export const initialAgentMessages = [
+  {
+    id: "m-0",
+    role: "assistant",
+    text: "我会先把业务输入压成一条可演示路径：行业理解 → 线索获取 → 内容触达 → 转化提升 → 数据复盘。",
+    focusId: ROOT_ID,
+  },
+];
+
+const routeRules = [
+  {
+    keywords: ["行业", "白酒", "代理", "经销", "品鉴"],
+    focusId: "industry-baijiu",
+    reply: "我先把行业语境拉近。白酒招商更像渠道信任问题，不只是获客问题。",
+  },
+  {
+    keywords: ["线索", "获客", "招商", "来源", "客户"],
+    focusId: "problem-leads",
+    reply: "这句话更像线索获取链路。建议先聚焦线索来源、代理画像和首轮邀约。",
+  },
+  {
+    keywords: ["转化", "成交", "异议", "逼单", "成交率"],
+    focusId: "problem-conversion",
+    reply: "我会把焦点切到转化提升，把异议、信任证明和成交动作拆开。",
+  },
+  {
+    keywords: ["内容", "朋友圈", "小红书", "图文", "素材"],
+    focusId: "capability-content",
+    reply: "这更适合进入内容触达层，把招商理由变成可发布的内容资产。",
+  },
+  {
+    keywords: ["跟进", "销售", "话术", "节奏", "沟通"],
+    focusId: "capability-sales",
+    reply: "我会聚焦销售跟进，让智能体按客户阶段生成下一次动作。",
+  },
+  {
+    keywords: ["私域", "社群", "复购", "标签", "养熟"],
+    focusId: "capability-private",
+    reply: "这条要进私域承接层，核心是客户状态、标签和养熟节奏。",
+  },
+  {
+    keywords: ["数据", "复盘", "看板", "指标", "分析"],
+    focusId: "capability-review",
+    reply: "我会把视角切到数据复盘层，用指标反推内容、线索和成交动作。",
+  },
+];
+
+export function getNode(id) {
+  if (graphModel[id]) return graphModel[id];
+  const [label, type] = leafLabels[id] || [id, "node"];
+  return {
+    id,
+    label,
+    type,
+    summary: `${label} 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。`,
+    insight: "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+    children: [],
+    agents: [],
+  };
+}
+
+export function getChildren(id) {
+  return (getNode(id).children || []).map((childId) => getNode(childId));
+}
+
+export function getFocusPath(focusId) {
+  const focus = getNode(focusId);
+  const parent = focus.parent ? getNode(focus.parent) : null;
+  return [parent || getNode(ROOT_ID), focus].filter(
+    (node, index, arr) => index === 0 || node.id !== arr[index - 1].id,
+  );
+}
+
+export function getAgentPackage(focusId) {
+  const focus = getNode(focusId);
+  const parent = focus.parent ? getNode(focus.parent) : null;
+  const ids = [
+    ...(focus.agents || []),
+    ...(parent?.agents || []),
+    ...graphModel[ROOT_ID].agents,
+    "agent-content",
+    "agent-review",
+  ];
+  return [...new Set(ids)]
+    .map((id) => agentCatalog[id])
+    .filter(Boolean)
+    .slice(0, 7);
+}
+
+export function buildJumpPayload(focusId, source = "graph") {
+  const focus = getNode(focusId);
+  const path = getFocusPath(focusId).map((node) => ({ id: node.id, label: node.label }));
+  const packageAgents = getAgentPackage(focusId);
+  return {
+    source,
+    focusId,
+    focusLabel: focus.label,
+    path,
+    providerStrategy: "backend-gateway",
+    gatewayEndpoint: "/api/agent-gateway/chat",
+    targetProvider: "coze",
+    recommendedAgents: packageAgents.map((agent) => ({
+      name: agent.name,
+      agentKey: agent.agentKey,
+      provider: agent.provider,
+    })),
+  };
+}
+
+export function invokeAgentJump(agent, focusId = ROOT_ID) {
+  return {
+    ok: true,
+    provider: agent.provider || "mock",
+    endpoint: agent.endpoint,
+    payload: buildJumpPayload(focusId, "recommendation-rail"),
+    message: `${agent.name} 已走 Coze 网关预留：前端传 agentKey，后端映射 bot_id。`,
+  };
+}
+
+export function buildCozeGatewayDraft({ agent, focusId, userMessage, conversationId }) {
+  const focus = getNode(focusId);
+  return {
+    endpoint: "/api/agent-gateway/chat",
+    method: "POST",
+    provider: "coze",
+    agentKey: agent.agentKey,
+    conversationId: conversationId || null,
+    stream: true,
+    message: {
+      role: "user",
+      type: "question",
+      content: userMessage,
+      content_type: "text",
+      meta_data: {
+        focusId,
+        focusLabel: focus.label,
+      },
+    },
+    graphContext: {
+      focusId,
+      focusLabel: focus.label,
+      path: getFocusPath(focusId).map((node) => node.label),
+    },
+  };
+}
+
+export function askRoutingAgent(message, currentFocusId = ROOT_ID) {
+  const hit = routeRules.find((rule) => rule.keywords.some((keyword) => message.includes(keyword)));
+  const focusId = hit?.focusId || currentFocusId || ROOT_ID;
+  const focus = getNode(focusId);
+  return {
+    id: `m-${Date.now()}`,
+    role: "assistant",
+    text: hit
+      ? `${hit.reply} 我已把星图焦点推到「${focus.label}」。`
+      : `我会保留当前焦点「${focus.label}」，先把你的补充写进语义简报，再等待下一步路径选择。`,
+    focusId,
+    entities: getChildren(focusId)
+      .slice(0, 5)
+      .map((node) => node.label),
+  };
+}

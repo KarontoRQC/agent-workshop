@@ -1,20 +1,19 @@
 {
-  "name": "frontend",
-  "version": "1.0.0",
+  "name": "exp-20260617-agent-knowledge-graph",
+  "version": "0.0.0",
   "private": true,
-  "description": "React + Vite frontend for the workshop app.",
+  "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173"
   },
-  "type": "module",
   "dependencies": {
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
-    "vite": "^8.0.16"
+    "@phosphor-icons/react": "^2.1.10",
+    "@vitejs/plugin-react": "5.0.4",
+    "pixi.js": "^8.19.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite": "6.4.2"
   }
 }

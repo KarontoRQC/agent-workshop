@@ -1,0 +1,3088 @@
+{
+  "metadata": {
+    "version": "2026-06-18-v1",
+    "root_node_id": "root-brief",
+    "description": "业务语义图谱数据库种子数据，不包含任何前端视觉布局字段。"
+  },
+  "tables": {
+    "nodes": [
+      {
+        "id": "root-brief",
+        "title": "行业智能体开端",
+        "node_type": "brief",
+        "parent_id": null,
+        "level": 0,
+        "summary": "把一个模糊业务输入先落到行业语境，再沿痛点、任务和智能体能力逐圈展开。",
+        "insight": "开端节点负责点亮行业积累，真正的作战路径从选中某个行业后开始收束。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 0
+      },
+      {
+        "id": "industry-baijiu",
+        "title": "白酒行业",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕区域代理、招商会、渠道承接和私域复购建立行业场景。",
+        "insight": "白酒招商不是单纯要流量，而是渠道信任、代理判断和转化承接的组合题。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 1
+      },
+      {
+        "id": "industry-catering",
+        "title": "餐饮连锁",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕门店选址、加盟转化、外卖增长和复购运营展开。",
+        "insight": "餐饮的增长卡点通常不是缺活动，而是门店模型、品类记忆和加盟证据不够清楚。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 2
+      },
+      {
+        "id": "industry-beauty",
+        "title": "美业门店",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "拆解到店转化、项目包装、顾问话术、会员复购和私域养熟。",
+        "insight": "美业节点要重点处理信任和周期，不能只做低价引流。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 3
+      },
+      {
+        "id": "industry-education",
+        "title": "教育培训",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕试听课、家长沟通、转介绍、续费和课程价值证明展开。",
+        "insight": "教育培训的核心是长期信任和结果证明，智能体要能沉淀家长决策链。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 4
+      },
+      {
+        "id": "industry-local-life",
+        "title": "本地生活",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "处理团购转化、到店核销、评价沉淀、商圈竞争和复购提醒。",
+        "insight": "本地生活需要把一次性流量变成可复访的人群资产。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 5
+      },
+      {
+        "id": "industry-enterprise",
+        "title": "企服获客",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "从线索评分、顾问式销售、方案生成、决策链和交付证明展开。",
+        "insight": "企服获客要让智能体理解客户组织，而不是只生成一套销售话术。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 6
+      },
+      {
+        "id": "industry-tourism",
+        "title": "文旅招商",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "把目的地内容、渠道合作、活动招商和游客转化串成路径。",
+        "insight": "文旅不是只做漂亮内容，还要把内容热度接到渠道和招商动作。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 7
+      },
+      {
+        "id": "industry-medical-beauty",
+        "title": "医美私域",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕项目认知、咨询转化、案例证明、复诊提醒和合规边界展开。",
+        "insight": "医美节点要同时处理信任、审美和合规，不能用普通促销逻辑硬推。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 8
+      },
+      {
+        "id": "industry-realestate",
+        "title": "房产渠道",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "拆解渠道经纪、客户画像、案场邀约、异议处理和成交复盘。",
+        "insight": "房产渠道重在时机和信任，智能体要能判断客户阶段和下一触点。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 9
+      },
+      {
+        "id": "industry-agriculture",
+        "title": "农特产招商",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕产地故事、渠道分销、品鉴转化、达人内容和复购展开。",
+        "insight": "农特产要把信任来源可视化，否则很容易只剩价格竞争。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 10
+      },
+      {
+        "id": "industry-franchise",
+        "title": "品牌加盟",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "围绕招商页、咨询承接、加盟证据、门店模型和跟进节奏展开。",
+        "insight": "加盟节点最怕证据散，智能体要把模型、案例和跟进动作串起来。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 11
+      },
+      {
+        "id": "industry-highend-service",
+        "title": "高端服务",
+        "node_type": "industry",
+        "parent_id": "root-brief",
+        "level": 1,
+        "summary": "处理客资筛选、私密沟通、顾问信任、服务证明和长期关系。",
+        "insight": "高端服务不能靠高频打扰，要靠精准判断和少量高质量触达。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 12
+      },
+      {
+        "id": "agri-origin",
+        "title": "产地故事",
+        "node_type": "信任",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "产地故事 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "agri-channel",
+        "title": "分销渠道",
+        "node_type": "增长",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "分销渠道 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "agri-sample",
+        "title": "品鉴转化",
+        "node_type": "动作",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "品鉴转化 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "agri-kol",
+        "title": "达人内容",
+        "node_type": "内容",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "达人内容 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "agri-repeat",
+        "title": "复购提醒",
+        "node_type": "任务",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "复购提醒 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "agri-pack",
+        "title": "包装卖点",
+        "node_type": "素材",
+        "parent_id": "industry-agriculture",
+        "level": 2,
+        "summary": "包装卖点 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "problem-leads",
+        "title": "线索获取",
+        "node_type": "problem",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "从线索来源、客户画像、首轮触达和招商理由四个方向拆解。",
+        "insight": "线索问题不能只问流量，要问谁值得跟、为什么现在跟、下一句说什么。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 1
+      },
+      {
+        "id": "problem-conversion",
+        "title": "转化提升",
+        "node_type": "problem",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "把成交阻力拆成异议、信任、利益、时机和下一步动作。",
+        "insight": "转化不是催单，是把每次卡住的位置翻译成下一步动作。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 2
+      },
+      {
+        "id": "capability-content",
+        "title": "内容触达",
+        "node_type": "capability",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "用朋友圈、小红书、公众号图文把客户问题翻译成可发布内容。",
+        "insight": "内容层负责让陌生人先相信你，而不是只负责把文字写漂亮。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 3
+      },
+      {
+        "id": "capability-sales",
+        "title": "销售跟进",
+        "node_type": "capability",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "围绕客户阶段生成话术、跟进节奏、成交动作和复盘建议。",
+        "insight": "销售智能体不是替人聊天，而是让每一次跟进有理由、有节奏、有证据。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 4
+      },
+      {
+        "id": "capability-private",
+        "title": "私域承接",
+        "node_type": "capability",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "把公域线索转成可追踪、可复访、可转化的私域资产。",
+        "insight": "私域不是群发话术仓库，而是客户关系的状态机。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 5
+      },
+      {
+        "id": "capability-review",
+        "title": "数据复盘",
+        "node_type": "capability",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "把每次触达、内容、线索和成交动作转成可复盘的改进线索。",
+        "insight": "复盘层让智能体组合越用越准，而不是每次都从零开始猜。",
+        "status": "active",
+        "is_leaf": false,
+        "sort_order": 6
+      },
+      {
+        "id": "baijiu-channel",
+        "title": "渠道承接",
+        "node_type": "行业变量",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "渠道承接 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 7
+      },
+      {
+        "id": "baijiu-trust",
+        "title": "代理信任",
+        "node_type": "行业变量",
+        "parent_id": "industry-baijiu",
+        "level": 2,
+        "summary": "代理信任 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 8
+      },
+      {
+        "id": "beauty-trust",
+        "title": "信任建立",
+        "node_type": "痛点",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "信任建立 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "beauty-package",
+        "title": "项目包装",
+        "node_type": "任务",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "项目包装 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "beauty-consultant",
+        "title": "顾问话术",
+        "node_type": "任务",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "顾问话术 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "beauty-member",
+        "title": "会员复购",
+        "node_type": "任务",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "会员复购 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "beauty-private",
+        "title": "私域养熟",
+        "node_type": "场景",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "私域养熟 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "beauty-case",
+        "title": "案例证明",
+        "node_type": "素材",
+        "parent_id": "industry-beauty",
+        "level": 2,
+        "summary": "案例证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "catering-location",
+        "title": "选址判断",
+        "node_type": "痛点",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "选址判断 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "catering-franchise",
+        "title": "加盟转化",
+        "node_type": "痛点",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "加盟转化 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "catering-takeaway",
+        "title": "外卖增长",
+        "node_type": "任务",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "外卖增长 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "catering-repeat",
+        "title": "会员复购",
+        "node_type": "任务",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "会员复购 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "catering-menu",
+        "title": "菜单结构",
+        "node_type": "变量",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "菜单结构 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "catering-review",
+        "title": "门店复盘",
+        "node_type": "数据",
+        "parent_id": "industry-catering",
+        "level": 2,
+        "summary": "门店复盘 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "edu-trial",
+        "title": "试听转化",
+        "node_type": "痛点",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "试听转化 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "edu-parent",
+        "title": "家长沟通",
+        "node_type": "任务",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "家长沟通 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "edu-renewal",
+        "title": "续费节奏",
+        "node_type": "任务",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "续费节奏 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "edu-referral",
+        "title": "转介绍",
+        "node_type": "增长",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "转介绍 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "edu-result",
+        "title": "结果证明",
+        "node_type": "素材",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "结果证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "edu-teacher",
+        "title": "老师人设",
+        "node_type": "内容",
+        "parent_id": "industry-education",
+        "level": 2,
+        "summary": "老师人设 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "b2b-lead-score",
+        "title": "线索评分",
+        "node_type": "判断",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "线索评分 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "b2b-solution",
+        "title": "方案生成",
+        "node_type": "任务",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "方案生成 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "b2b-decision",
+        "title": "决策链",
+        "node_type": "变量",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "决策链 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "b2b-proof",
+        "title": "交付证明",
+        "node_type": "素材",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "交付证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "b2b-procurement",
+        "title": "采购阻力",
+        "node_type": "痛点",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "采购阻力 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "b2b-renewal",
+        "title": "续约复盘",
+        "node_type": "数据",
+        "parent_id": "industry-enterprise",
+        "level": 2,
+        "summary": "续约复盘 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "franchise-page",
+        "title": "招商页面",
+        "node_type": "内容",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "招商页面 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "franchise-consult",
+        "title": "咨询承接",
+        "node_type": "任务",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "咨询承接 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "franchise-proof",
+        "title": "加盟证据",
+        "node_type": "素材",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "加盟证据 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "franchise-store",
+        "title": "门店模型",
+        "node_type": "变量",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "门店模型 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "franchise-risk",
+        "title": "投资顾虑",
+        "node_type": "痛点",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "投资顾虑 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "franchise-follow",
+        "title": "跟进节奏",
+        "node_type": "任务",
+        "parent_id": "industry-franchise",
+        "level": 2,
+        "summary": "跟进节奏 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "service-screening",
+        "title": "客资筛选",
+        "node_type": "判断",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "客资筛选 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "service-trust",
+        "title": "顾问信任",
+        "node_type": "痛点",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "顾问信任 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "service-consult",
+        "title": "私密沟通",
+        "node_type": "场景",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "私密沟通 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "service-proof",
+        "title": "服务证明",
+        "node_type": "素材",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "服务证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "service-private",
+        "title": "关系维护",
+        "node_type": "任务",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "关系维护 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "service-renewal",
+        "title": "长期复购",
+        "node_type": "增长",
+        "parent_id": "industry-highend-service",
+        "level": 2,
+        "summary": "长期复购 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "local-coupon",
+        "title": "团购承接",
+        "node_type": "痛点",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "团购承接 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "local-store",
+        "title": "到店核销",
+        "node_type": "任务",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "到店核销 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "local-review",
+        "title": "评价沉淀",
+        "node_type": "数据",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "评价沉淀 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "local-repeat",
+        "title": "复购提醒",
+        "node_type": "任务",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "复购提醒 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "local-area",
+        "title": "商圈竞争",
+        "node_type": "变量",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "商圈竞争 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "local-private",
+        "title": "私域留存",
+        "node_type": "场景",
+        "parent_id": "industry-local-life",
+        "level": 2,
+        "summary": "私域留存 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "medbeauty-consult",
+        "title": "咨询转化",
+        "node_type": "痛点",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "咨询转化 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "medbeauty-case",
+        "title": "案例证明",
+        "node_type": "素材",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "案例证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "medbeauty-risk",
+        "title": "风险解释",
+        "node_type": "合规",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "风险解释 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "medbeauty-follow",
+        "title": "复诊提醒",
+        "node_type": "任务",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "复诊提醒 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "medbeauty-compliance",
+        "title": "合规边界",
+        "node_type": "约束",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "合规边界 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "medbeauty-content",
+        "title": "审美内容",
+        "node_type": "内容",
+        "parent_id": "industry-medical-beauty",
+        "level": 2,
+        "summary": "审美内容 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "estate-channel",
+        "title": "经纪渠道",
+        "node_type": "增长",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "经纪渠道 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "estate-avatar",
+        "title": "客户画像",
+        "node_type": "判断",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "客户画像 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "estate-invite",
+        "title": "案场邀约",
+        "node_type": "动作",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "案场邀约 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "estate-objection",
+        "title": "异议处理",
+        "node_type": "痛点",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "异议处理 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "estate-proof",
+        "title": "成交证明",
+        "node_type": "素材",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "成交证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "estate-follow",
+        "title": "跟进时机",
+        "node_type": "任务",
+        "parent_id": "industry-realestate",
+        "level": 2,
+        "summary": "跟进时机 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "tourism-story",
+        "title": "目的地故事",
+        "node_type": "内容",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "目的地故事 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "tourism-channel",
+        "title": "渠道合作",
+        "node_type": "增长",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "渠道合作 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "tourism-event",
+        "title": "活动招商",
+        "node_type": "任务",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "活动招商 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "tourism-dealer",
+        "title": "代理承接",
+        "node_type": "痛点",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "代理承接 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "tourism-season",
+        "title": "淡旺季",
+        "node_type": "变量",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "淡旺季 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "tourism-route",
+        "title": "线路设计",
+        "node_type": "方案",
+        "parent_id": "industry-tourism",
+        "level": 2,
+        "summary": "线路设计 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "content-persona",
+        "title": "人设文档",
+        "node_type": "知识库",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "人设文档 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "content-hooks",
+        "title": "开头钩子",
+        "node_type": "文案",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "开头钩子 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "content-photo",
+        "title": "图片提示词",
+        "node_type": "素材",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "图片提示词 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "content-proof",
+        "title": "成交证明",
+        "node_type": "素材",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "成交证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "content-series",
+        "title": "栏目系列",
+        "node_type": "内容",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "栏目系列 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "content-polish",
+        "title": "一键爆改",
+        "node_type": "工具",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "一键爆改 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "content-calendar",
+        "title": "发布节奏",
+        "node_type": "流程",
+        "parent_id": "capability-content",
+        "level": 3,
+        "summary": "发布节奏 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 7
+      },
+      {
+        "id": "private-tag",
+        "title": "客户标签",
+        "node_type": "数据",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "客户标签 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "private-greeting",
+        "title": "入群欢迎",
+        "node_type": "话术",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "入群欢迎 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "private-nurture",
+        "title": "养熟节奏",
+        "node_type": "流程",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "养熟节奏 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "private-event",
+        "title": "活动承接",
+        "node_type": "动作",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "活动承接 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "private-offer",
+        "title": "限时权益",
+        "node_type": "方案",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "限时权益 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "private-rebuy",
+        "title": "复购提醒",
+        "node_type": "动作",
+        "parent_id": "capability-private",
+        "level": 3,
+        "summary": "复购提醒 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "review-metrics",
+        "title": "指标看板",
+        "node_type": "数据",
+        "parent_id": "capability-review",
+        "level": 3,
+        "summary": "指标看板 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "review-source",
+        "title": "来源分析",
+        "node_type": "数据",
+        "parent_id": "capability-review",
+        "level": 3,
+        "summary": "来源分析 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "review-dropoff",
+        "title": "流失节点",
+        "node_type": "问题",
+        "parent_id": "capability-review",
+        "level": 3,
+        "summary": "流失节点 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "review-script",
+        "title": "话术复盘",
+        "node_type": "优化",
+        "parent_id": "capability-review",
+        "level": 3,
+        "summary": "话术复盘 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "review-next",
+        "title": "下一动作",
+        "node_type": "动作",
+        "parent_id": "capability-review",
+        "level": 3,
+        "summary": "下一动作 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "sales-stage",
+        "title": "客户阶段",
+        "node_type": "判断",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "客户阶段 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "sales-message",
+        "title": "跟进消息",
+        "node_type": "话术",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "跟进消息 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "sales-meeting",
+        "title": "会前准备",
+        "node_type": "动作",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "会前准备 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "sales-risk",
+        "title": "成交风险",
+        "node_type": "判断",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "成交风险 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "sales-close",
+        "title": "逼单动作",
+        "node_type": "动作",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "逼单动作 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "sales-crm",
+        "title": "客户记录",
+        "node_type": "数据",
+        "parent_id": "capability-sales",
+        "level": 3,
+        "summary": "客户记录 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "conversion-objection",
+        "title": "异议处理",
+        "node_type": "问题",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "异议处理 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "conversion-proof",
+        "title": "信任证明",
+        "node_type": "素材",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "信任证明 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "conversion-offer",
+        "title": "成交方案",
+        "node_type": "动作",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "成交方案 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "conversion-sop",
+        "title": "销售 SOP",
+        "node_type": "流程",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "销售 SOP 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "conversion-demo",
+        "title": "现场演示",
+        "node_type": "动作",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "现场演示 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "conversion-urgency",
+        "title": "紧迫理由",
+        "node_type": "话术",
+        "parent_id": "problem-conversion",
+        "level": 3,
+        "summary": "紧迫理由 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "lead-source",
+        "title": "线索来源",
+        "node_type": "问题",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "线索来源 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 1
+      },
+      {
+        "id": "lead-quality",
+        "title": "线索质量",
+        "node_type": "问题",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "线索质量 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 2
+      },
+      {
+        "id": "dealer-avatar",
+        "title": "代理画像",
+        "node_type": "人群",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "代理画像 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 3
+      },
+      {
+        "id": "invite-script",
+        "title": "邀约话术",
+        "node_type": "动作",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "邀约话术 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 4
+      },
+      {
+        "id": "event-hook",
+        "title": "招商钩子",
+        "node_type": "素材",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "招商钩子 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 5
+      },
+      {
+        "id": "pain-mining",
+        "title": "痛点挖掘",
+        "node_type": "问题",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "痛点挖掘 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 6
+      },
+      {
+        "id": "follow-up-rhythm",
+        "title": "跟进节奏",
+        "node_type": "动作",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "跟进节奏 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 7
+      },
+      {
+        "id": "asset-pack",
+        "title": "资料包",
+        "node_type": "素材",
+        "parent_id": "problem-leads",
+        "level": 3,
+        "summary": "资料包 是当前焦点的关联变量，可继续沉淀成知识库或智能体动作。",
+        "insight": "这个节点目前是变量层，后续可以升级为独立智能体或知识库条目。",
+        "status": "active",
+        "is_leaf": true,
+        "sort_order": 8
+      }
+    ],
+    "edges": [
+      {
+        "id": "root-brief->industry-baijiu",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-baijiu",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 1
+      },
+      {
+        "id": "root-brief->industry-catering",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-catering",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 2
+      },
+      {
+        "id": "root-brief->industry-beauty",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-beauty",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 3
+      },
+      {
+        "id": "root-brief->industry-education",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-education",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 4
+      },
+      {
+        "id": "root-brief->industry-local-life",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-local-life",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 5
+      },
+      {
+        "id": "root-brief->industry-enterprise",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-enterprise",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 6
+      },
+      {
+        "id": "root-brief->industry-tourism",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-tourism",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 7
+      },
+      {
+        "id": "root-brief->industry-medical-beauty",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-medical-beauty",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 8
+      },
+      {
+        "id": "root-brief->industry-realestate",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-realestate",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 9
+      },
+      {
+        "id": "root-brief->industry-agriculture",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-agriculture",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 10
+      },
+      {
+        "id": "root-brief->industry-franchise",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-franchise",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 11
+      },
+      {
+        "id": "root-brief->industry-highend-service",
+        "source_node_id": "root-brief",
+        "target_node_id": "industry-highend-service",
+        "relation_type": "opens_to_industry",
+        "relation_label": "行业积累",
+        "sort_order": 12
+      },
+      {
+        "id": "industry-baijiu->problem-leads",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "problem-leads",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-baijiu->problem-conversion",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "problem-conversion",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-baijiu->capability-content",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "capability-content",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-baijiu->capability-sales",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "capability-sales",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-baijiu->capability-private",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "capability-private",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-baijiu->capability-review",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "capability-review",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-baijiu->baijiu-channel",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "baijiu-channel",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 7
+      },
+      {
+        "id": "industry-baijiu->baijiu-trust",
+        "source_node_id": "industry-baijiu",
+        "target_node_id": "baijiu-trust",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 8
+      },
+      {
+        "id": "industry-catering->catering-location",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-location",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-catering->catering-franchise",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-franchise",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-catering->catering-takeaway",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-takeaway",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-catering->catering-repeat",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-repeat",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-catering->catering-menu",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-menu",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-catering->catering-review",
+        "source_node_id": "industry-catering",
+        "target_node_id": "catering-review",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-beauty->beauty-trust",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-trust",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-beauty->beauty-package",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-package",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-beauty->beauty-consultant",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-consultant",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-beauty->beauty-member",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-member",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-beauty->beauty-private",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-private",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-beauty->beauty-case",
+        "source_node_id": "industry-beauty",
+        "target_node_id": "beauty-case",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-education->edu-trial",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-trial",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-education->edu-parent",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-parent",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-education->edu-renewal",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-renewal",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-education->edu-referral",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-referral",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-education->edu-result",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-result",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-education->edu-teacher",
+        "source_node_id": "industry-education",
+        "target_node_id": "edu-teacher",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-local-life->local-coupon",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-coupon",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-local-life->local-store",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-store",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-local-life->local-review",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-review",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-local-life->local-repeat",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-repeat",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-local-life->local-area",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-area",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-local-life->local-private",
+        "source_node_id": "industry-local-life",
+        "target_node_id": "local-private",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-enterprise->b2b-lead-score",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-lead-score",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-enterprise->b2b-solution",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-solution",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-enterprise->b2b-decision",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-decision",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-enterprise->b2b-proof",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-proof",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-enterprise->b2b-procurement",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-procurement",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-enterprise->b2b-renewal",
+        "source_node_id": "industry-enterprise",
+        "target_node_id": "b2b-renewal",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-tourism->tourism-story",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-story",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-tourism->tourism-channel",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-channel",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-tourism->tourism-event",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-event",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-tourism->tourism-dealer",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-dealer",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-tourism->tourism-season",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-season",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-tourism->tourism-route",
+        "source_node_id": "industry-tourism",
+        "target_node_id": "tourism-route",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-consult",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-consult",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-case",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-case",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-risk",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-risk",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-follow",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-follow",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-compliance",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-compliance",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-medical-beauty->medbeauty-content",
+        "source_node_id": "industry-medical-beauty",
+        "target_node_id": "medbeauty-content",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-realestate->estate-channel",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-channel",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-realestate->estate-avatar",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-avatar",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-realestate->estate-invite",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-invite",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-realestate->estate-objection",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-objection",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-realestate->estate-proof",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-proof",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-realestate->estate-follow",
+        "source_node_id": "industry-realestate",
+        "target_node_id": "estate-follow",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-agriculture->agri-origin",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-origin",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-agriculture->agri-channel",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-channel",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-agriculture->agri-sample",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-sample",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-agriculture->agri-kol",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-kol",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-agriculture->agri-repeat",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-repeat",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-agriculture->agri-pack",
+        "source_node_id": "industry-agriculture",
+        "target_node_id": "agri-pack",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-franchise->franchise-page",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-page",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-franchise->franchise-consult",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-consult",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-franchise->franchise-proof",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-proof",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-franchise->franchise-store",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-store",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-franchise->franchise-risk",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-risk",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-franchise->franchise-follow",
+        "source_node_id": "industry-franchise",
+        "target_node_id": "franchise-follow",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "industry-highend-service->service-screening",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-screening",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "industry-highend-service->service-trust",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-trust",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "industry-highend-service->service-consult",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-consult",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "industry-highend-service->service-proof",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-proof",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "industry-highend-service->service-private",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-private",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "industry-highend-service->service-renewal",
+        "source_node_id": "industry-highend-service",
+        "target_node_id": "service-renewal",
+        "relation_type": "decomposes_to_business_node",
+        "relation_label": "行业拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "problem-leads->lead-source",
+        "source_node_id": "problem-leads",
+        "target_node_id": "lead-source",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "problem-leads->lead-quality",
+        "source_node_id": "problem-leads",
+        "target_node_id": "lead-quality",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "problem-leads->dealer-avatar",
+        "source_node_id": "problem-leads",
+        "target_node_id": "dealer-avatar",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "problem-leads->invite-script",
+        "source_node_id": "problem-leads",
+        "target_node_id": "invite-script",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "problem-leads->event-hook",
+        "source_node_id": "problem-leads",
+        "target_node_id": "event-hook",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "problem-leads->pain-mining",
+        "source_node_id": "problem-leads",
+        "target_node_id": "pain-mining",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "problem-leads->follow-up-rhythm",
+        "source_node_id": "problem-leads",
+        "target_node_id": "follow-up-rhythm",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 7
+      },
+      {
+        "id": "problem-leads->asset-pack",
+        "source_node_id": "problem-leads",
+        "target_node_id": "asset-pack",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 8
+      },
+      {
+        "id": "problem-conversion->conversion-objection",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-objection",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "problem-conversion->conversion-proof",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-proof",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "problem-conversion->conversion-offer",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-offer",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "problem-conversion->conversion-sop",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-sop",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "problem-conversion->conversion-demo",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-demo",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "problem-conversion->conversion-urgency",
+        "source_node_id": "problem-conversion",
+        "target_node_id": "conversion-urgency",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "capability-content->content-persona",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-persona",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "capability-content->content-hooks",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-hooks",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "capability-content->content-photo",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-photo",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "capability-content->content-proof",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-proof",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "capability-content->content-series",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-series",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "capability-content->content-polish",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-polish",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "capability-content->content-calendar",
+        "source_node_id": "capability-content",
+        "target_node_id": "content-calendar",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 7
+      },
+      {
+        "id": "capability-sales->sales-stage",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-stage",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "capability-sales->sales-message",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-message",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "capability-sales->sales-meeting",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-meeting",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "capability-sales->sales-risk",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-risk",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "capability-sales->sales-close",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-close",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "capability-sales->sales-crm",
+        "source_node_id": "capability-sales",
+        "target_node_id": "sales-crm",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "capability-private->private-tag",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-tag",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "capability-private->private-greeting",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-greeting",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "capability-private->private-nurture",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-nurture",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "capability-private->private-event",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-event",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "capability-private->private-offer",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-offer",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      },
+      {
+        "id": "capability-private->private-rebuy",
+        "source_node_id": "capability-private",
+        "target_node_id": "private-rebuy",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 6
+      },
+      {
+        "id": "capability-review->review-metrics",
+        "source_node_id": "capability-review",
+        "target_node_id": "review-metrics",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 1
+      },
+      {
+        "id": "capability-review->review-source",
+        "source_node_id": "capability-review",
+        "target_node_id": "review-source",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 2
+      },
+      {
+        "id": "capability-review->review-dropoff",
+        "source_node_id": "capability-review",
+        "target_node_id": "review-dropoff",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 3
+      },
+      {
+        "id": "capability-review->review-script",
+        "source_node_id": "capability-review",
+        "target_node_id": "review-script",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 4
+      },
+      {
+        "id": "capability-review->review-next",
+        "source_node_id": "capability-review",
+        "target_node_id": "review-next",
+        "relation_type": "decomposes_to_variable",
+        "relation_label": "变量拆解",
+        "sort_order": 5
+      }
+    ],
+    "agents": [
+      {
+        "id": "agent-strategy",
+        "agent_key": "strategy",
+        "name": "战略诊断智能体",
+        "role": "把业务问题翻译成智能体作战方向",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 94,
+        "status": "active"
+      },
+      {
+        "id": "agent-position",
+        "agent_key": "positioning",
+        "name": "定位提炼智能体",
+        "role": "提炼人群、卖点和差异化表达",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 91,
+        "status": "active"
+      },
+      {
+        "id": "agent-content",
+        "agent_key": "content",
+        "name": "图文内容智能体",
+        "role": "生成朋友圈、小红书和公众号图文",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 89,
+        "status": "active"
+      },
+      {
+        "id": "agent-industry-map",
+        "agent_key": "industry_map",
+        "name": "行业地图智能体",
+        "role": "拆解行业链路、场景和关键变量",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 88,
+        "status": "active"
+      },
+      {
+        "id": "agent-script",
+        "agent_key": "script",
+        "name": "招商话术智能体",
+        "role": "生成邀约、破冰、跟进和成交话术",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 93,
+        "status": "active"
+      },
+      {
+        "id": "agent-lead-mining",
+        "agent_key": "lead_mining",
+        "name": "线索挖掘智能体",
+        "role": "判断线索来源和客户优先级",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 92,
+        "status": "active"
+      },
+      {
+        "id": "agent-brief",
+        "agent_key": "brief",
+        "name": "客户问诊智能体",
+        "role": "通过提问收敛客户真实需求",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 90,
+        "status": "active"
+      },
+      {
+        "id": "agent-objection",
+        "agent_key": "objection",
+        "name": "异议处理智能体",
+        "role": "把客户拒绝点转成下一步动作",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 87,
+        "status": "active"
+      },
+      {
+        "id": "agent-sales-sop",
+        "agent_key": "sales_sop",
+        "name": "销售 SOP 智能体",
+        "role": "按阶段生成跟进计划和动作清单",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 86,
+        "status": "active"
+      },
+      {
+        "id": "agent-review",
+        "agent_key": "review",
+        "name": "成交复盘智能体",
+        "role": "分析卡点并给出改进建议",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 84,
+        "status": "active"
+      },
+      {
+        "id": "agent-moments",
+        "agent_key": "moments",
+        "name": "朋友圈爆款智能体",
+        "role": "围绕人设和成交场景生成朋友圈",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 95,
+        "status": "active"
+      },
+      {
+        "id": "agent-xhs",
+        "agent_key": "xhs",
+        "name": "小红书图文智能体",
+        "role": "输出小红书标题、正文和配图提示",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 88,
+        "status": "active"
+      },
+      {
+        "id": "agent-image",
+        "agent_key": "image",
+        "name": "配图审美智能体",
+        "role": "把图片提示词从生硬拉到可信",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 82,
+        "status": "active"
+      },
+      {
+        "id": "agent-follow-up",
+        "agent_key": "follow_up",
+        "name": "客户跟进智能体",
+        "role": "生成下一次沟通策略和消息",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 89,
+        "status": "active"
+      },
+      {
+        "id": "agent-private-domain",
+        "agent_key": "private_domain",
+        "name": "私域承接智能体",
+        "role": "设计入群、养熟和转化承接链路",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 85,
+        "status": "active"
+      },
+      {
+        "id": "agent-data-review",
+        "agent_key": "data_review",
+        "name": "数据复盘智能体",
+        "role": "从指标和过程记录中发现问题",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 83,
+        "status": "active"
+      },
+      {
+        "id": "agent-kpi",
+        "agent_key": "kpi",
+        "name": "指标设计智能体",
+        "role": "把业务目标拆成可追踪指标",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 80,
+        "status": "active"
+      },
+      {
+        "id": "agent-report",
+        "agent_key": "report",
+        "name": "复盘报告智能体",
+        "role": "输出老板能看懂的周报和复盘",
+        "provider": "coze",
+        "endpoint": "/api/agent-gateway/chat",
+        "score": 81,
+        "status": "active"
+      }
+    ],
+    "node_agents": [
+      {
+        "id": "root-brief:agent-strategy",
+        "node_id": "root-brief",
+        "agent_id": "agent-strategy",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "root-brief:agent-lead-mining",
+        "node_id": "root-brief",
+        "agent_id": "agent-lead-mining",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "root-brief:agent-position",
+        "node_id": "root-brief",
+        "agent_id": "agent-position",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-baijiu:agent-industry-map",
+        "node_id": "industry-baijiu",
+        "agent_id": "agent-industry-map",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-baijiu:agent-position",
+        "node_id": "industry-baijiu",
+        "agent_id": "agent-position",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-baijiu:agent-script",
+        "node_id": "industry-baijiu",
+        "agent_id": "agent-script",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-catering:agent-strategy",
+        "node_id": "industry-catering",
+        "agent_id": "agent-strategy",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-catering:agent-content",
+        "node_id": "industry-catering",
+        "agent_id": "agent-content",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-catering:agent-review",
+        "node_id": "industry-catering",
+        "agent_id": "agent-review",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-beauty:agent-private-domain",
+        "node_id": "industry-beauty",
+        "agent_id": "agent-private-domain",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-beauty:agent-script",
+        "node_id": "industry-beauty",
+        "agent_id": "agent-script",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-beauty:agent-content",
+        "node_id": "industry-beauty",
+        "agent_id": "agent-content",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-education:agent-follow-up",
+        "node_id": "industry-education",
+        "agent_id": "agent-follow-up",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-education:agent-content",
+        "node_id": "industry-education",
+        "agent_id": "agent-content",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-education:agent-kpi",
+        "node_id": "industry-education",
+        "agent_id": "agent-kpi",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-local-life:agent-data-review",
+        "node_id": "industry-local-life",
+        "agent_id": "agent-data-review",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-local-life:agent-private-domain",
+        "node_id": "industry-local-life",
+        "agent_id": "agent-private-domain",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-local-life:agent-content",
+        "node_id": "industry-local-life",
+        "agent_id": "agent-content",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-enterprise:agent-lead-mining",
+        "node_id": "industry-enterprise",
+        "agent_id": "agent-lead-mining",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-enterprise:agent-sales-sop",
+        "node_id": "industry-enterprise",
+        "agent_id": "agent-sales-sop",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-enterprise:agent-report",
+        "node_id": "industry-enterprise",
+        "agent_id": "agent-report",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-tourism:agent-content",
+        "node_id": "industry-tourism",
+        "agent_id": "agent-content",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-tourism:agent-industry-map",
+        "node_id": "industry-tourism",
+        "agent_id": "agent-industry-map",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-tourism:agent-review",
+        "node_id": "industry-tourism",
+        "agent_id": "agent-review",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-medical-beauty:agent-private-domain",
+        "node_id": "industry-medical-beauty",
+        "agent_id": "agent-private-domain",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-medical-beauty:agent-objection",
+        "node_id": "industry-medical-beauty",
+        "agent_id": "agent-objection",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-medical-beauty:agent-content",
+        "node_id": "industry-medical-beauty",
+        "agent_id": "agent-content",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-realestate:agent-follow-up",
+        "node_id": "industry-realestate",
+        "agent_id": "agent-follow-up",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-realestate:agent-objection",
+        "node_id": "industry-realestate",
+        "agent_id": "agent-objection",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-realestate:agent-data-review",
+        "node_id": "industry-realestate",
+        "agent_id": "agent-data-review",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-agriculture:agent-content",
+        "node_id": "industry-agriculture",
+        "agent_id": "agent-content",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-agriculture:agent-script",
+        "node_id": "industry-agriculture",
+        "agent_id": "agent-script",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-agriculture:agent-review",
+        "node_id": "industry-agriculture",
+        "agent_id": "agent-review",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-franchise:agent-position",
+        "node_id": "industry-franchise",
+        "agent_id": "agent-position",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-franchise:agent-script",
+        "node_id": "industry-franchise",
+        "agent_id": "agent-script",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-franchise:agent-sales-sop",
+        "node_id": "industry-franchise",
+        "agent_id": "agent-sales-sop",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-highend-service:agent-brief",
+        "node_id": "industry-highend-service",
+        "agent_id": "agent-brief",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-highend-service:agent-follow-up",
+        "node_id": "industry-highend-service",
+        "agent_id": "agent-follow-up",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "industry-highend-service:agent-private-domain",
+        "node_id": "industry-highend-service",
+        "agent_id": "agent-private-domain",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-leads:agent-lead-mining",
+        "node_id": "problem-leads",
+        "agent_id": "agent-lead-mining",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-leads:agent-script",
+        "node_id": "problem-leads",
+        "agent_id": "agent-script",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-leads:agent-brief",
+        "node_id": "problem-leads",
+        "agent_id": "agent-brief",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-conversion:agent-objection",
+        "node_id": "problem-conversion",
+        "agent_id": "agent-objection",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-conversion:agent-sales-sop",
+        "node_id": "problem-conversion",
+        "agent_id": "agent-sales-sop",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "problem-conversion:agent-review",
+        "node_id": "problem-conversion",
+        "agent_id": "agent-review",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-content:agent-moments",
+        "node_id": "capability-content",
+        "agent_id": "agent-moments",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-content:agent-xhs",
+        "node_id": "capability-content",
+        "agent_id": "agent-xhs",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-content:agent-image",
+        "node_id": "capability-content",
+        "agent_id": "agent-image",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-sales:agent-follow-up",
+        "node_id": "capability-sales",
+        "agent_id": "agent-follow-up",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-sales:agent-objection",
+        "node_id": "capability-sales",
+        "agent_id": "agent-objection",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-sales:agent-sales-sop",
+        "node_id": "capability-sales",
+        "agent_id": "agent-sales-sop",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-private:agent-private-domain",
+        "node_id": "capability-private",
+        "agent_id": "agent-private-domain",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-private:agent-follow-up",
+        "node_id": "capability-private",
+        "agent_id": "agent-follow-up",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-private:agent-content",
+        "node_id": "capability-private",
+        "agent_id": "agent-content",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-review:agent-data-review",
+        "node_id": "capability-review",
+        "agent_id": "agent-data-review",
+        "priority": 1,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-review:agent-kpi",
+        "node_id": "capability-review",
+        "agent_id": "agent-kpi",
+        "priority": 2,
+        "relation_type": "recommended_agent"
+      },
+      {
+        "id": "capability-review:agent-report",
+        "node_id": "capability-review",
+        "agent_id": "agent-report",
+        "priority": 3,
+        "relation_type": "recommended_agent"
+      }
+    ]
+  }
+}

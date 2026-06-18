@@ -1,132 +1,133 @@
-import { useCallback, useEffect, useState } from 'react'
-import './App.css'
+import { useEffect, useState } from "react";
+import {
+  ClockCounterClockwise,
+  CubeTransparent,
+  Network,
+  PlugsConnected,
+} from "@phosphor-icons/react";
+import {
+  askRoutingAgent,
+  graphModel,
+  ROOT_ID,
+} from "./agentAdapter.js";
+import { AgentDock } from "./components/AgentDock.jsx";
+import { ControlDock } from "./components/ControlDock.jsx";
+import { KnowledgeGraph } from "./components/KnowledgeGraph.jsx";
+import { RecommendationRail } from "./components/RecommendationRail.jsx";
 
-const defaultStatus = {
-  state: 'idle',
-  message: '尚未连接后端',
-  payload: null,
+function TopBar({ mode, setMode }) {
+  return (
+    <header className="top-bar">
+      <div className="brand-lockup">
+        <span className="brand-glyph">
+          <CubeTransparent size={24} weight="duotone" />
+        </span>
+        <div>
+          <strong>智能体知识图谱</strong>
+          <span>Agentic Knowledge Atlas</span>
+        </div>
+      </div>
+
+      <nav className="top-pills" aria-label="系统状态">
+        <span>
+          <Network size={15} />
+          66 智能体库
+        </span>
+        <span>
+          <PlugsConnected size={15} />
+          API Layer Mock
+        </span>
+        <span>
+          <ClockCounterClockwise size={15} />
+          演示模式
+        </span>
+      </nav>
+
+      <div className="top-switch">
+        <button type="button" className={mode === "atlas" ? "active" : ""} onClick={() => setMode("atlas")}>
+          全域
+        </button>
+        <button type="button" className={mode === "path" ? "active" : ""} onClick={() => setMode("path")}>
+          路径
+        </button>
+        <button type="button" className={mode === "step" ? "active" : ""} onClick={() => setMode("step")}>
+          推进
+        </button>
+      </div>
+    </header>
+  );
 }
 
-function App() {
-  const [status, setStatus] = useState(defaultStatus)
-  const [echoText, setEchoText] = useState('你好，Flask')
-  const [echoResult, setEchoResult] = useState(null)
+export function App() {
+  const [focusId, setFocusId] = useState(ROOT_ID);
+  const [selectedId, setSelectedId] = useState(ROOT_ID);
+  const [depth, setDepth] = useState(3);
+  const [mode, setMode] = useState("atlas");
+  const [showLabels, setShowLabels] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [toast, setToast] = useState("");
 
-  const checkHealth = useCallback(async () => {
-    setStatus({ state: 'loading', message: '正在连接后端...', payload: null })
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
-    try {
-      const response = await fetch('/api/health')
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-      setStatus({
-        state: 'success',
-        message: '后端连接正常',
-        payload: data,
-      })
-    } catch (error) {
-      setStatus({
-        state: 'error',
-        message: `无法连接后端：${error.message}`,
-        payload: null,
-      })
-    }
-  }, [])
-
-  const sendEcho = async (event) => {
-    event.preventDefault()
-    setEchoResult({ state: 'loading', data: null })
-
-    try {
-      const response = await fetch('/api/echo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: echoText }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-      setEchoResult({ state: 'success', data })
-    } catch (error) {
-      setEchoResult({
-        state: 'error',
-        data: { error: error.message },
-      })
+  function focusNode(id) {
+    setSelectedId(id);
+    if (graphModel[id]) {
+      setFocusId(id);
+      setMode(id === ROOT_ID ? "atlas" : "path");
     }
   }
 
-  useEffect(() => {
-    checkHealth()
-  }, [checkHealth])
+  function resetGraph() {
+    setFocusId(ROOT_ID);
+    setSelectedId(ROOT_ID);
+    setMode("atlas");
+  }
+
+  function sendAgentMessage() {
+    const text = draft.trim();
+    if (!text) return;
+    const response = askRoutingAgent(text, focusId);
+    setDraft("");
+    if (response.focusId) focusNode(response.focusId);
+    setToast(response.text);
+  }
 
   return (
-    <main className="app-shell">
-      <section className="status-panel" aria-labelledby="app-title">
-        <div>
-          <p className="eyebrow">React + Vite / Flask</p>
-          <h1 id="app-title">前后端项目已就绪</h1>
-          <p className="intro">
-            这个前端通过 Vite 代理请求 Flask API，可以直接作为你的业务项目起点。
-          </p>
-        </div>
-
-        <div className={`health health-${status.state}`}>
-          <span className="health-dot" aria-hidden="true" />
-          <div>
-            <strong>{status.message}</strong>
-            {status.payload ? (
-              <span>
-                {status.payload.service} / {status.payload.status}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      <section className="workspace-grid" aria-label="项目状态">
-        <article className="project-card">
-          <span className="project-label">Frontend</span>
-          <h2>React + Vite</h2>
-          <p>组件入口、样式、Vite 代理和构建脚本已经配置好。</p>
-          <button type="button" onClick={checkHealth}>
-            重新检测 API
-          </button>
-        </article>
-
-        <article className="project-card">
-          <span className="project-label">Backend</span>
-          <h2>Flask API</h2>
-          <p>默认运行在 127.0.0.1:5000，并提供健康检查与 echo 接口。</p>
-          <form onSubmit={sendEcho} className="echo-form">
-            <label htmlFor="echo-input">发送测试消息</label>
-            <div className="echo-row">
-              <input
-                id="echo-input"
-                value={echoText}
-                onChange={(event) => setEchoText(event.target.value)}
-                placeholder="输入一段消息"
-              />
-              <button type="submit">发送</button>
-            </div>
-          </form>
-          {echoResult ? (
-            <pre className={`echo-result echo-${echoResult.state}`}>
-              {JSON.stringify(echoResult.data ?? { state: echoResult.state }, null, 2)}
-            </pre>
-          ) : null}
-        </article>
-      </section>
+    <main className={`app-shell app-mode-${mode}`}>
+      <TopBar mode={mode} setMode={setMode} />
+      <AgentDock
+        draft={draft}
+        setDraft={setDraft}
+        onSend={sendAgentMessage}
+      />
+      <KnowledgeGraph
+        focusId={focusId}
+        selectedId={selectedId}
+        depth={depth}
+        mode={mode}
+        showLabels={showLabels}
+        onFocus={focusNode}
+        onSelect={setSelectedId}
+      />
+      <RecommendationRail focusId={focusId} selectedId={selectedId} onToast={setToast} />
+      <ControlDock
+        mode={mode}
+        setMode={setMode}
+        depth={depth}
+        setDepth={setDepth}
+        showLabels={showLabels}
+        setShowLabels={setShowLabels}
+        onReset={resetGraph}
+      />
+      {toast && (
+        <button type="button" className="toast" onClick={() => setToast("")}>
+          {toast}
+        </button>
+      )}
     </main>
-  )
+  );
 }
-
-export default App
