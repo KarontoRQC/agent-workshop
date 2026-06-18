@@ -150,12 +150,10 @@ def _iter_chat_workflow_stream(
 
 def build_recommender_message(selected_route, agent_names, original_message):
     route = selected_route or "未识别到明确路线"
-    agent_collection = "、".join(agent_names)
 
     return "\n".join(
         [
             f"已选择的路线：{route}",
-            f"该路线对应的智能体合集：{agent_collection}",
             f"可能包含业务需求、学习目标或任务描述：{original_message}",
         ]
     )

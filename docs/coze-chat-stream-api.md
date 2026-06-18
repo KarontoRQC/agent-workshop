@@ -58,7 +58,6 @@ Content-Type: application/json
 
 ```text
 已选择的路线：{第一阶段 KG_PATH}
-该路线对应的智能体合集：{agent_names}
 可能包含业务需求、学习目标或任务描述：{message}
 ```
 
