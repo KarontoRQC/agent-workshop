@@ -28,7 +28,7 @@ export function KnowledgeGraph({
   const hoverFrameRef = useRef(0);
   const pendingHoverRef = useRef(null);
   const [hoveredId, setHoveredId] = useState(null);
-  const ambientNodes = useMemo(() => makeAmbientField(700), []);
+  const ambientNodes = useMemo(() => makeAmbientField(540), []);
   const ambientLinks = useMemo(() => makeAmbientLinks(ambientNodes), [ambientNodes]);
   const layout = useMemo(() => buildGraphLayout({ focusId, depth, mode }), [focusId, depth, mode]);
   const focus = getNode(focusId);

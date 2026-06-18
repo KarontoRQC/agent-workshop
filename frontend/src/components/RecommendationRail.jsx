@@ -13,7 +13,18 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
   const launchTargets = getAgentLaunchTargets(agents);
 
   function handlePackageAgents() {
-    launchTargets.forEach((target) => {
+    const openedTabs = launchTargets.map((target) => ({
+      target,
+      tab: window.open("about:blank", "_blank"),
+    }));
+
+    openedTabs.forEach(({ target, tab }) => {
+      if (tab) {
+        tab.opener = null;
+        tab.location.replace(target.href);
+        return;
+      }
+
       window.open(target.href, "_blank", "noopener,noreferrer");
     });
   }
@@ -102,7 +113,7 @@ function FlipAgentCard({ agent, index }) {
               <ArrowSquareOut size={14} weight="bold" />
             </a>
           ) : (
-            <span className="agent-card-link-muted">暂无入口</span>
+            <span className="agent-card-link-muted">等待入口</span>
           )}
         </div>
       </div>
@@ -125,6 +136,8 @@ function enrichRecommendedAgent(agent) {
 
   return {
     ...agent,
+    id: agent.id || catalogAgent?.id,
+    agentKey: agentKey || catalogAgent?.agentKey,
     name,
     endpoint,
     canOpen: Boolean(launchTarget?.href),
@@ -150,7 +163,12 @@ function findCatalogAgent(name, agentKey) {
     catalogAgents.find((item) => normalizeAgentName(item.name) === normalizedName) ||
     catalogAgents.find((item) => {
       const candidate = normalizeAgentName(item.name);
-      return candidate && (candidate.includes(normalizedName) || normalizedName.includes(candidate));
+      return (
+        candidate &&
+        normalizedName.length >= 3 &&
+        candidate.length >= 3 &&
+        (candidate.includes(normalizedName) || normalizedName.includes(candidate))
+      );
     }) ||
     null
   );
@@ -158,15 +176,22 @@ function findCatalogAgent(name, agentKey) {
 
 function normalizeAgentName(name) {
   return String(name || "")
-    .replace(/^[\s\d①②③④⑤⑥⑦⑧⑨⑩]+[.:：、)\]-]?\s*/, "")
-    .replace(/\s+/g, "")
+    .trim()
+    .replace(/^[\s\d①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]+[.、:：)\]）-]?\s*/u, "")
+    .replace(/[\s·・、，,.:：;；()（）[\]【】《》<>_\-/\\|]+/gu, "")
     .toLowerCase();
 }
 
 function getAgentLaunchTargets(agents) {
+  const seen = new Set();
+
   return agents
     .map((agent) => ({ href: agent.launchTarget, name: agent.name }))
-    .filter((target) => target.href);
+    .filter((target) => {
+      if (!target.href || seen.has(target.href)) return false;
+      seen.add(target.href);
+      return true;
+    });
 }
 
 function getAgentLaunchTarget(endpoint) {

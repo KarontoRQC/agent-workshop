@@ -75,7 +75,7 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     const nextHoverKey = params.hoveredId || "";
     if (nextHoverKey !== hoverKey) {
       hoverKey = nextHoverKey;
-      scheduleAnimationBurst(320, 72);
+      scheduleAnimationBurst(140, 110);
     }
     latestBaseParams = params;
     const positionedParams = applyDragPositions(params, dragPositions);
@@ -468,10 +468,9 @@ function getRelationState(params) {
   const { layout, focusId, selectedId, hoveredId } = params;
   const nodeMap = new Map(layout.nodes.map((node) => [node.id, node]));
   const hoveredNode = hoveredId ? nodeMap.get(hoveredId) : null;
-  const selectedNode = selectedId ? nodeMap.get(selectedId) : null;
   const hasHover = Boolean(hoveredNode);
   const rootHover = hoveredId === ROOT_ID && nodeMap.has(ROOT_ID);
-  const selectedIsRoute = Boolean(selectedNode && selectedId !== focusId);
+  const selectedIsRoute = Boolean(selectedId && selectedId !== focusId && getNode(selectedId));
 
   function addNode(id, isHot = false) {
     if (!id) return;
@@ -516,20 +515,19 @@ function getRelationState(params) {
     addDirectChildEdges(id, true);
   }
 
+  if (selectedIsRoute) addFocusedRoute(selectedId);
+
   if (rootHover) {
     addNode(ROOT_ID, true);
     addDirectChildEdges(ROOT_ID, true);
-    return { related, hot, hotEdges, specificSelection: false, hasHover, rootHover };
   }
 
-  if (hasHover) {
+  if (hasHover && !rootHover) {
     addFocusedRoute(hoveredId);
-    return { related, hot, hotEdges, specificSelection: true, hasHover, rootHover: false };
   }
 
-  if (selectedIsRoute) {
-    addFocusedRoute(selectedId);
-    return { related, hot, hotEdges, specificSelection: true, hasHover: false, rootHover: false };
+  if (selectedIsRoute || hasHover) {
+    return { related, hot, hotEdges, specificSelection: selectedIsRoute, hasHover, rootHover };
   }
 
   addNode(focusId, true);
