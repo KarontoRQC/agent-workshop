@@ -4,7 +4,7 @@ import {
   Graphics,
   Text,
 } from "pixi.js";
-import { ROOT_ID } from "./agentAdapter.js";
+import { getNode, ROOT_ID } from "./agentAdapter.js";
 import { VIEWBOX } from "./graphLayout.js";
 
 const colors = {
@@ -464,12 +464,13 @@ function shouldShowLabel(node, state, params) {
 function getRelationState(params) {
   const related = new Set();
   const hot = new Set();
+  const hotEdges = new Set();
   const { layout, focusId, selectedId, hoveredId } = params;
   const nodeMap = new Map(layout.nodes.map((node) => [node.id, node]));
   const hoveredNode = hoveredId ? nodeMap.get(hoveredId) : null;
   const selectedNode = selectedId ? nodeMap.get(selectedId) : null;
   const hasHover = Boolean(hoveredNode);
-  const rootHover = hoveredId === ROOT_ID;
+  const rootHover = hoveredId === ROOT_ID && nodeMap.has(ROOT_ID);
   const selectedIsRoute = Boolean(selectedNode && selectedId !== focusId);
 
   function addNode(id, isHot = false) {
@@ -478,45 +479,61 @@ function getRelationState(params) {
     if (isHot) hot.add(id);
   }
 
-  function addAncestors(id, isHot = false) {
-    let cursor = nodeMap.get(id);
+  function addEdge(sourceId, targetId, isHot = false) {
+    if (!sourceId || !targetId) return;
+    hotEdges.add(edgeKey(sourceId, targetId));
+    addNode(sourceId, isHot);
+    addNode(targetId, isHot);
+  }
+
+  function parentIdFor(id) {
+    return nodeMap.get(id)?.parentId || getNode(id)?.parent || null;
+  }
+
+  function addAncestorRoute(id, isHot = false, shouldLightEdges = false) {
+    let cursorId = id;
     let guard = 0;
-    while (cursor && guard < 24) {
-      addNode(cursor.id, isHot);
-      cursor = cursor.parentId ? nodeMap.get(cursor.parentId) : null;
+
+    while (cursorId && guard < 24) {
+      addNode(cursorId, isHot);
+      const parentId = parentIdFor(cursorId);
+      if (!parentId) break;
+      if (shouldLightEdges) addEdge(parentId, cursorId, isHot);
+      else addNode(parentId, isHot);
+      cursorId = parentId;
       guard += 1;
     }
   }
 
-  function addChildren(id, isHot = false) {
+  function addDirectChildEdges(id, isHot = false) {
     layout.nodes.forEach((node) => {
-      if (node.parentId === id) addNode(node.id, isHot);
+      if (node.parentId === id) addEdge(id, node.id, isHot);
     });
   }
 
   function addFocusedRoute(id) {
-    addAncestors(id, true);
-    addChildren(id, true);
+    addAncestorRoute(id, true, true);
+    addDirectChildEdges(id, true);
   }
 
   if (rootHover) {
     addNode(ROOT_ID, true);
-    addChildren(ROOT_ID, true);
-    return { related, hot, specificSelection: false, hasHover, rootHover };
+    addDirectChildEdges(ROOT_ID, true);
+    return { related, hot, hotEdges, specificSelection: false, hasHover, rootHover };
   }
 
   if (hasHover) {
     addFocusedRoute(hoveredId);
-    return { related, hot, specificSelection: true, hasHover, rootHover: false };
+    return { related, hot, hotEdges, specificSelection: true, hasHover, rootHover: false };
   }
 
   if (selectedIsRoute) {
     addFocusedRoute(selectedId);
-    return { related, hot, specificSelection: true, hasHover: false, rootHover: false };
+    return { related, hot, hotEdges, specificSelection: true, hasHover: false, rootHover: false };
   }
 
   addNode(focusId, true);
-  addAncestors(focusId);
+  addAncestorRoute(focusId);
 
   layout.nodes.forEach((node) => {
     if (node.isLineage || isMajorNode(node)) addNode(node.id, node.id === focusId || node.id === selectedId);
@@ -536,7 +553,7 @@ function getRelationState(params) {
     });
   }
 
-  return { related, hot, specificSelection: false, hasHover: false, rootHover: false };
+  return { related, hot, hotEdges, specificSelection: false, hasHover: false, rootHover: false };
 }
 
 function getNodeState(node, relation, params, elapsed) {
@@ -563,7 +580,8 @@ function getNodeState(node, relation, params, elapsed) {
 
 function getLinkState(link, source, target, relation, params, elapsed) {
   const reveal = ringReveal(link.ring ?? Math.max(source.ring ?? 1, target.ring ?? 1), elapsed, params.mode);
-  const hot = relation.hot.has(source.id) && relation.hot.has(target.id);
+  const explicitlyHot = relation.hotEdges.has(edgeKey(source.id, target.id));
+  const hot = explicitlyHot || (!relation.hasHover && !relation.specificSelection && relation.hot.has(source.id) && relation.hot.has(target.id));
   const related = relation.related.has(source.id) && relation.related.has(target.id);
   const rootHoverIndustry = relation.rootHover && source.id === ROOT_ID && target.parentId === ROOT_ID;
   const lineage = link.kind === "lineage";
@@ -578,6 +596,10 @@ function getLinkState(link, source, target, relation, params, elapsed) {
     width: lineage ? 1.35 + highlight * 1.45 : link.kind === "industry" ? 0.8 + highlight * 0.9 : link.kind === "main" ? 0.72 + highlight * 0.84 : 0.42 + highlight * 0.5,
     flow: lineageHot ? reveal : hot && link.kind === "main" ? 0.45 * reveal : 0,
   };
+}
+
+function edgeKey(sourceId, targetId) {
+  return `${sourceId}->${targetId}`;
 }
 
 function ringReveal(ring, elapsed, mode) {
