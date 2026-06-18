@@ -25,8 +25,10 @@ export function KnowledgeGraph({
 }) {
   const mountRef = useRef(null);
   const engineRef = useRef(null);
+  const hoverFrameRef = useRef(0);
+  const pendingHoverRef = useRef(null);
   const [hoveredId, setHoveredId] = useState(null);
-  const ambientNodes = useMemo(() => makeAmbientField(980), []);
+  const ambientNodes = useMemo(() => makeAmbientField(700), []);
   const ambientLinks = useMemo(() => makeAmbientLinks(ambientNodes), [ambientNodes]);
   const layout = useMemo(() => buildGraphLayout({ focusId, depth, mode }), [focusId, depth, mode]);
   const focus = getNode(focusId);
@@ -41,7 +43,14 @@ export function KnowledgeGraph({
     import("../pixiGraphEngine.js")
       .then(({ createPixiGraphEngine }) =>
         createPixiGraphEngine(mount, {
-          onHover: setHoveredId,
+          onHover(id) {
+            pendingHoverRef.current = id;
+            if (hoverFrameRef.current) return;
+            hoverFrameRef.current = window.requestAnimationFrame(() => {
+              hoverFrameRef.current = 0;
+              setHoveredId(pendingHoverRef.current);
+            });
+          },
           onNodeClick(node) {
             onSelect(node.id);
             if (hasChildren(node.id)) onFocus(node.id);
@@ -69,6 +78,7 @@ export function KnowledgeGraph({
 
     return () => {
       cancelled = true;
+      if (hoverFrameRef.current) window.cancelAnimationFrame(hoverFrameRef.current);
       engineRef.current?.destroy();
       engineRef.current = null;
     };
