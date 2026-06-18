@@ -75,6 +75,14 @@ function emitSseFrame(frame, handlers) {
     handlers.onRecommendedAgentsCompleted?.(event.agents || [], event);
   }
 
+  if (event.event === "graph.node.delta") {
+    handlers.onGraphNode?.(event.node, event);
+  }
+
+  if (event.event === "graph.path.resolved") {
+    handlers.onGraphPathResolved?.(event);
+  }
+
   if (event.event === "workflow.error") {
     handlers.onWorkflowError?.(event);
   }

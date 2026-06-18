@@ -105,7 +105,7 @@ const industrySpecs = [
     "industry-baijiu",
     "白酒行业招商获客",
     "industry",
-    "围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立行业作战图谱。",
+    "围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立业务关系路径。",
     q(["管理", "专家", "销售"], ["招商", "白酒", "渠道", "获客"]),
     [
       branch("baijiu-target", "目标洞察", "problem", "先识别招商对象、代理画像、市场机会和决策理由。", q(["管理", "专家", "销售"], ["画像", "定位", "决策"]), [
@@ -232,14 +232,26 @@ function addEdge(source, target, relationType, relationLabel, sortOrder = 0) {
   });
 }
 
+function getAddedNode(id) {
+  return nodes.find((node) => node.id === id);
+}
+
+function makeRelationTitle(parentId, label) {
+  const parent = getAddedNode(parentId);
+  if (!parent || parentId === ROOT_ID) return label;
+  return `${parent.label}-${label}`;
+}
+
 function addSemanticNode(spec, parentId, sortOrder = 0) {
   const children = spec.children || [];
+  const displayLabel = makeRelationTitle(parentId, spec.label);
   addNode({
     id: spec.id,
     label: spec.label,
+    displayLabel,
     type: spec.type,
     summary: spec.summary,
-    insight: spec.insight || `${spec.label} 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。`,
+    insight: spec.insight || `${displayLabel} 是当前业务图谱中的语义节点，用于承接下一层拆解和智能体推荐。`,
     parent: parentId,
     children: children.map((child) => child.id),
     agents: pickAgents(spec.query, spec.agentCap || 7),
@@ -247,7 +259,7 @@ function addSemanticNode(spec, parentId, sortOrder = 0) {
   });
 
   if (parentId) {
-    addEdge(parentId, spec.id, relationFor(spec.type), relationLabelFor(spec.type), sortOrder);
+    addEdge(parentId, spec.id, relationFor(spec.type), displayLabel, sortOrder);
   }
 
   children.forEach((child, index) => addSemanticNode(child, spec.id, index + 1));
@@ -273,10 +285,11 @@ function relationLabelFor(type) {
 
 addNode({
   id: ROOT_ID,
-  label: "行业智能体作战图谱",
+  label: "业务关系索引",
+  displayLabel: "业务关系索引",
   type: "brief",
-  summary: `先从行业场景进入，再沿痛点、能力、动作逐层展开；${rows.length} 个智能体作为推荐调用资源挂在语义节点后面。`,
-  insight: "开端节点负责点亮行业积累。真正的作战路径从选中某个行业后开始收束，而不是直接把智能体按功能分类摊开。",
+  summary: `直接从具体业务关系进入，例如“本地生活-团购转化”；${rows.length} 个智能体会根据当前关系节点推荐可调用能力。`,
+  insight: "这个索引用于组织数据，不作为前端画布中的总节点展示。",
   parent: null,
   children: industrySpecs.map((item) => item.id),
   agents: pickAgents(q(["管理", "专家", "销售"], ["策略", "诊断", "行业", "获客"]), 7),

@@ -1,7 +1,7 @@
 import { getChildren, getNode, graphModel, hasChildren, ROOT_ID } from "./agentAdapter.js";
 
 export const VIEWBOX = { width: 1660, height: 900 };
-export const CENTER = { x: 650, y: 430 };
+export const CENTER = { x: 880, y: 430 };
 
 const rootChildIds = graphModel[ROOT_ID].children;
 

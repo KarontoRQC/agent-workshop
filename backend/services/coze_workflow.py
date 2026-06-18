@@ -13,10 +13,12 @@ from services.coze_stream_transformer import (
     format_sse_event,
     iter_tagged_events,
 )
+from services.graph_path_resolver import GraphPathResolver
 
 
 KNOWLEDGE_GRAPH_STAGE = "knowledge_graph"
 AGENT_RECOMMENDATION_STAGE = "agent_recommendation"
+graph_path_resolver = GraphPathResolver()
 
 
 def start_chat_workflow_stream(coze_client, message, parameters=None, user_id=None, agent_names=None):
@@ -73,12 +75,28 @@ def _iter_chat_workflow_stream(
 
     selected_route = route_sections.get("KG_PATH", "").strip()
     route_explanation = route_sections.get("EXPLANATION", "").strip()
+    graph_path = graph_path_resolver.resolve(selected_route)
+
+    for node in graph_path["nodes"]:
+        yield _stage_event(
+            "graph.node.delta",
+            KNOWLEDGE_GRAPH_STAGE,
+            route=selected_route,
+            node=node,
+        )
+
+    yield _stage_event(
+        "graph.path.resolved",
+        KNOWLEDGE_GRAPH_STAGE,
+        **graph_path,
+    )
 
     yield _stage_event(
         "workflow.stage.completed",
         KNOWLEDGE_GRAPH_STAGE,
         selected_route=selected_route,
         route_explanation=route_explanation,
+        graph_path=graph_path,
     )
 
     recommender_message = build_recommender_message(

@@ -96,6 +96,8 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"KG_PATH","conte
 | `content.started` | `content.started` | 某个标签内容段开始。 |
 | `content.delta` | `content.delta` | 文本内容增量。 |
 | `content.completed` | `content.completed` | 某个标签内容段结束。 |
+| `graph.node.delta` | `graph.node.delta` | 第一阶段路径节点增量，用于点亮/渲染图谱节点。 |
+| `graph.path.resolved` | `graph.path.resolved` | 第一阶段路径解析完成，返回完整节点和边。 |
 | `recommended_agents.delta` | `recommended_agents.delta` | 推荐智能体增量，JSON 对象。 |
 | `recommended_agents.completed` | `recommended_agents.completed` | 推荐智能体列表完成。 |
 | `chat.completed` | `chat.completed` | 两个阶段都完成。 |
@@ -128,6 +130,35 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"KG_PATH","conte
 event: content.delta
 data: {"event":"content.delta","stage":"knowledge_graph","type":"EXPLANATION","content_type":"text","content":"该路径聚焦白酒行业销售场景..."}
 ```
+
+### 图谱节点返回
+
+当前端已经默认渲染初始节点 `行业智能体作战图谱` 时，后端不会在 `nodes` 里重复返回根节点，只返回路线对应的业务节点。
+
+例如 `KG_PATH` 为：
+
+```text
+白酒行业招商获客-销售跟进
+```
+
+后端会先逐个返回节点：
+
+```text
+event: graph.node.delta
+data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"industry-baijiu","label":"白酒行业招商获客","type":"industry","summary":"围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立行业作战图谱。","parent":"root-brief","children":["baijiu-target","baijiu-leads","baijiu-content","baijiu-follow","baijiu-private","baijiu-review"],"agents":["agent-030","agent-001","agent-003","agent-004","agent-005","agent-008","agent-032"],"count":6}}
+
+event: graph.node.delta
+data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"baijiu-follow","label":"销售跟进","type":"capability","summary":"围绕客户阶段生成话术、节奏、异议处理和下一步动作。","parent":"industry-baijiu","children":["follow-script","follow-strategy","follow-objection","follow-deal"],"agents":["agent-005","agent-008","agent-009","agent-012","agent-007","agent-030","agent-035"],"count":4}}
+```
+
+然后返回完整路径：
+
+```text
+event: graph.path.resolved
+data: {"event":"graph.path.resolved","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","root_id":"root-brief","nodes":[{"id":"industry-baijiu","label":"白酒行业招商获客","type":"industry"},{"id":"baijiu-follow","label":"销售跟进","type":"capability"}],"edges":[{"id":"root-brief->industry-baijiu","source":"root-brief","target":"industry-baijiu","relationType":"starts_from_industry","relationLabel":"行业场景","sortOrder":1},{"id":"industry-baijiu->baijiu-follow","source":"industry-baijiu","target":"baijiu-follow","relationType":"maps_to_capability","relationLabel":"能力映射","sortOrder":4}]}
+```
+
+前端推荐使用 `graph.path.resolved.nodes` 的最后一个节点作为当前焦点。上面的例子里，最终焦点应为 `baijiu-follow`。
 
 ## 第二阶段内容
 
@@ -234,6 +265,14 @@ async function streamCozeChat(message, handlers = {}) {
         handlers.onRecommendedAgentsCompleted?.(event.agents)
       }
 
+      if (event.event === 'graph.node.delta') {
+        handlers.onGraphNode?.(event.node, event)
+      }
+
+      if (event.event === 'graph.path.resolved') {
+        handlers.onGraphPathResolved?.(event)
+      }
+
       if (event.event === 'workflow.completed') {
         handlers.onCompleted?.(event)
       }
@@ -296,6 +335,10 @@ await streamCozeChat('我想优化白酒行业销售转化', {
   onRecommendedAgent(agent) {
     state.agentRecommendation.agents.push(agent)
     render(state)
+  },
+  onGraphPathResolved(event) {
+    const target = event.nodes?.[event.nodes.length - 1]
+    if (target) focusGraphNode(target.id)
   },
   onCompleted() {
     setLoading(false)

@@ -25,6 +25,7 @@ function createEmptyAgentWorkflow() {
       ACK: "",
       KG_PATH: "",
       EXPLANATION: "",
+      graphPath: null,
     },
     agentRecommendation: {
       ACK: "",
@@ -110,6 +111,20 @@ export function App() {
       setFocusId(id);
       setMode(id === ROOT_ID ? "atlas" : "path");
     }
+  }
+
+  function moveGraphToNode(node) {
+    const nodeId = node?.id;
+    const graphNode = nodeId ? graphModel[nodeId] : null;
+
+    if (!graphNode) return;
+
+    const parentId = graphNode.parent || node.parent;
+    const nextFocusId = hasChildren(nodeId) ? nodeId : parentId || nodeId;
+
+    setSelectedId(nodeId);
+    setFocusId(graphModel[nextFocusId] ? nextFocusId : nodeId);
+    setMode(nodeId === ROOT_ID ? "atlas" : "path");
   }
 
   function resetGraph() {
@@ -206,9 +221,33 @@ export function App() {
                     ...turn,
                     workflow: replaceRecommendedAgents(turn.workflow, agents),
                   }
-                : turn,
+              : turn,
             ),
           );
+        },
+        onGraphNode(node) {
+          moveGraphToNode(node);
+        },
+        onGraphPathResolved(event) {
+          const nodes = Array.isArray(event.nodes) ? event.nodes : [];
+          const target = [...nodes].reverse().find((node) => node?.id && graphModel[node.id]);
+
+          setAgentStream((current) => ({
+            ...current,
+            workflow: setWorkflowGraphPath(current.workflow, event),
+          }));
+          setAgentTurns((current) =>
+            current.map((turn) =>
+              turn.id === turnId
+                ? {
+                    ...turn,
+                    workflow: setWorkflowGraphPath(turn.workflow, event),
+                  }
+              : turn,
+            ),
+          );
+
+          moveGraphToNode(target);
         },
         onWorkflowError(event) {
           const message = formatWorkflowError(event);
@@ -346,6 +385,16 @@ function replaceRecommendedAgents(workflow, agents) {
     agentRecommendation: {
       ...workflow.agentRecommendation,
       agents,
+    },
+  };
+}
+
+function setWorkflowGraphPath(workflow, graphPath) {
+  return {
+    ...workflow,
+    knowledgeGraph: {
+      ...workflow.knowledgeGraph,
+      graphPath,
     },
   };
 }

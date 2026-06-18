@@ -388,6 +388,12 @@ button {
   overflow: hidden;
 }
 
+.app-mode-path .agent-dock,
+.app-mode-step .agent-dock {
+  width: min(340px, calc(100vw - 44px));
+  max-height: min(420px, calc(100vh - 174px));
+}
+
 .agent-header {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
