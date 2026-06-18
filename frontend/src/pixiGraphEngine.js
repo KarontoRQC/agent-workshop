@@ -70,12 +70,12 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
       );
       transitionKey = params.transitionKey;
       transitionStartedAt = performance.now();
-      scheduleAnimationBurst(1200, 18);
+      scheduleAnimationBurst(960, 34);
     }
     const nextHoverKey = params.hoveredId || "";
     if (nextHoverKey !== hoverKey) {
       hoverKey = nextHoverKey;
-      scheduleAnimationBurst(620, 22);
+      scheduleAnimationBurst(320, 72);
     }
     latestBaseParams = params;
     const positionedParams = applyDragPositions(params, dragPositions);
@@ -280,7 +280,9 @@ function pickNodeAt(point, nodes) {
 }
 
 function clearLayer(layer) {
-  layer.removeChildren().forEach((child) => child.destroy({ children: true }));
+  layer.removeChildren().forEach((child) =>
+    child.destroy({ children: true, texture: true, textureSource: true }),
+  );
 }
 
 function renderBackground(layer, bounds) {
@@ -459,7 +461,11 @@ function getRelationState(params) {
   const hot = new Set();
   const { layout, focusId, selectedId, hoveredId } = params;
   const nodeMap = new Map(layout.nodes.map((node) => [node.id, node]));
-  const specificSelection = Boolean(selectedId && selectedId !== focusId);
+  const hoveredNode = hoveredId ? nodeMap.get(hoveredId) : null;
+  const selectedNode = selectedId ? nodeMap.get(selectedId) : null;
+  const hoverIsRoute = Boolean(hoveredNode && hoveredId !== ROOT_ID && hoveredId !== focusId);
+  const selectedIsRoute = Boolean(selectedNode && selectedId !== focusId);
+  const specificSelection = hoverIsRoute || selectedIsRoute;
 
   function addNode(id, isHot = false) {
     if (!id) return;
@@ -479,27 +485,25 @@ function getRelationState(params) {
 
   addNode(focusId, true);
   addAncestors(focusId);
-  addNode(selectedId, true);
-  addAncestors(selectedId, true);
+  if (selectedIsRoute && !hoverIsRoute) addAncestors(selectedId, true);
 
   layout.nodes.forEach((node) => {
     if (node.isLineage || isMajorNode(node)) addNode(node.id, node.id === focusId || node.id === selectedId);
   });
 
-  if (focusId !== ROOT_ID) {
+  if (focusId !== ROOT_ID && !specificSelection) {
     addNode(ROOT_ID);
     layout.nodes.forEach((node) => {
-      if (!specificSelection && node.parentId === focusId) addNode(node.id, node.ring <= 2);
-      if (!specificSelection && related.has(node.parentId)) addNode(node.id);
+      if (node.parentId === focusId) addNode(node.id, node.ring <= 2);
+      if (related.has(node.parentId)) addNode(node.id);
     });
   }
 
   if (hoveredId) {
-    addNode(hoveredId, true);
+    addAncestors(hoveredId, true);
     layout.nodes.forEach((node) => {
       if (hoveredId === ROOT_ID && node.parentId === ROOT_ID) addNode(node.id, true);
       if (node.parentId === hoveredId) addNode(node.id, true);
-      if (node.id === hoveredId && node.parentId) addNode(node.parentId);
     });
   }
 
@@ -535,7 +539,7 @@ function getNodeState(node, relation, params, elapsed) {
 
 function getLinkState(link, source, target, relation, params, elapsed) {
   const reveal = ringReveal(link.ring ?? Math.max(source.ring ?? 1, target.ring ?? 1), elapsed, params.mode);
-  const hot = relation.hot.has(source.id) || relation.hot.has(target.id);
+  const hot = relation.hot.has(source.id) && relation.hot.has(target.id);
   const related = relation.related.has(source.id) && relation.related.has(target.id);
   const rootHoverIndustry = params.hoveredId === ROOT_ID && source.id === ROOT_ID && target.parentId === ROOT_ID;
   const lineage = link.kind === "lineage";
