@@ -537,6 +537,10 @@ button {
   grid-template-columns: minmax(0, 1fr) 28px;
 }
 
+.agent-message-assistant {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .agent-avatar {
   width: 28px;
   height: 28px;
@@ -554,6 +558,10 @@ button {
   color: var(--amber);
   border: 1px solid rgba(215, 169, 54, 0.3);
   background: rgba(215, 169, 54, 0.1);
+}
+
+.agent-message-assistant .agent-avatar-assistant {
+  display: none;
 }
 
 .agent-bubble {
@@ -581,8 +589,10 @@ button {
 
 .agent-message-assistant .agent-bubble {
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .agent-message-meta {
@@ -613,117 +623,191 @@ button {
   white-space: pre-wrap;
 }
 
-.agent-tool-call {
+.agent-path-card {
   display: grid;
-  gap: 7px;
-  margin: 2px 0;
-  padding: 9px;
-  border: 1px solid rgba(235, 227, 209, 0.12);
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid rgba(215, 169, 54, 0.16);
   border-radius: 7px;
   background:
-    linear-gradient(180deg, rgba(215, 169, 54, 0.075), rgba(255, 255, 255, 0.018)),
-    rgba(10, 10, 9, 0.42);
+    linear-gradient(105deg, rgba(215, 169, 54, 0.09), rgba(255, 255, 255, 0.018) 58%, rgba(124, 199, 128, 0.035)),
+    rgba(11, 11, 10, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 26px rgba(0, 0, 0, 0.18);
 }
 
-.agent-tool-call-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.agent-path-card.is-running {
+  border-color: rgba(215, 169, 54, 0.34);
 }
 
-.agent-tool-call-head span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: rgba(247, 241, 226, 0.78);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.agent-tool-call-head svg {
+.agent-path-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   color: var(--amber);
 }
 
-.agent-tool-call-head em {
-  flex: 0 0 auto;
-  color: rgba(124, 199, 128, 0.84);
-  font-size: 10px;
-  font-style: normal;
+.agent-path-copy {
+  min-width: 0;
 }
 
-.agent-tool-call p,
-.agent-error {
+.agent-path-copy strong,
+.agent-path-copy p,
+.agent-recommendation-copy strong,
+.agent-recommendation-copy em,
+.agent-recommendation-copy p {
+  display: block;
+}
+
+.agent-path-copy strong {
+  color: rgba(247, 241, 226, 0.92);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-path-copy p {
   margin: 0;
+  color: rgba(235, 227, 209, 0.64);
+  font-size: 10px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.agent-tool-call p {
-  color: rgba(235, 227, 209, 0.72);
-  font-size: 11px;
-  line-height: 1.5;
+.agent-result-chip {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid rgba(124, 199, 128, 0.16);
+  border-radius: 8px;
+  color: rgba(111, 221, 124, 0.96);
+  background: rgba(52, 116, 55, 0.34);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.agent-tool-call.is-running .agent-tool-call-head em {
-  color: rgba(215, 169, 54, 0.92);
+.agent-result-chip.is-running {
+  border-color: rgba(215, 169, 54, 0.22);
+  color: rgba(245, 205, 95, 0.96);
+  background: rgba(135, 99, 29, 0.32);
 }
 
-.agent-recommendation-card {
+.agent-recommendation-section {
+  display: grid;
   gap: 8px;
+  margin-top: 2px;
 }
 
-.agent-recommendation-card.is-running {
-  border-color: rgba(215, 169, 54, 0.32);
-  background:
-    linear-gradient(180deg, rgba(215, 169, 54, 0.1), rgba(255, 255, 255, 0.02)),
-    rgba(10, 10, 9, 0.48);
+.agent-section-heading {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  color: rgba(240, 210, 111, 0.98);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-section-heading svg {
+  color: var(--amber);
+}
+
+.agent-section-heading i {
+  display: block;
+  height: 1px;
+  background: rgba(235, 227, 209, 0.08);
 }
 
 .agent-recommendation-list {
   display: grid;
-  gap: 6px;
-}
-
-.agent-recommendation-item {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
   gap: 8px;
-  padding: 8px;
-  border: 1px solid rgba(235, 227, 209, 0.08);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.18);
 }
 
-.agent-recommendation-item > span {
+.agent-recommendation-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 70px;
+  padding: 10px 8px 10px 12px;
+  border: 1px solid rgba(215, 169, 54, 0.15);
+  border-radius: 7px;
+  background:
+    linear-gradient(105deg, rgba(215, 169, 54, 0.1), rgba(255, 255, 255, 0.018) 62%, rgba(215, 169, 54, 0.04)),
+    rgba(12, 12, 10, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.agent-recommendation-card.is-running {
+  border-color: rgba(215, 169, 54, 0.34);
+}
+
+.agent-recommendation-rank {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   color: #15110a;
-  background: rgba(215, 169, 54, 0.9);
-  font-size: 10px;
+  background: linear-gradient(180deg, #f3cf69, #d7a936);
+  box-shadow: 0 8px 18px rgba(215, 169, 54, 0.18);
+  font-size: 13px;
   font-weight: 800;
 }
 
-.agent-recommendation-item strong,
-.agent-recommendation-item em,
-.agent-recommendation-item p {
-  display: block;
+.agent-recommendation-copy {
+  min-width: 0;
 }
 
-.agent-recommendation-item strong {
-  color: rgba(247, 241, 226, 0.9);
-  font-size: 11px;
+.agent-recommendation-copy strong {
+  color: rgba(247, 241, 226, 0.94);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-recommendation-copy em {
+  margin-top: 2px;
+  color: rgba(240, 210, 111, 0.9);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
   line-height: 1.35;
 }
 
-.agent-recommendation-item em {
-  margin-top: 2px;
-  color: rgba(215, 169, 54, 0.78);
+.agent-recommendation-copy p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin: 4px 0 0;
+  color: rgba(235, 227, 209, 0.58);
   font-size: 10px;
-  font-style: normal;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+.agent-recommendation-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-recommendation-side svg {
+  color: rgba(240, 210, 111, 0.82);
+}
+
+.agent-error {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .agent-typing {

@@ -25,29 +25,39 @@ const ambientCategories = [
 ];
 
 const industryOrbit = [
-  { x: 320, y: 235, fan: "leftTop" },
-  { x: 515, y: 170, fan: "top" },
-  { x: 750, y: 188, fan: "top" },
-  { x: 970, y: 275, fan: "rightTop" },
-  { x: 1045, y: 470, fan: "rightMid" },
-  { x: 920, y: 645, fan: "bottomRight" },
-  { x: 690, y: 710, fan: "bottom" },
-  { x: 455, y: 675, fan: "bottom" },
-  { x: 270, y: 540, fan: "leftLow" },
-  { x: 220, y: 365, fan: "leftTop" },
-  { x: 1120, y: 195, fan: "rightTop" },
-  { x: 1135, y: 650, fan: "bottomRight" },
+  { x: 478, y: 292, fan: "leftTop" },
+  { x: 640, y: 210, fan: "top" },
+  { x: 828, y: 184, fan: "top" },
+  { x: 1038, y: 242, fan: "rightTop" },
+  { x: 1164, y: 398, fan: "rightMid" },
+  { x: 1098, y: 558, fan: "bottomRight" },
+  { x: 912, y: 642, fan: "bottom" },
+  { x: 718, y: 612, fan: "bottom" },
+  { x: 548, y: 522, fan: "leftLow" },
+  { x: 428, y: 404, fan: "leftLow" },
+  { x: 1218, y: 272, fan: "rightTop" },
+  { x: 1216, y: 568, fan: "bottomRight" },
 ];
 
 const fanConfig = {
-  leftTop: { start: -1.72, spread: 1.48, distance: 112, labelLimit: 3 },
-  top: { start: -1.45, spread: 1.2, distance: 108, labelLimit: 2 },
-  rightTop: { start: -0.82, spread: 1.42, distance: 118, labelLimit: 3 },
-  rightMid: { start: -0.48, spread: 1.28, distance: 122, labelLimit: 3 },
-  bottomRight: { start: 0.24, spread: 1.36, distance: 114, labelLimit: 2 },
-  bottom: { start: 0.66, spread: 1.5, distance: 114, labelLimit: 2 },
-  leftLow: { start: 2.1, spread: 1.32, distance: 112, labelLimit: 2 },
+  leftTop: { start: 2.42, spread: 1.28, distance: 128, labelLimit: 3 },
+  top: { start: -2.34, spread: 1.48, distance: 126, labelLimit: 2 },
+  rightTop: { start: -0.72, spread: 1.24, distance: 134, labelLimit: 3 },
+  rightMid: { start: -0.46, spread: 0.92, distance: 138, labelLimit: 3 },
+  bottomRight: { start: 0.38, spread: 1.28, distance: 132, labelLimit: 2 },
+  bottom: { start: 0.86, spread: 1.42, distance: 130, labelLimit: 2 },
+  leftLow: { start: 2.58, spread: 1.3, distance: 130, labelLimit: 2 },
   focus: { start: -1.15, spread: 2.36, distance: 225, labelLimit: 8 },
+};
+
+const centerFanBias = {
+  leftTop: -0.42,
+  leftLow: 0.42,
+  top: 0.08,
+  rightTop: 0.34,
+  rightMid: -0.04,
+  bottomRight: -0.34,
+  bottom: -0.1,
 };
 
 function noise(seed) {
@@ -133,12 +143,28 @@ function addChildRing(nodes, links, anchor, options = {}) {
 
   children.slice(0, cap).forEach((child, index) => {
     const progress = cap === 1 ? 0.5 : index / (cap - 1);
-    const angle = config.start + config.spread * progress + (noise(index + anchor.x) - 0.5) * 0.18;
-    const radiusShift = (index % 3) * 13 + noise(index + anchor.y) * 13;
+    const centerPacked = mode === "atlas" && anchor.id !== ROOT_ID;
+    const leafLayer = centerPacked && ring >= 3;
+    const packedSpread = leafLayer ? Math.min(1.42, config.spread + 0.1) : Math.min(1.56, config.spread + 0.18);
+    const inwardAngle = Math.atan2(CENTER.y - anchor.y, CENTER.x - anchor.x);
+    const outwardAngle = Math.atan2(anchor.y - CENTER.y, anchor.x - CENTER.x);
+    const bias = centerPacked ? centerFanBias[anchor.fan] || 0 : 0;
+    const radialAngle = leafLayer ? outwardAngle : inwardAngle;
+    const start = centerPacked ? radialAngle + bias - packedSpread * 0.5 : config.start;
+    const spread = centerPacked ? packedSpread : config.spread;
+    const angle = start + spread * progress + (noise(index + anchor.x) - 0.5) * 0.18;
+    const radiusShift = (index % 3) * 10 + noise(index + anchor.y) * 12;
+    const spreadDistance = distance + radiusShift + (leafLayer ? 12 : 0);
+    const verticalSquash = mode === "atlas" ? 0.82 : 0.78;
+    const position = keepOutsideFocusHalo(
+      clamp(anchor.x + Math.cos(angle) * spreadDistance, 58, VIEWBOX.width - 58),
+      clamp(anchor.y + Math.sin(angle) * spreadDistance * verticalSquash, 58, VIEWBOX.height - 58),
+      leafLayer ? 216 : 156,
+    );
     const childNode = {
       ...child,
-      x: anchor.x + Math.cos(angle) * (distance + radiusShift),
-      y: anchor.y + Math.sin(angle) * (distance + radiusShift) * 0.78,
+      x: position.x,
+      y: position.y,
       kind,
       radius: semanticRadius(child),
       labelMode: ring <= 2 && index < labelLimit ? "always" : "hover",
@@ -164,7 +190,7 @@ function addChildRing(nodes, links, anchor, options = {}) {
         ring: ring + 1,
         kind: "leaf",
         limit: Math.min(getChildren(child.id).length, 4),
-        distance: 68,
+        distance: mode === "atlas" ? 76 : 68,
         labelLimit: 0,
       });
     }
@@ -178,6 +204,20 @@ function industryPosition(index) {
     ...preset,
     x: preset.x + Math.cos(index * 1.31) * drift,
     y: preset.y + Math.sin(index * 1.77) * drift,
+  };
+}
+
+function keepOutsideFocusHalo(x, y, minDistance) {
+  const dx = x - CENTER.x;
+  const dy = y - CENTER.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance >= minDistance || distance === 0) return { x, y };
+
+  const ratio = minDistance / distance;
+  return {
+    x: CENTER.x + dx * ratio,
+    y: CENTER.y + dy * ratio,
   };
 }
 
@@ -302,7 +342,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
           ring: 2,
           kind: "branch",
           limit: Math.min(getChildren(id).length, 6),
-          distance: mode === "atlas" ? 88 : 74,
+          distance: mode === "atlas" ? 82 : 74,
           labelLimit: mode === "atlas" ? 2 : 0,
         });
       }

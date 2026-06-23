@@ -86,7 +86,6 @@ export function App() {
   const [selectedId, setSelectedId] = useState(ROOT_ID);
   const [depth, setDepth] = useState(3);
   const [mode, setMode] = useState("atlas");
-  const [showLabels, setShowLabels] = useState(false);
   const [draft, setDraft] = useState("");
   const [agentStream, setAgentStream] = useState({
     status: "idle",
@@ -422,7 +421,6 @@ export function App() {
         selectedId={selectedId}
         depth={depth}
         mode={mode}
-        showLabels={showLabels}
         onFocus={focusNode}
         onSelect={setSelectedId}
       />
@@ -437,8 +435,6 @@ export function App() {
         setMode={setMode}
         depth={depth}
         setDepth={setDepth}
-        showLabels={showLabels}
-        setShowLabels={setShowLabels}
         onReset={resetGraph}
       />
     </main>

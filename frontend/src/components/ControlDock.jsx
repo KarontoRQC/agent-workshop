@@ -1,7 +1,6 @@
 import {
   ArrowsOutSimple,
   Crosshair,
-  FadersHorizontal,
   GitBranch,
   SlidersHorizontal,
 } from "@phosphor-icons/react";
@@ -15,7 +14,7 @@ const modes = [
   { id: "step", label: "逐层推进", desc: "适合现场讲解" },
 ];
 
-export function ControlDock({ mode, setMode, depth, setDepth, showLabels, setShowLabels, onReset }) {
+export function ControlDock({ mode, setMode, depth, setDepth, onReset }) {
   return (
     <footer className="control-dock" aria-label="图谱控制">
       <section className="control-cluster view-controls">
@@ -29,9 +28,6 @@ export function ControlDock({ mode, setMode, depth, setDepth, showLabels, setSho
           </button>
           <button type="button" aria-label="路径聚焦" onClick={() => setMode("path")}>
             <GitBranch size={18} />
-          </button>
-          <button type="button" aria-label="显示标签" onClick={() => setShowLabels((value) => !value)}>
-            <FadersHorizontal size={18} weight={showLabels ? "fill" : "regular"} />
           </button>
         </div>
       </section>

@@ -5,7 +5,7 @@ const DEFAULT_API_BASE_URL = "http://106.52.56.14/agent-workshop-api";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiBaseUrl = env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+  const apiBaseUrl = env.API_PROXY_BASE_URL || env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
   const apiUrl = new URL(apiBaseUrl);
   const proxyPrefix = apiUrl.pathname.replace(/\/+$/, "");
 

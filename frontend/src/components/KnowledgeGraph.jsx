@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Crosshair, GitBranch, Graph } from "@phosphor-icons/react";
 import { getNode, hasChildren, libraryStats } from "../agentAdapter.js";
 import { buildGraphLayout, makeAmbientField, makeAmbientLinks } from "../graphLayout.js";
@@ -19,7 +19,6 @@ export function KnowledgeGraph({
   selectedId,
   depth,
   mode,
-  showLabels,
   onFocus,
   onSelect,
 }) {
@@ -27,7 +26,8 @@ export function KnowledgeGraph({
   const engineRef = useRef(null);
   const hoverFrameRef = useRef(0);
   const pendingHoverRef = useRef(null);
-  const [hoveredId, setHoveredId] = useState(null);
+  const hoveredIdRef = useRef(null);
+  const latestEngineParamsRef = useRef(null);
   const ambientNodes = useMemo(() => makeAmbientField(540), []);
   const ambientLinks = useMemo(() => makeAmbientLinks(ambientNodes), [ambientNodes]);
   const layout = useMemo(() => buildGraphLayout({ focusId, depth, mode }), [focusId, depth, mode]);
@@ -48,7 +48,19 @@ export function KnowledgeGraph({
             if (hoverFrameRef.current) return;
             hoverFrameRef.current = window.requestAnimationFrame(() => {
               hoverFrameRef.current = 0;
-              setHoveredId(pendingHoverRef.current);
+              const hoveredId = pendingHoverRef.current;
+              if (hoveredIdRef.current === hoveredId) return;
+
+              hoveredIdRef.current = hoveredId;
+              const latestParams = latestEngineParamsRef.current;
+              if (!latestParams || !engineRef.current) return;
+
+              const nextParams = {
+                ...latestParams,
+                hoveredId,
+              };
+              latestEngineParamsRef.current = nextParams;
+              engineRef.current.update(nextParams);
             });
           },
           onNodeClick(node) {
@@ -63,17 +75,7 @@ export function KnowledgeGraph({
           return;
         }
         engineRef.current = engine;
-        engine.update({
-          ambientNodes,
-          ambientLinks,
-          layout,
-          focusId,
-          selectedId,
-          hoveredId,
-          showLabels,
-          mode,
-          transitionKey,
-        });
+        if (latestEngineParamsRef.current) engine.update(latestEngineParamsRef.current);
       });
 
     return () => {
@@ -85,18 +87,20 @@ export function KnowledgeGraph({
   }, []);
 
   useEffect(() => {
-    engineRef.current?.update({
+    const params = {
       ambientNodes,
       ambientLinks,
       layout,
       focusId,
       selectedId,
-      hoveredId,
-      showLabels,
+      hoveredId: hoveredIdRef.current,
       mode,
       transitionKey,
-    });
-  }, [ambientNodes, ambientLinks, layout, focusId, selectedId, hoveredId, showLabels, mode, transitionKey]);
+    };
+
+    latestEngineParamsRef.current = params;
+    engineRef.current?.update(params);
+  }, [ambientNodes, ambientLinks, layout, focusId, selectedId, mode, transitionKey]);
 
   useEffect(() => {
     const handleResize = () => engineRef.current?.resize();

@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
+  CaretRight,
   ChatCircleText,
   GitBranch,
   PaperPlaneTilt,
@@ -120,34 +121,39 @@ function ChatTurn({ turn, currentStatus }) {
           <Waveform size={15} weight="duotone" />
         </span>
         <div className="agent-bubble">
-          <div className="agent-message-meta">
-            <span>智能助手</span>
-            {isStreaming && <em>生成中</em>}
-          </div>
+          {isStreaming && (
+            <div className="agent-message-meta">
+              <span>智能助手</span>
+              <em>生成中</em>
+            </div>
+          )}
 
           {directReply && <AssistantText>{directReply}</AssistantText>}
           {ack && <AssistantText>{ack}</AssistantText>}
           {path && (
-            <ToolCall
-              icon={<GitBranch size={13} weight="bold" />}
-              label="知识图谱路径"
-              value={path}
-              active={isStreaming && !explanation}
-            />
+            <PathResultCard path={path} active={isStreaming && !explanation} />
           )}
           {explanation && <AssistantText>{explanation}</AssistantText>}
           {recommendationAck && <AssistantText>{recommendationAck}</AssistantText>}
-          {recommendedAgents.map((agent, index) => {
-            const agentKey = getRecommendedAgentKey(agent, index);
-            const active = isStreaming && agent.streamStatus !== "completed";
-
-            return (
-              <Fragment key={agentKey}>
-                <AgentRecommendationCard agent={agent} index={index} active={active} />
-                {agent.reason ? <AssistantText>{agent.reason}</AssistantText> : active && <TypingLine />}
-              </Fragment>
-            );
-          })}
+          {recommendedAgents.length > 0 && (
+            <section className="agent-recommendation-section" aria-label="推荐智能体组合">
+              <div className="agent-section-heading">
+                <Sparkle size={14} weight="bold" />
+                <span>推荐智能体组合</span>
+                <i />
+              </div>
+              <div className="agent-recommendation-list">
+                {recommendedAgents.map((agent, index) => (
+                  <AgentRecommendationCard
+                    key={getRecommendedAgentKey(agent, index)}
+                    agent={agent}
+                    index={index}
+                    active={isStreaming && agent.streamStatus !== "completed"}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           {summary && <AssistantText>{summary}</AssistantText>}
           {isStreaming && !hasAssistantContent && <TypingLine />}
 
@@ -162,17 +168,17 @@ function AssistantText({ children }) {
   return <p className="agent-assistant-text">{children}</p>;
 }
 
-function ToolCall({ icon, label, value, active }) {
+function PathResultCard({ path, active }) {
   return (
-    <div className={`agent-tool-call ${active ? "is-running" : ""}`}>
-      <div className="agent-tool-call-head">
-        <span>
-          {icon}
-          {label}
-        </span>
-        <em>{active ? "运行中" : "完成"}</em>
+    <div className={`agent-path-card ${active ? "is-running" : ""}`}>
+      <span className="agent-path-icon">
+        <GitBranch size={22} weight="bold" />
+      </span>
+      <div className="agent-path-copy">
+        <strong>知识图谱路径</strong>
+        <p>{path}</p>
       </div>
-      <p>{value}</p>
+      <StatusChip active={active} />
     </div>
   );
 }
@@ -180,24 +186,29 @@ function ToolCall({ icon, label, value, active }) {
 function AgentRecommendationCard({ agent, index, active }) {
   const rank = agent.rank || index + 1;
   const name = agent.agent_name || agent.name || "智能体生成中";
+  const reason = agent.reason || (active ? "推荐理由生成中..." : "");
 
   return (
-    <div className={`agent-tool-call agent-recommendation-card ${active ? "is-running" : ""}`}>
-      <div className="agent-tool-call-head">
-        <span>
-          <Sparkle size={13} weight="bold" />
-          推荐智能体 {String(rank).padStart(2, "0")}
-        </span>
-        <em>{active ? "运行中" : "完成"}</em>
+    <article className={`agent-recommendation-card ${active ? "is-running" : ""}`}>
+      <span className="agent-recommendation-rank">{rank}</span>
+      <div className="agent-recommendation-copy">
+        <strong>{name}</strong>
+        {agent.stage && <em>{agent.stage}</em>}
+        {reason && <p>{reason}</p>}
       </div>
-      <article className="agent-recommendation-item">
-        <span>{rank}</span>
-        <div>
-          <strong>{name}</strong>
-          {agent.stage && <em>{agent.stage}</em>}
-        </div>
-      </article>
-    </div>
+      <div className="agent-recommendation-side">
+        <StatusChip active={active} />
+        <CaretRight size={16} weight="bold" />
+      </div>
+    </article>
+  );
+}
+
+function StatusChip({ active }) {
+  return (
+    <em className={`agent-result-chip ${active ? "is-running" : ""}`}>
+      {active ? "生成中" : "完成"}
+    </em>
   );
 }
 

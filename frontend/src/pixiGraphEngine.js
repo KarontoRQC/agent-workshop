@@ -5,7 +5,7 @@ import {
   Text,
 } from "pixi.js";
 import { getNode, ROOT_ID } from "./agentAdapter.js";
-import { VIEWBOX } from "./graphLayout.js";
+import { CENTER, VIEWBOX } from "./graphLayout.js";
 
 const colors = {
   bg: 0x11110f,
@@ -14,6 +14,7 @@ const colors = {
   amber: 0xd7a936,
   amberHot: 0xffd765,
   amberDeep: 0x3a2b13,
+  lineWhite: 0xf4efe4,
   cream: 0xded6c4,
   green: 0x8d9e7d,
   blue: 0x6f929d,
@@ -22,15 +23,16 @@ const colors = {
 };
 
 const TRANSITION_MS = 860;
+const CAMERA_EASE = 0.16;
 
 export async function createPixiGraphEngine(mount, handlers = {}) {
   const app = new Application();
   await app.init({
     resizeTo: mount,
     backgroundAlpha: 0,
-    antialias: true,
+    antialias: false,
     autoDensity: true,
-    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    resolution: Math.min(window.devicePixelRatio || 1, 1.5),
     preference: "webgl",
   });
 
@@ -48,6 +50,13 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   scene.addChild(ambientLayer, linkLayer, nodeLayer, labelLayer);
 
   const dragPositions = new Map();
+  const physicsStates = new Map();
+  const cameraState = {
+    x: null,
+    y: null,
+    scale: null,
+    focusKey: "",
+  };
   let latestBaseParams = null;
   let latestParams = null;
   let destroyed = false;
@@ -59,6 +68,8 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   let backgroundKey = "";
   let ambientKey = "";
   let animationFrame = 0;
+  let animationUntil = 0;
+  let dragFrame = 0;
   let hoverKey = "";
 
   function update(params) {
@@ -70,20 +81,21 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
       );
       transitionKey = params.transitionKey;
       transitionStartedAt = performance.now();
-      scheduleAnimationBurst(960, 34);
+      scheduleAnimationBurst(params.mode === "step" ? 2400 : 3200);
     }
     const nextHoverKey = params.hoveredId || "";
     if (nextHoverKey !== hoverKey) {
       hoverKey = nextHoverKey;
-      scheduleAnimationBurst(140, 110);
+      scheduleAnimationBurst(240);
     }
     latestBaseParams = params;
     const positionedParams = applyDragPositions(params, dragPositions);
-    latestParams = transitionChanged
+    const transitionedParams = transitionChanged
       ? applyLayoutTransition(positionedParams, transitionFromNodes, transitionStartedAt)
       : applyLayoutTransition(positionedParams, transitionFromNodes, transitionStartedAt);
+    latestParams = applyPhysicsLayout(transitionedParams, physicsStates);
     const bounds = mount.getBoundingClientRect();
-    layoutScene(scene, bounds, latestParams);
+    layoutScene(scene, bounds, latestParams, cameraState);
     const nextBackgroundKey = `${Math.round(bounds.width)}:${Math.round(bounds.height)}`;
     if (nextBackgroundKey !== backgroundKey) {
       backgroundKey = nextBackgroundKey;
@@ -111,21 +123,19 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     redraw();
   }
 
-  function scheduleAnimationBurst(duration = 1200, frameBudget = 48) {
-    if (animationFrame) window.cancelAnimationFrame(animationFrame);
-    const startedAt = performance.now();
-    let lastFrameAt = 0;
+  function scheduleAnimationBurst(duration = 1200) {
+    animationUntil = Math.max(animationUntil, performance.now() + duration);
+    if (animationFrame) return;
 
     const step = (now) => {
       if (destroyed) return;
-      if (now - lastFrameAt >= frameBudget) {
-        lastFrameAt = now;
-        redraw();
-      }
-      if (now - startedAt < duration) {
+      redraw();
+      if (now < animationUntil) {
         animationFrame = window.requestAnimationFrame(step);
       } else {
         animationFrame = 0;
+        animationUntil = 0;
+        redraw();
       }
     };
 
@@ -155,7 +165,16 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
       x: clamp(local.x + dragState.offsetX, 28, VIEWBOX.width - 28),
       y: clamp(local.y + dragState.offsetY, 34, VIEWBOX.height - 34),
     });
-    redraw();
+    scheduleDragRedraw();
+    scheduleAnimationBurst(900);
+  }
+
+  function scheduleDragRedraw() {
+    if (dragFrame) return;
+    dragFrame = window.requestAnimationFrame(() => {
+      dragFrame = 0;
+      redraw();
+    });
   }
 
   function handleCanvasClick(event) {
@@ -177,6 +196,7 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     }
     dragState = null;
     app.canvas.classList.remove("is-dragging");
+    scheduleAnimationBurst(1600);
   }
 
   app.canvas.addEventListener("click", handleCanvasClick);
@@ -191,6 +211,7 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     destroy() {
       destroyed = true;
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      if (dragFrame) window.cancelAnimationFrame(dragFrame);
       app.canvas.removeEventListener("click", handleCanvasClick);
       app.canvas.removeEventListener("pointermove", moveDrag);
       window.removeEventListener("pointerup", stopDrag);
@@ -241,15 +262,316 @@ function applyLayoutTransition(params, fromNodes, startedAt) {
   };
 }
 
-function layoutScene(scene, bounds, params) {
+function applyPhysicsLayout(params, physicsStates) {
+  const nodes = params.layout.nodes;
+  const activeIds = new Set(nodes.map((node) => node.id));
+
+  physicsStates.forEach((_, id) => {
+    if (!activeIds.has(id)) physicsStates.delete(id);
+  });
+
+  nodes.forEach((node) => {
+    let state = physicsStates.get(node.id);
+    if (!state) {
+      state = {
+        x: node.x,
+        y: node.y,
+        vx: 0,
+        vy: 0,
+      };
+      physicsStates.set(node.id, state);
+    }
+
+    state.node = node;
+    state.targetX = node.x;
+    state.targetY = node.y;
+    state.radius = physicsCollisionRadius(node);
+    state.fixed = isPhysicsFixed(node);
+  });
+
+  const states = nodes.map((node) => physicsStates.get(node.id)).filter(Boolean);
+  stepPhysics(states, params);
+
+  return {
+    ...params,
+    layout: {
+      ...params.layout,
+      nodes: nodes.map((node) => {
+        const state = physicsStates.get(node.id);
+        return state ? { ...node, x: state.x, y: state.y } : node;
+      }),
+    },
+  };
+}
+
+function stepPhysics(states, params) {
+  const stateById = new Map(states.map((state) => [state.node.id, state]));
+
+  states.forEach((state) => {
+    const node = state.node;
+
+    if (state.fixed) {
+      state.x = state.targetX;
+      state.y = state.targetY;
+      state.vx = 0;
+      state.vy = 0;
+      return;
+    }
+
+    const spring = physicsSpringStrength(node, params.mode);
+    state.vx += (state.targetX - state.x) * spring;
+    state.vy += (state.targetY - state.y) * spring;
+
+    const desiredRadius = physicsDesiredRadius(node, params.mode);
+    if (desiredRadius > 0) {
+      const dx = state.x - CENTER.x;
+      const dy = state.y - CENTER.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const radialForce = (desiredRadius - distance) * physicsRadialStrength(node);
+      state.vx += (dx / distance) * radialForce;
+      state.vy += (dy / distance) * radialForce;
+    }
+  });
+
+  applyPhysicsLinkSprings(stateById, params.layout.links);
+
+  states.forEach((state) => {
+    if (state.fixed) return;
+    state.vx *= 0.84;
+    state.vy *= 0.84;
+    state.x += clamp(state.vx, -18, 18);
+    state.y += clamp(state.vy, -18, 18);
+  });
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    resolvePhysicsCollisions(states);
+  }
+
+  states.forEach((state) => {
+    state.x = clamp(state.x, 48 + state.radius, VIEWBOX.width - 48 - state.radius);
+    state.y = clamp(state.y, 50 + state.radius, VIEWBOX.height - 48 - state.radius);
+  });
+}
+
+function applyPhysicsLinkSprings(stateById, links) {
+  links.forEach((link) => {
+    const source = stateById.get(link.source);
+    const target = stateById.get(link.target);
+    if (!source || !target) return;
+
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const idealDistance = physicsLinkDistance(source.node, target.node, link);
+    const force = (distance - idealDistance) * physicsLinkStrength(source.node, target.node, link);
+    const nx = dx / distance;
+    const ny = dy / distance;
+    const sourceMobility = source.fixed ? 0 : physicsLinkMobility(source.node);
+    const targetMobility = target.fixed ? 0 : physicsLinkMobility(target.node);
+    const totalMobility = sourceMobility + targetMobility || 1;
+    const sourceForce = (force * sourceMobility) / totalMobility;
+    const targetForce = (force * targetMobility) / totalMobility;
+
+    if (!source.fixed) {
+      source.vx += nx * sourceForce;
+      source.vy += ny * sourceForce;
+    }
+
+    if (!target.fixed) {
+      target.vx -= nx * targetForce;
+      target.vy -= ny * targetForce;
+    }
+  });
+}
+
+function resolvePhysicsCollisions(states) {
+  for (let i = 0; i < states.length; i += 1) {
+    const a = states[i];
+    for (let j = i + 1; j < states.length; j += 1) {
+      const b = states[j];
+      const minDistance = a.radius + b.radius;
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      let distance = Math.hypot(dx, dy);
+
+      if (distance >= minDistance) continue;
+
+      if (distance < 0.001) {
+        const angle = (i * 12.9898 + j * 78.233) % (Math.PI * 2);
+        dx = Math.cos(angle);
+        dy = Math.sin(angle);
+        distance = 1;
+      }
+
+      const nx = dx / distance;
+      const ny = dy / distance;
+      const overlap = (minDistance - distance) * 0.56;
+      const aMobility = a.fixed ? 0 : physicsMobility(a.node);
+      const bMobility = b.fixed ? 0 : physicsMobility(b.node);
+      const totalMobility = aMobility + bMobility || 1;
+      const aPush = (overlap * aMobility) / totalMobility;
+      const bPush = (overlap * bMobility) / totalMobility;
+
+      if (!a.fixed) {
+        a.x -= nx * aPush;
+        a.y -= ny * aPush;
+        a.vx -= nx * aPush * 0.08;
+        a.vy -= ny * aPush * 0.08;
+      }
+
+      if (!b.fixed) {
+        b.x += nx * bPush;
+        b.y += ny * bPush;
+        b.vx += nx * bPush * 0.08;
+        b.vy += ny * bPush * 0.08;
+      }
+    }
+  }
+}
+
+function physicsCollisionRadius(node) {
+  if (node.kind === "focus") return node.radius + 58;
+  if (node.kind === "origin" || node.kind === "anchor") return node.radius + 32;
+  if (node.kind === "industry") return node.radius + 24;
+  if (node.kind === "branch") return node.radius + 22;
+  if (node.kind === "leaf") return node.radius + 18;
+  return node.radius + 16;
+}
+
+function physicsSpringStrength(node, mode) {
+  if (node.dragged || node.kind === "focus") return 0.34;
+  if (mode === "step") return 0.045;
+  if (node.kind === "industry") return 0.05;
+  if (node.kind === "branch") return 0.035;
+  if (node.kind === "leaf") return 0.024;
+  return 0.032;
+}
+
+function physicsDesiredRadius(node, mode) {
+  if (mode !== "atlas" || node.dragged || node.kind === "focus") return 0;
+  if (node.kind === "leaf" || node.ring >= 3) return 380;
+  if (node.kind === "branch" || node.ring === 2) return 245;
+  if (node.kind === "industry" || node.ring === 1) return 350;
+  return 0;
+}
+
+function physicsRadialStrength(node) {
+  if (node.kind === "leaf" || node.ring >= 3) return 0.0048;
+  if (node.kind === "branch" || node.ring === 2) return 0.0042;
+  if (node.kind === "industry" || node.ring === 1) return 0.0032;
+  return 0;
+}
+
+function physicsLinkDistance(source, target, link) {
+  if (link.kind === "leaf" || target.kind === "leaf" || target.ring >= 3) return 74;
+  if (link.kind === "main" || target.kind === "branch" || target.ring === 2) return 118;
+  if (link.kind === "lineage") return 176;
+  if (link.kind === "industry") return 330;
+  return 126;
+}
+
+function physicsLinkStrength(source, target, link) {
+  const draggedEndpoint = source.dragged || target.dragged;
+  const base =
+    link.kind === "leaf" || target.kind === "leaf" || target.ring >= 3
+      ? 0.052
+      : link.kind === "main" || target.kind === "branch"
+        ? 0.038
+        : link.kind === "lineage"
+          ? 0.022
+          : 0.012;
+
+  return draggedEndpoint ? base * 2.2 : base;
+}
+
+function physicsLinkMobility(node) {
+  if (node.kind === "focus") return 0;
+  if (node.kind === "industry" || node.ring === 1) return 0.42;
+  if (node.kind === "branch" || node.ring === 2) return 0.8;
+  if (node.kind === "leaf" || node.ring >= 3) return 1.24;
+  return 0.7;
+}
+
+function physicsMobility(node) {
+  if (node.kind === "focus") return 0;
+  if (node.kind === "industry") return 0.54;
+  if (node.kind === "branch") return 0.86;
+  if (node.kind === "leaf") return 1.12;
+  return 0.74;
+}
+
+function isPhysicsFixed(node) {
+  return node.dragged || node.kind === "focus";
+}
+
+function layoutScene(scene, bounds, params, cameraState) {
   const leftReserve = bounds.width >= 840 ? Math.min(260, Math.max(140, bounds.width * 0.18)) : 0;
   const usableWidth = Math.max(420, bounds.width - leftReserve * 0.66);
   const base = Math.min(usableWidth / VIEWBOX.width, bounds.height / VIEWBOX.height);
-  const scale = base * 1.02;
-  const offsetX = (bounds.width - VIEWBOX.width * scale) / 2 + leftReserve * 0.55;
-  const offsetY = (bounds.height - VIEWBOX.height * scale) / 2 + 8;
-  scene.position.set(offsetX, offsetY);
-  scene.scale.set(scale);
+  const defaultScale = base * 1.02;
+  const defaultCamera = {
+    x: (bounds.width - VIEWBOX.width * defaultScale) / 2 + leftReserve * 0.55,
+    y: (bounds.height - VIEWBOX.height * defaultScale) / 2 + 8,
+    scale: defaultScale,
+    focusKey: "global",
+  };
+  const focusCamera = getRouteFocusCamera(bounds, params, defaultScale, leftReserve);
+  const target = focusCamera || defaultCamera;
+
+  if (cameraState.x === null) {
+    cameraState.x = target.x;
+    cameraState.y = target.y;
+    cameraState.scale = target.scale;
+  } else {
+    cameraState.x = lerp(cameraState.x, target.x, CAMERA_EASE);
+    cameraState.y = lerp(cameraState.y, target.y, CAMERA_EASE);
+    cameraState.scale = lerp(cameraState.scale, target.scale, CAMERA_EASE);
+  }
+
+  cameraState.focusKey = target.focusKey;
+  scene.position.set(cameraState.x, cameraState.y);
+  scene.scale.set(cameraState.scale);
+}
+
+function getRouteFocusCamera(bounds, params, defaultScale, leftReserve) {
+  const selectedId = params.selectedId;
+  if (!selectedId || selectedId === ROOT_ID) return null;
+
+  const nodeMap = new Map(params.layout.nodes.map((node) => [node.id, node]));
+  const selectedNode = nodeMap.get(selectedId);
+  if (!selectedNode || !isLeafRouteSelection(selectedNode)) return null;
+
+  const pathIds = getSelectedPathIds(selectedId, nodeMap);
+  const routeNodes = params.layout.nodes.filter((node) => pathIds.has(node.id));
+  if (routeNodes.length < 2) return null;
+
+  const padding = bounds.width < 760 ? 92 : 132;
+  const minX = Math.min(...routeNodes.map((node) => node.x - node.radius)) - padding;
+  const maxX = Math.max(...routeNodes.map((node) => node.x + node.radius)) + padding;
+  const minY = Math.min(...routeNodes.map((node) => node.y - node.radius)) - padding;
+  const maxY = Math.max(...routeNodes.map((node) => node.y + node.radius)) + padding;
+  const routeWidth = Math.max(220, maxX - minX);
+  const routeHeight = Math.max(180, maxY - minY);
+  const cameraWidth = Math.max(360, bounds.width - leftReserve * 0.4);
+  const cameraHeight = Math.max(260, bounds.height * 0.9);
+  const routeScale = Math.min(cameraWidth / routeWidth, cameraHeight / routeHeight);
+  const scale = clamp(Math.max(defaultScale * 1.16, routeScale), defaultScale, defaultScale * 1.78);
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const screenCenterX = bounds.width * 0.56 + leftReserve * 0.22;
+  const screenCenterY = bounds.height * 0.5 + 4;
+
+  return {
+    x: screenCenterX - centerX * scale,
+    y: screenCenterY - centerY * scale,
+    scale,
+    focusKey: `route:${selectedId}`,
+  };
+}
+
+function isLeafRouteSelection(node) {
+  const sourceNode = getNode(node.id);
+  return node.kind === "leaf" || node.ring >= 3 || !(sourceNode.children || []).length;
 }
 
 function pointerToScene(event, mount, scene) {
@@ -326,13 +648,16 @@ function renderAmbient(layer, { ambientNodes, ambientLinks, mode }) {
 }
 
 function renderLinks(layer, params, transitionStartedAt) {
-  clearLayer(layer);
   const elapsed = (performance.now() - transitionStartedAt) / 1000;
   const nodeMap = new Map(params.layout.nodes.map((node) => [node.id, node]));
   const relation = getRelationState(params);
-  const glow = new Graphics();
-  const graphics = new Graphics();
-  const flow = new Graphics();
+  const glow = getReusableGraphics(layer, "glow");
+  const graphics = getReusableGraphics(layer, "lines");
+  const flow = getReusableGraphics(layer, "flow");
+
+  glow.clear();
+  graphics.clear();
+  flow.clear();
 
   params.layout.links.forEach((link) => {
     const source = nodeMap.get(link.source);
@@ -343,15 +668,15 @@ function renderLinks(layer, params, transitionStartedAt) {
     if (state.highlight > 0.05) {
       drawCurve(glow, source, target, link.kind);
       glow.stroke({
-        color: colors.amber,
-        alpha: 0.05 + state.highlight * 0.16,
+        color: state.selected ? colors.amber : colors.lineWhite,
+        alpha: state.selected ? 0.05 + state.highlight * 0.16 : 0.035 + state.highlight * 0.06,
         width: link.kind === "lineage" ? 12 : link.kind === "industry" ? 8.5 : 6.5,
       });
     }
 
     drawCurve(graphics, source, target, link.kind);
     graphics.stroke({
-      color: state.hot ? colors.amberHot : colors.amber,
+      color: state.selected ? colors.amberHot : colors.lineWhite,
       alpha: state.alpha,
       width: state.width,
     });
@@ -367,22 +692,33 @@ function renderLinks(layer, params, transitionStartedAt) {
 }
 
 function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
-  clearLayer(nodeLayer);
-  clearLayer(labelLayer);
+  const entries = getNodeEntryCache(nodeLayer);
+  entries.forEach((entry) => {
+    entry.seen = false;
+  });
+
   const elapsed = (performance.now() - controls.transitionStartedAt) / 1000;
   const relation = getRelationState(params);
+  const labelState = getLabelState(params);
 
   params.layout.nodes.forEach((node) => {
     const state = getNodeState(node, relation, params, elapsed);
-    const group = new Container();
+    const entry = getNodeEntry(nodeLayer, labelLayer, node.id);
+    const { group, aura, halo, ring, core, pin, hit } = entry;
+
+    entry.node = node;
+    entry.handlers = handlers;
+    entry.controls = controls;
+    entry.seen = true;
+    group.visible = true;
     group.alpha = (node.opacity ?? 1) * state.alpha;
 
-    const aura = new Graphics();
+    aura.clear();
     aura
       .circle(node.x, node.y, node.radius + state.aura)
       .fill({ color: colors.amber, alpha: state.auraAlpha });
 
-    const halo = new Graphics();
+    halo.clear();
     if (state.highlight > 0.12) {
       halo
         .circle(node.x, node.y, node.radius + 12 + Math.sin(elapsed * 4 + node.ring) * 2)
@@ -393,7 +729,7 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
         });
     }
 
-    const ring = new Graphics();
+    ring.clear();
     ring
       .circle(node.x, node.y, node.radius + 3.6)
       .fill({ color: colors.black, alpha: isMajorNode(node) ? 0.78 : 0.86 })
@@ -403,12 +739,12 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
         width: state.hot ? 1.55 : 0.9,
       });
 
-    const core = new Graphics();
+    core.clear();
     core
       .circle(node.x, node.y, node.radius)
       .fill({ color: nodeCoreColor(node, state), alpha: nodeCoreAlpha(node, state) });
 
-    const pin = new Graphics();
+    pin.clear();
     if (node.dragged) {
       pin
         .circle(node.x + node.radius * 0.72, node.y - node.radius * 0.72, 3.2)
@@ -417,60 +753,173 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
         .stroke({ color: colors.amberHot, alpha: 0.28, width: 0.8 });
     }
 
-    const hit = new Graphics();
+    hit.clear();
     hit
       .circle(node.x, node.y, Math.max(node.radius + 20, 22))
       .fill({ color: 0xffffff, alpha: 0.001 });
-    hit.eventMode = "static";
+    hit.hitArea = makeCircleHitArea(node.x, node.y, Math.max(node.radius + 20, 22));
     hit.cursor = node.dragged ? "grabbing" : "grab";
-    hit.on("pointerover", () => handlers.onHover?.(node.id));
-    hit.on("pointerout", () => handlers.onHover?.(null));
-    hit.on("pointerdown", (event) => {
-      event.stopPropagation();
-      controls.startDrag(node, event);
-    });
 
-    group.addChild(aura, halo, ring, core, pin, hit);
-    nodeLayer.addChild(group);
+    const labelVisible = shouldShowLabel(node, labelState);
+    updateLabel(entry, node, state, labelVisible);
+  });
 
-    const labelVisible = shouldShowLabel(node, state, { ...params, relation });
-    if (labelVisible) labelLayer.addChild(makeLabel(node, state));
+  entries.forEach((entry) => {
+    if (entry.seen) return;
+    entry.group.visible = false;
+    if (entry.label) entry.label.visible = false;
   });
 }
 
-function shouldShowLabel(node, state, params) {
-  const relation = params.relation;
-  const quietMode = relation?.hasHover || relation?.specificSelection;
-  if (node.type === "agent" || node.kind === "leaf") {
-    return (
-      params.showLabels ||
-      node.labelMode === "always" ||
-      node.id === params.selectedId ||
-      node.id === params.hoveredId ||
-      (!quietMode && isMajorNode(node)) ||
-      state.hot
-    );
+function getReusableGraphics(layer, key) {
+  if (!layer.__graphicsCache) layer.__graphicsCache = new Map();
+  const cached = layer.__graphicsCache.get(key);
+  if (cached) return cached;
+
+  const graphics = new Graphics();
+  layer.__graphicsCache.set(key, graphics);
+  layer.addChild(graphics);
+  return graphics;
+}
+
+function getNodeEntryCache(nodeLayer) {
+  if (!nodeLayer.__nodeEntries) nodeLayer.__nodeEntries = new Map();
+  return nodeLayer.__nodeEntries;
+}
+
+function getNodeEntry(nodeLayer, labelLayer, nodeId) {
+  const entries = getNodeEntryCache(nodeLayer);
+  const cached = entries.get(nodeId);
+  if (cached) {
+    cached.labelLayer = labelLayer;
+    return cached;
   }
 
+  const entry = {
+    node: null,
+    handlers: null,
+    controls: null,
+    seen: true,
+    group: new Container(),
+    aura: new Graphics(),
+    halo: new Graphics(),
+    ring: new Graphics(),
+    core: new Graphics(),
+    pin: new Graphics(),
+    hit: new Graphics(),
+    label: null,
+    labelLayer,
+    labelStyleKey: "",
+  };
+
+  entry.hit.eventMode = "static";
+  entry.hit.on("pointerover", () => entry.handlers?.onHover?.(entry.node?.id));
+  entry.hit.on("pointerout", () => entry.handlers?.onHover?.(null));
+  entry.hit.on("pointerdown", (event) => {
+    if (!entry.node || !entry.controls) return;
+    event.stopPropagation();
+    entry.controls.startDrag(entry.node, event);
+  });
+
+  entry.group.addChild(entry.aura, entry.halo, entry.ring, entry.core, entry.pin, entry.hit);
+  nodeLayer.addChild(entry.group);
+  entries.set(nodeId, entry);
+  return entry;
+}
+
+function makeCircleHitArea(x, y, radius) {
+  return {
+    contains(pointX, pointY) {
+      return Math.hypot(pointX - x, pointY - y) <= radius;
+    },
+  };
+}
+
+function updateLabel(entry, node, state, visible) {
+  if (!visible) {
+    if (entry.label) entry.label.visible = false;
+    return;
+  }
+
+  if (!entry.label) {
+    entry.label = new Text({
+      text: node.label,
+      style: makeLabelStyle(node, state),
+    });
+    entry.label.anchor.set(0.5);
+    entry.labelLayer.addChild(entry.label);
+  } else if (entry.label.text !== node.label) {
+    entry.label.text = node.label;
+  }
+
+  const styleKey = makeLabelStyleKey(node, state);
+  if (styleKey !== entry.labelStyleKey) {
+    entry.label.style = makeLabelStyle(node, state);
+    entry.labelStyleKey = styleKey;
+  }
+
+  entry.label.visible = true;
+  entry.label.position.set(node.x, isMajorNode(node) ? node.y + 3 : node.y - node.radius - 17);
+  entry.label.alpha = isMajorNode(node) ? 1 : node.kind === "leaf" ? 0.82 : 0.92;
+}
+
+function getLabelState(params) {
+  const nodeMap = new Map(params.layout.nodes.map((node) => [node.id, node]));
+
+  return {
+    focusId: params.focusId,
+    hoveredId: params.hoveredId,
+    pathIds: getSelectedPathIds(params.selectedId || params.focusId, nodeMap),
+  };
+}
+
+function getSelectedPathIds(selectedId, nodeMap) {
+  const pathIds = new Set();
+  let cursorId = selectedId;
+  let guard = 0;
+
+  while (cursorId && guard < 24) {
+    pathIds.add(cursorId);
+    const parentId = nodeMap.get(cursorId)?.parentId || getNode(cursorId)?.parent || null;
+    if (!parentId) break;
+    cursorId = parentId;
+    guard += 1;
+  }
+
+  return pathIds;
+}
+
+function shouldShowLabel(node, labelState) {
   return (
-    params.showLabels ||
-    node.labelMode === "always" ||
-    state.hot ||
-    (state.related && node.ring <= 2) ||
-    (!quietMode && isMajorNode(node))
+    labelState.pathIds.has(node.id) ||
+    isSecondLevelLabelNode(node, labelState.focusId) ||
+    isHoveredRevealLabelNode(node, labelState.hoveredId)
   );
+}
+
+function isSecondLevelLabelNode(node, focusId) {
+  if (node.kind === "context" || node.kind === "sibling" || node.kind === "ghost") return false;
+  return node.parentId === ROOT_ID || node.parentId === focusId;
+}
+
+function isHoveredRevealLabelNode(node, hoveredId) {
+  if (node.id !== hoveredId) return false;
+  if (node.kind === "context" || node.kind === "sibling" || node.kind === "ghost") return false;
+  return node.labelMode === "hover" || node.kind === "leaf" || node.kind === "branch";
 }
 
 function getRelationState(params) {
   const related = new Set();
   const hot = new Set();
   const hotEdges = new Set();
+  const selectedEdges = new Set();
   const { layout, focusId, selectedId, hoveredId } = params;
   const nodeMap = new Map(layout.nodes.map((node) => [node.id, node]));
   const hoveredNode = hoveredId ? nodeMap.get(hoveredId) : null;
   const hasHover = Boolean(hoveredNode);
   const rootHover = hoveredId === ROOT_ID && nodeMap.has(ROOT_ID);
-  const selectedIsRoute = Boolean(selectedId && selectedId !== focusId && getNode(selectedId));
+  const hasSelectedNode = Boolean(selectedId && selectedId !== ROOT_ID && getNode(selectedId));
+  const selectedIsRoute = Boolean(hasSelectedNode && selectedId !== focusId);
 
   function addNode(id, isHot = false) {
     if (!id) return;
@@ -478,9 +927,11 @@ function getRelationState(params) {
     if (isHot) hot.add(id);
   }
 
-  function addEdge(sourceId, targetId, isHot = false) {
+  function addEdge(sourceId, targetId, isHot = false, options = {}) {
     if (!sourceId || !targetId) return;
-    hotEdges.add(edgeKey(sourceId, targetId));
+    const key = edgeKey(sourceId, targetId);
+    hotEdges.add(key);
+    if (options.selected) selectedEdges.add(key);
     addNode(sourceId, isHot);
     addNode(targetId, isHot);
   }
@@ -489,7 +940,7 @@ function getRelationState(params) {
     return nodeMap.get(id)?.parentId || getNode(id)?.parent || null;
   }
 
-  function addAncestorRoute(id, isHot = false, shouldLightEdges = false) {
+  function addAncestorRoute(id, isHot = false, shouldLightEdges = false, options = {}) {
     let cursorId = id;
     let guard = 0;
 
@@ -497,7 +948,7 @@ function getRelationState(params) {
       addNode(cursorId, isHot);
       const parentId = parentIdFor(cursorId);
       if (!parentId) break;
-      if (shouldLightEdges) addEdge(parentId, cursorId, isHot);
+      if (shouldLightEdges) addEdge(parentId, cursorId, isHot, options);
       else addNode(parentId, isHot);
       cursorId = parentId;
       guard += 1;
@@ -515,7 +966,8 @@ function getRelationState(params) {
     addDirectChildEdges(id, true);
   }
 
-  if (selectedIsRoute) addFocusedRoute(selectedId);
+  if (hasSelectedNode) addAncestorRoute(selectedId, true, true, { selected: true });
+  if (selectedIsRoute) addDirectChildEdges(selectedId, true);
 
   if (rootHover) {
     addNode(ROOT_ID, true);
@@ -527,7 +979,7 @@ function getRelationState(params) {
   }
 
   if (selectedIsRoute || hasHover) {
-    return { related, hot, hotEdges, specificSelection: selectedIsRoute, hasHover, rootHover };
+    return { related, hot, hotEdges, selectedEdges, specificSelection: selectedIsRoute, hasHover, rootHover };
   }
 
   addNode(focusId, true);
@@ -551,7 +1003,7 @@ function getRelationState(params) {
     });
   }
 
-  return { related, hot, hotEdges, specificSelection: false, hasHover: false, rootHover: false };
+  return { related, hot, hotEdges, selectedEdges, specificSelection: false, hasHover: false, rootHover: false };
 }
 
 function getNodeState(node, relation, params, elapsed) {
@@ -578,21 +1030,25 @@ function getNodeState(node, relation, params, elapsed) {
 
 function getLinkState(link, source, target, relation, params, elapsed) {
   const reveal = ringReveal(link.ring ?? Math.max(source.ring ?? 1, target.ring ?? 1), elapsed, params.mode);
-  const explicitlyHot = relation.hotEdges.has(edgeKey(source.id, target.id));
+  const key = edgeKey(source.id, target.id);
+  const selected = relation.selectedEdges.has(key);
+  const explicitlyHot = relation.hotEdges.has(key);
   const hot = explicitlyHot || (!relation.hasHover && !relation.specificSelection && relation.hot.has(source.id) && relation.hot.has(target.id));
   const related = relation.related.has(source.id) && relation.related.has(target.id);
   const rootHoverIndustry = relation.rootHover && source.id === ROOT_ID && target.parentId === ROOT_ID;
   const lineage = link.kind === "lineage";
-  const lineageHot = lineage && !relation.hasHover && !relation.specificSelection;
   const quietMode = relation.hasHover || relation.specificSelection;
-  const highlight = (lineageHot || hot || rootHoverIndustry ? 1 : related ? 0.62 : quietMode ? 0 : 0.12) * reveal;
-  const idleAlpha = quietMode ? 0.018 : 0.14;
+  const highlight = (selected ? 1 : hot || rootHoverIndustry ? 0.72 : related ? 0.36 : quietMode ? 0 : 0.18) * reveal;
+  const idleAlpha = quietMode ? 0.15 : 0.2;
+  const baseWidth = lineage ? 1.35 : link.kind === "industry" ? 0.86 : link.kind === "main" ? 0.76 : 0.48;
+
   return {
-    hot: lineageHot || hot || rootHoverIndustry,
+    selected,
+    hot: hot || rootHoverIndustry,
     highlight,
-    alpha: lineageHot ? 0.34 + highlight * 0.58 : link.kind === "leaf" ? idleAlpha + highlight * 0.52 : idleAlpha + highlight * 0.66,
-    width: lineage ? 1.35 + highlight * 1.45 : link.kind === "industry" ? 0.8 + highlight * 0.9 : link.kind === "main" ? 0.72 + highlight * 0.84 : 0.42 + highlight * 0.5,
-    flow: lineageHot ? reveal : hot && link.kind === "main" ? 0.45 * reveal : 0,
+    alpha: selected ? 0.62 + highlight * 0.28 : idleAlpha + highlight * (link.kind === "leaf" ? 0.24 : 0.32),
+    width: baseWidth + highlight * (selected ? 1.35 : 0.58),
+    flow: selected ? 0.42 * reveal : 0,
   };
 }
 
@@ -615,28 +1071,31 @@ function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-function makeLabel(node, state) {
+function makeLabelStyleKey(node, state) {
+  return [
+    node.kind,
+    node.radius,
+    isMajorNode(node) ? "major" : "minor",
+    state.hot ? "hot" : "idle",
+  ].join(":");
+}
+
+function makeLabelStyle(node, state) {
   const isCenter = isMajorNode(node);
-  const text = new Text({
-    text: node.label,
-    style: {
-      fontFamily: "Inter, Microsoft YaHei UI, sans-serif",
-      fontSize: node.kind === "focus" ? 18 : node.kind === "anchor" ? 15 : node.kind === "origin" ? 14 : node.kind === "leaf" ? 11 : 13,
-      fontWeight: isCenter ? "800" : "650",
-      fill: isCenter || state.hot ? 0xfff3c5 : colors.label,
-      align: "center",
-      stroke: {
-        color: colors.bg,
-        width: isCenter ? 7 : 5,
-      },
-      wordWrap: isCenter,
-      wordWrapWidth: isCenter ? Math.max(104, node.radius * 2.5) : 120,
+
+  return {
+    fontFamily: "Inter, Microsoft YaHei UI, sans-serif",
+    fontSize: node.kind === "focus" ? 18 : node.kind === "anchor" ? 15 : node.kind === "origin" ? 14 : node.kind === "leaf" ? 11 : 13,
+    fontWeight: isCenter ? "800" : "650",
+    fill: isCenter || state.hot ? 0xfff3c5 : colors.label,
+    align: "center",
+    stroke: {
+      color: colors.bg,
+      width: isCenter ? 7 : 5,
     },
-  });
-  text.anchor.set(0.5);
-  text.position.set(node.x, isCenter ? node.y + 3 : node.y - node.radius - 17);
-  text.alpha = isCenter ? 1 : node.kind === "leaf" ? 0.82 : 0.92;
-  return text;
+    wordWrap: isCenter,
+    wordWrapWidth: isCenter ? Math.max(104, node.radius * 2.5) : 120,
+  };
 }
 
 function drawCurve(graphics, source, target, kind) {

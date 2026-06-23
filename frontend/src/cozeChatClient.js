@@ -1,4 +1,5 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+const apiBaseUrl = import.meta.env.DEV ? "/api" : import.meta.env.VITE_API_BASE_URL || "/api";
+const API_BASE_URL = apiBaseUrl.replace(/\/+$/, "");
 const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
 
 export async function streamCozeChat(message, handlers = {}) {
