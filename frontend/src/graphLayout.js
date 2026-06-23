@@ -37,6 +37,10 @@ const industryOrbit = [
   { x: 428, y: 404, fan: "leftLow" },
   { x: 1218, y: 272, fan: "rightTop" },
   { x: 1216, y: 568, fan: "bottomRight" },
+  { x: 328, y: 648, fan: "leftLow" },
+  { x: 1358, y: 438, fan: "rightMid" },
+  { x: 366, y: 184, fan: "leftTop" },
+  { x: 1346, y: 676, fan: "bottomRight" },
 ];
 
 const fanConfig = {
@@ -142,6 +146,7 @@ function addChildRing(nodes, links, anchor, options = {}) {
   const cap = Math.min(children.length, limit);
 
   children.slice(0, cap).forEach((child, index) => {
+    const childHasChildren = hasChildren(child.id);
     const progress = cap === 1 ? 0.5 : index / (cap - 1);
     const centerPacked = mode === "atlas" && anchor.id !== ROOT_ID;
     const leafLayer = centerPacked && ring >= 3;
@@ -167,7 +172,7 @@ function addChildRing(nodes, links, anchor, options = {}) {
       y: position.y,
       kind,
       radius: semanticRadius(child),
-      labelMode: ring <= 2 && index < labelLimit ? "always" : "hover",
+      labelMode: ring <= 2 && (index < labelLimit || childHasChildren) ? "always" : "hover",
       opacity: mode === "step" && ring > depth ? 0.22 : 0.92,
       parentId: anchor.id,
       ring,
@@ -198,12 +203,16 @@ function addChildRing(nodes, links, anchor, options = {}) {
 }
 
 function industryPosition(index) {
-  const preset = industryOrbit[index % industryOrbit.length];
-  const drift = index >= industryOrbit.length ? 52 : 0;
+  const preset = industryOrbit[index];
+  if (preset) return preset;
+
+  const angle = -Math.PI * 0.86 + (Math.PI * 2 * index) / Math.max(rootChildIds.length, 1);
+  const radiusScale = index % 2 === 0 ? 1 : 0.92;
+
   return {
-    ...preset,
-    x: preset.x + Math.cos(index * 1.31) * drift,
-    y: preset.y + Math.sin(index * 1.77) * drift,
+    x: CENTER.x + Math.cos(angle) * 500 * radiusScale,
+    y: CENTER.y + Math.sin(angle) * 280 * radiusScale,
+    fan: fanFromAngle(angle),
   };
 }
 
@@ -222,6 +231,18 @@ function keepOutsideFocusHalo(x, y, minDistance) {
 }
 
 function focusChildPositionFrom(anchor, index, total, lineageDepth) {
+  if (total > 10 && lineageDepth <= 2) {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / total;
+    const radiusX = total > 14 ? 300 : 268;
+    const radiusY = total > 14 ? 214 : 190;
+
+    return {
+      x: clamp(anchor.x + Math.cos(angle) * radiusX, 76, VIEWBOX.width - 76),
+      y: clamp(anchor.y + Math.sin(angle) * radiusY, 76, VIEWBOX.height - 76),
+      angle,
+    };
+  }
+
   const opensRight = lineageDepth > 2;
   const denseLeafSet = opensRight && total > 10;
   const start = denseLeafSet ? -1.28 : opensRight ? -1.12 : total > 7 ? -1.18 : -1.06;
@@ -385,6 +406,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
   const activeFocus = nodes.find((node) => node.id === focusId) || focusNode;
   const activeParent = focus.parent ? nodes.find((node) => node.id === focus.parent) : null;
   const childRing = lineage.length > 2 ? 3 : 2;
+  const useDenseFocusRing = children.length > 10 && lineage.length <= 2;
 
   if (activeParent && activeParent.id !== ROOT_ID) {
     const siblings = getChildren(activeParent.id)
@@ -437,6 +459,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
       target: child.id,
       kind: "main",
       strength: 0.72,
+      idealDistance: useDenseFocusRing ? 238 : undefined,
       ring: childRing,
     });
 
@@ -478,6 +501,17 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
 function pickSubFan(index) {
   const keys = ["rightTop", "rightMid", "bottomRight", "bottom", "leftLow", "leftTop", "top"];
   return keys[index % keys.length];
+}
+
+function fanFromAngle(angle) {
+  const normalized = Math.atan2(Math.sin(angle), Math.cos(angle));
+  if (normalized < -2.35) return "leftTop";
+  if (normalized < -1.15) return "top";
+  if (normalized < -0.25) return "rightTop";
+  if (normalized < 0.35) return "rightMid";
+  if (normalized < 1.3) return "bottomRight";
+  if (normalized < 2.15) return "bottom";
+  return "leftLow";
 }
 
 function semanticRadius(node) {

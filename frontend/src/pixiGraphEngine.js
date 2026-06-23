@@ -24,6 +24,7 @@ const colors = {
 
 const TRANSITION_MS = 860;
 const CAMERA_EASE = 0.16;
+const IDLE_FRAME_MS = 34;
 
 export async function createPixiGraphEngine(mount, handlers = {}) {
   const app = new Application();
@@ -69,6 +70,8 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   let ambientKey = "";
   let animationFrame = 0;
   let animationUntil = 0;
+  let idleFrame = 0;
+  let lastIdleDrawAt = 0;
   let dragFrame = 0;
   let hoverKey = "";
 
@@ -142,6 +145,23 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     animationFrame = window.requestAnimationFrame(step);
   }
 
+  function startIdleAnimationLoop() {
+    if (idleFrame) return;
+
+    const step = (now) => {
+      if (destroyed) return;
+
+      if (!document.hidden && now - lastIdleDrawAt >= IDLE_FRAME_MS) {
+        lastIdleDrawAt = now;
+        if (!animationFrame) redraw();
+      }
+
+      idleFrame = window.requestAnimationFrame(step);
+    };
+
+    idleFrame = window.requestAnimationFrame(step);
+  }
+
   function startDrag(node, event) {
     const local = scene.toLocal(event.global);
     dragState = {
@@ -203,6 +223,7 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   app.canvas.addEventListener("pointermove", moveDrag);
   window.addEventListener("pointerup", stopDrag);
   window.addEventListener("pointercancel", stopDrag);
+  startIdleAnimationLoop();
 
   return {
     app,
@@ -211,6 +232,7 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
     destroy() {
       destroyed = true;
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      if (idleFrame) window.cancelAnimationFrame(idleFrame);
       if (dragFrame) window.cancelAnimationFrame(dragFrame);
       app.canvas.removeEventListener("click", handleCanvasClick);
       app.canvas.removeEventListener("pointermove", moveDrag);
@@ -463,6 +485,7 @@ function physicsRadialStrength(node) {
 }
 
 function physicsLinkDistance(source, target, link) {
+  if (Number.isFinite(link.idealDistance)) return link.idealDistance;
   if (link.kind === "leaf" || target.kind === "leaf" || target.ring >= 3) return 74;
   if (link.kind === "main" || target.kind === "branch" || target.ring === 2) return 118;
   if (link.kind === "lineage") return 176;
@@ -891,6 +914,7 @@ function getSelectedPathIds(selectedId, nodeMap) {
 
 function shouldShowLabel(node, labelState) {
   return (
+    node.labelMode === "always" ||
     labelState.pathIds.has(node.id) ||
     isSecondLevelLabelNode(node, labelState.focusId) ||
     isHoveredRevealLabelNode(node, labelState.hoveredId)

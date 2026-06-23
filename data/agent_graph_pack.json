@@ -1,11 +1,11 @@
 {
-  "version": "2026-06-18-agent-library-semantic-v2",
+  "version": "2026-06-18-agent-library-semantic-v2+industry-kg-2026-06-23",
   "rootId": "root-brief",
   "stats": {
     "agentCount": 60,
-    "industryCount": 12,
-    "nodeCount": 87,
-    "edgeCount": 86
+    "industryCount": 13,
+    "nodeCount": 154,
+    "edgeCount": 153
   },
   "nodes": [
     {
@@ -28,7 +28,8 @@
         "industry-realestate",
         "industry-agriculture",
         "industry-franchise",
-        "industry-highend-service"
+        "industry-highend-service",
+        "kg-industry-knowledge"
       ],
       "agents": [
         "agent-054",
@@ -39,7 +40,7 @@
         "agent-003",
         "agent-004"
       ],
-      "count": 12
+      "count": 13
     },
     {
       "id": "industry-baijiu",
@@ -1852,6 +1853,1635 @@
         "agent-001"
       ],
       "count": 0
+    },
+    {
+      "id": "kg-industry-knowledge",
+      "label": "AI服务行业知识图谱",
+      "displayLabel": "AI服务行业知识图谱",
+      "type": "industry",
+      "summary": "从去客户化行业图谱导入，覆盖行业主题、业务场景、AI能力、常见卡点与交付载体。",
+      "insight": "本分支来自行业知识图谱工作簿，包含 66 个源节点和 413 条源关系；前端按最强路径组织，完整关系保留在节点洞察中。",
+      "parent": "root-brief",
+      "children": [
+        "kg-theme-enterprise-ai",
+        "kg-theme-ip-content",
+        "kg-theme-sales-growth",
+        "kg-theme-education",
+        "kg-theme-digital-human",
+        "kg-theme-agents-automation",
+        "kg-theme-data-knowledge",
+        "kg-theme-private-domain",
+        "kg-theme-manufacturing-erp",
+        "kg-theme-finance-planning",
+        "kg-product-enterprise-ai",
+        "kg-product-ip-stage",
+        "kg-customer-type-one-person-company",
+        "kg-customer-type-sme"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 14
+    },
+    {
+      "id": "kg-cap-agent-orchestration",
+      "label": "智能体编排",
+      "displayLabel": "内容与文案生成-智能体编排",
+      "type": "capability",
+      "summary": "通过智能体组合任务、工具和数据，实现业务自动化。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 34，置信度 高。关联关系：交付载体：智能体交付（27条）；覆盖AI能力：企业AI化（17条）；依赖AI能力：企业经营AI化（17条）；依赖AI能力：智能体与工具自动化（17条）；依赖AI能力：销售成交与招商增长（12条）。",
+      "parent": "kg-scenario-content-copywriting",
+      "children": [
+        "kg-delivery-agent-count"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-018"
+      ],
+      "count": 1,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 34,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-cap-ai-basic",
+      "label": "AI基础配置与功能讲解",
+      "displayLabel": "企业AI化-AI基础配置与功能讲解",
+      "type": "capability",
+      "summary": "面向客户启用AI工具、配置基础环境和理解功能边界的基础能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 116，置信度 高。关联关系：交付载体：基础配置与功能讲解（116条）。",
+      "parent": "kg-product-enterprise-ai",
+      "children": [
+        "kg-delivery-basic-config"
+      ],
+      "agents": [
+        "agent-005",
+        "agent-008",
+        "agent-018",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-001"
+      ],
+      "count": 1,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 116,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-cap-ai-reading",
+      "label": "AI伴读",
+      "displayLabel": "数据资产与知识库-AI伴读",
+      "type": "capability",
+      "summary": "面向学习陪伴、课程理解和知识答疑的AI伴读能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-data-knowledge",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-auto-qa",
+      "label": "自动问答与推荐",
+      "displayLabel": "智能体与工具自动化-自动问答与推荐",
+      "type": "capability",
+      "summary": "面向社群、客户服务和资料问答的自动答疑与精准推荐。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-agents-automation",
+      "children": [],
+      "agents": [
+        "agent-005",
+        "agent-008",
+        "agent-009",
+        "agent-012",
+        "agent-013",
+        "agent-052",
+        "agent-007"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-content-ai",
+      "label": "内容生成AI",
+      "displayLabel": "内容与文案生成-内容生成AI",
+      "type": "capability",
+      "summary": "生成文案、内容、海报文案、课程表达和产品方案的能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 12，置信度 高。关联关系：依赖AI能力：IP与内容商业化（12条）；覆盖AI能力：企业AI化（12条）；依赖AI能力：企业经营AI化（12条）；由AI能力支撑：内容与文案生成（12条）；依赖AI能力：教育培训与知识服务（10条）。",
+      "parent": "kg-scenario-content-copywriting",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 12,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-cap-customer-profile",
+      "label": "客户画像与分层",
+      "displayLabel": "客户分层与画像-客户画像与分层",
+      "type": "capability",
+      "summary": "基于档案、标签和交互信息进行客户分层、画像与服务策略推荐。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 2，置信度 低。关联关系：依赖AI能力：IP与内容商业化（2条）；覆盖AI能力：企业AI化（2条）；依赖AI能力：企业经营AI化（2条）；由AI能力支撑：客户分层与画像（2条）；由AI能力支撑：思维复制与老师分身（2条）。",
+      "parent": "kg-scenario-customer-segmentation",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-data-integration",
+      "label": "数据接入与系统集成",
+      "displayLabel": "思维复制与老师分身-数据接入与系统集成",
+      "type": "capability",
+      "summary": "连接ERP、表格、业务系统和平台数据，支持分析与自动化。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 2，置信度 低。关联关系：依赖AI能力：IP与内容商业化（2条）；覆盖AI能力：企业AI化（2条）；依赖AI能力：企业经营AI化（2条）；由AI能力支撑：思维复制与老师分身（2条）；依赖AI能力：数字人与AI分身（2条）。",
+      "parent": "kg-scenario-mind-clone",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-digital-human",
+      "label": "数字人",
+      "displayLabel": "数字人讲课与展示-数字人",
+      "type": "capability",
+      "summary": "用于讲课、展示、品牌表达和规模化内容生产的数字人能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 170，置信度 高。关联关系：交付载体：数字人拍摄与加工（170条）；覆盖AI能力：企业AI化（11条）；依赖AI能力：企业经营AI化（11条）；依赖AI能力：教育培训与知识服务（11条）；依赖AI能力：数字人与AI分身（11条）。",
+      "parent": "kg-scenario-digital-human-teaching",
+      "children": [
+        "kg-delivery-digital-human"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-018",
+        "agent-003",
+        "agent-019",
+        "agent-011",
+        "agent-035",
+        "agent-001"
+      ],
+      "count": 1,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 170,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-cap-excel-json",
+      "label": "Excel/JSON数据处理",
+      "displayLabel": "数据资产与知识库-Excel/JSON数据处理",
+      "type": "capability",
+      "summary": "处理表格、JSON和结构化数据，用于数据清洗、转换和应用接入。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-data-knowledge",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-019"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-knowledge-retrieval",
+      "label": "知识库与检索",
+      "displayLabel": "思维复制与老师分身-知识库与检索",
+      "type": "capability",
+      "summary": "将资料和经验沉淀为可检索、可调用的知识库。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 4，置信度 中。关联关系：依赖AI能力：IP与内容商业化（4条）；覆盖AI能力：企业AI化（4条）；依赖AI能力：企业经营AI化（4条）；由AI能力支撑：思维复制与老师分身（4条）；依赖AI能力：数字人与AI分身（4条）。",
+      "parent": "kg-scenario-mind-clone",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 4,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-cap-live-review",
+      "label": "直播复盘分析",
+      "displayLabel": "直播复盘-直播复盘分析",
+      "type": "capability",
+      "summary": "对直播内容、话术、转化节点和复盘材料进行AI分析。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 3，置信度 中。关联关系：依赖AI能力：IP与内容商业化（3条）；覆盖AI能力：企业AI化（3条）；依赖AI能力：企业经营AI化（3条）；依赖AI能力：教育培训与知识服务（3条）；依赖AI能力：数据资产与知识库（3条）。",
+      "parent": "kg-scenario-live-review",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-cap-media-automation",
+      "label": "视频与素材自动化",
+      "displayLabel": "内容与文案生成-视频与素材自动化",
+      "type": "capability",
+      "summary": "面向视频下载、批量剪辑、物料处理和素材生产的自动化能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 2，置信度 低。关联关系：依赖AI能力：IP与内容商业化（2条）；覆盖AI能力：企业AI化（2条）；依赖AI能力：企业经营AI化（2条）；由AI能力支撑：内容与文案生成（2条）；由AI能力支撑：思维复制与老师分身（2条）。",
+      "parent": "kg-scenario-content-copywriting",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-019",
+        "agent-011",
+        "agent-035",
+        "agent-003",
+        "agent-005"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-cap-mind-clone",
+      "label": "思维克隆体",
+      "displayLabel": "思维复制与老师分身-思维克隆体",
+      "type": "capability",
+      "summary": "将专家经验、表达风格和决策逻辑沉淀为可复用的AI思维体。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 169，置信度 高。关联关系：交付载体：思维克隆体操作及技术交付（169条）；覆盖AI能力：企业AI化（15条）；依赖AI能力：企业经营AI化（15条）；由AI能力支撑：思维复制与老师分身（15条）；依赖AI能力：数字人与AI分身（15条）。",
+      "parent": "kg-scenario-mind-clone",
+      "children": [
+        "kg-delivery-mind-clone"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 1,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 169,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-cap-private-domain-ops",
+      "label": "私域运营自动化",
+      "displayLabel": "私域转化-私域运营自动化",
+      "type": "capability",
+      "summary": "支撑私域承接、社群互动、老客激活、裂变和转介绍的自动化能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 5，置信度 中。关联关系：依赖AI能力：IP与内容商业化（5条）；覆盖AI能力：企业AI化（5条）；依赖AI能力：企业经营AI化（5条）；依赖AI能力：教育培训与知识服务（5条）；依赖AI能力：私域与社群客户经营（5条）。",
+      "parent": "kg-scenario-private-domain-conversion",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 5,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-cap-sales-ai",
+      "label": "销售AI",
+      "displayLabel": "销售提效-销售AI",
+      "type": "capability",
+      "summary": "面向销售话术、成交辅助、客户跟进和转化承接的AI能力。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 8，置信度 中。关联关系：覆盖AI能力：企业AI化（8条）；依赖AI能力：企业经营AI化（8条）；依赖AI能力：销售成交与招商增长（8条）；由AI能力支撑：销售提效（8条）；依赖AI能力：IP与内容商业化（6条）。",
+      "parent": "kg-scenario-sales-enablement",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 8,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-cap-website-entry",
+      "label": "网站与诊断入口",
+      "displayLabel": "前端网站与诊断入口-网站与诊断入口",
+      "type": "capability",
+      "summary": "构建网站、诊断表单或前端入口，承接公域流量与咨询转化。",
+      "insight": "来源：行业知识图谱 / AI能力；支持记录数 4，置信度 中。关联关系：覆盖AI能力：企业AI化（4条）；依赖AI能力：企业经营AI化（4条）；由AI能力支撑：前端网站与诊断入口（4条）；依赖AI能力：数据资产与知识库（4条）；依赖AI能力：销售成交与招商增长（4条）。",
+      "parent": "kg-scenario-frontend-diagnosis",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "AI_CAPABILITY",
+      "sourceSupportCount": 4,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-customer-type-one-person-company",
+      "label": "一人公司",
+      "displayLabel": "一人公司",
+      "type": "variable",
+      "summary": "以个人或极小团队为主体的经营形态，常关注内容、销售、交付和能力复制。",
+      "insight": "来源：行业知识图谱 / 客户类型；支持记录数 37，置信度 高。关联关系：常见需求：招生增长与课程承接（7条）；常见需求：内容与文案生成（5条）；常见需求：思维复制与老师分身（5条）；常见需求：数字人讲课与展示（5条）；常见需求：公域引流与曝光（3条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "CUSTOMER_TYPE",
+      "sourceSupportCount": 37,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-customer-type-sme",
+      "label": "中小企业",
+      "displayLabel": "中小企业",
+      "type": "variable",
+      "summary": "有组织、流程、销售或数据系统需求的中小企业经营主体。",
+      "insight": "来源：行业知识图谱 / 客户类型；支持记录数 29，置信度 高。关联关系：常见需求：思维复制与老师分身（9条）；常见需求：销售提效（8条）；常见需求：内容与文案生成（6条）；常见需求：公域引流与曝光（5条）；常见需求：数字人讲课与展示（5条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "CUSTOMER_TYPE",
+      "sourceSupportCount": 29,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-delivery-agent-count",
+      "label": "智能体交付",
+      "displayLabel": "智能体编排-智能体交付",
+      "type": "asset",
+      "summary": "围绕具体业务场景完成智能体搭建和交付。",
+      "insight": "来源：行业知识图谱 / 交付模块；支持记录数 27，置信度 高。关联关系：交付载体：智能体编排（27条）。",
+      "parent": "kg-cap-agent-orchestration",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005"
+      ],
+      "count": 0,
+      "sourceNodeType": "DELIVERY_MODULE",
+      "sourceSupportCount": 27,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-delivery-basic-config",
+      "label": "基础配置与功能讲解",
+      "displayLabel": "AI基础配置与功能讲解-基础配置与功能讲解",
+      "type": "asset",
+      "summary": "AI工具启用、基础配置和功能边界讲解。",
+      "insight": "来源：行业知识图谱 / 交付模块；支持记录数 116，置信度 高。关联关系：交付载体：AI基础配置与功能讲解（116条）。",
+      "parent": "kg-cap-ai-basic",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005"
+      ],
+      "count": 0,
+      "sourceNodeType": "DELIVERY_MODULE",
+      "sourceSupportCount": 116,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-delivery-digital-human",
+      "label": "数字人拍摄与加工",
+      "displayLabel": "数字人-数字人拍摄与加工",
+      "type": "asset",
+      "summary": "数字人拍摄、加工、优化和应用准备。",
+      "insight": "来源：行业知识图谱 / 交付模块；支持记录数 170，置信度 高。关联关系：交付载体：数字人（170条）。",
+      "parent": "kg-cap-digital-human",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "DELIVERY_MODULE",
+      "sourceSupportCount": 170,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-delivery-mind-clone",
+      "label": "思维克隆体操作及技术交付",
+      "displayLabel": "思维克隆体-思维克隆体操作及技术交付",
+      "type": "asset",
+      "summary": "思维克隆体的操作指导、技术交付和底层能力交付。",
+      "insight": "来源：行业知识图谱 / 交付模块；支持记录数 169，置信度 高。关联关系：交付载体：思维克隆体（169条）。",
+      "parent": "kg-cap-mind-clone",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "DELIVERY_MODULE",
+      "sourceSupportCount": 169,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-delivery-offline-course",
+      "label": "线下课/工作坊承接",
+      "displayLabel": "教育培训与知识服务-线下课/工作坊承接",
+      "type": "asset",
+      "summary": "通过线下课、私董会、智能体课或IP流量工作坊承接学习与转化。",
+      "insight": "来源：行业知识图谱 / 交付模块；支持记录数 49，置信度 高。关联关系：暂无高频关系。",
+      "parent": "kg-theme-education",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "DELIVERY_MODULE",
+      "sourceSupportCount": 49,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-pain-adoption-uncertain",
+      "label": "使用落地待验证",
+      "displayLabel": "内容与文案生成-使用落地待验证",
+      "type": "variable",
+      "summary": "工具已交付或方案已提供，但实际使用、应用反馈和业务结果仍待确认。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 3，置信度 中。关联关系：常见卡点：内容与文案生成（2条）；常见卡点：思维复制与老师分身（2条）；常见卡点：数字人讲课与展示（2条）；常见卡点：知识库与资料沉淀（2条）。",
+      "parent": "kg-scenario-content-copywriting",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-business-model-validation",
+      "label": "商业模式待验证",
+      "displayLabel": "IP阶段-商业模式待验证",
+      "type": "variable",
+      "summary": "轻课、项目化售卖、体验包或商业模式需要先验证可行性。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-product-ip-stage",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-pain-complex-automation-later",
+      "label": "复杂自动化后置",
+      "displayLabel": "知识库与资料沉淀-复杂自动化后置",
+      "type": "variable",
+      "summary": "平台化、系统打通、投流运营或复杂自动化适合后续阶段评估。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 4，置信度 中。关联关系：常见卡点：知识库与资料沉淀（4条）；常见卡点：销售提效（4条）；常见卡点：公域引流与曝光（3条）；常见卡点：思维复制与老师分身（3条）；常见卡点：内容与文案生成（2条）。",
+      "parent": "kg-scenario-knowledge-base",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 4,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-delivery-not-started",
+      "label": "交付启动滞后",
+      "displayLabel": "企业AI化-交付启动滞后",
+      "type": "variable",
+      "summary": "关键交付模块仍处于待启动或未完成状态。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 2，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-product-enterprise-ai",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-pain-feedback-waiting",
+      "label": "等待反馈或回访",
+      "displayLabel": "招生增长与课程承接-等待反馈或回访",
+      "type": "variable",
+      "summary": "方案、资料或交付物已给出，但还需要进一步反馈、回访或使用反馈。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 3，置信度 中。关联关系：常见卡点：招生增长与课程承接（2条）；常见卡点：知识库与资料沉淀（2条）。",
+      "parent": "kg-scenario-enrollment-course",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-019"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-human-review",
+      "label": "自动化需人审",
+      "displayLabel": "数据资产与知识库-自动化需人审",
+      "type": "variable",
+      "summary": "不适合直接全自动，需要设置人工审核或半自动流程。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-data-knowledge",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-pain-material-gap",
+      "label": "资料待补齐",
+      "displayLabel": "知识库与资料沉淀-资料待补齐",
+      "type": "variable",
+      "summary": "知识库、文案、业务流程或训练资料尚未补齐，影响交付推进。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 4，置信度 中。关联关系：常见卡点：知识库与资料沉淀（4条）；常见卡点：内容与文案生成（2条）；常见卡点：思维复制与老师分身（2条）；常见卡点：批量剪辑与物料处理（2条）；常见卡点：数字人讲课与展示（2条）。",
+      "parent": "kg-scenario-knowledge-base",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 4,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-participation-low",
+      "label": "参与度不足",
+      "displayLabel": "招生增长与课程承接-参与度不足",
+      "type": "variable",
+      "summary": "线下课、反馈或交付使用参与度不足，影响落地效率。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 3，置信度 中。关联关系：常见卡点：招生增长与课程承接（3条）。",
+      "parent": "kg-scenario-enrollment-course",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-process-rules",
+      "label": "业务流程规则待明确",
+      "displayLabel": "内容与文案生成-业务流程规则待明确",
+      "type": "variable",
+      "summary": "生产流程、计算规则、销售流程或服务规则尚未结构化。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 2，置信度 低。关联关系：常见卡点：内容与文案生成（2条）；常见卡点：思维复制与老师分身（2条）；常见卡点：数字人讲课与展示（2条）。",
+      "parent": "kg-scenario-content-copywriting",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-003",
+        "agent-019",
+        "agent-011",
+        "agent-035",
+        "agent-001"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-pain-scope-sprawl",
+      "label": "需求发散需收敛",
+      "displayLabel": "知识库与资料沉淀-需求发散需收敛",
+      "type": "variable",
+      "summary": "需求范围较大或方向发散，需要先收敛到可落地的第一阶段。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 6，置信度 中。关联关系：常见卡点：知识库与资料沉淀（5条）；常见卡点：销售提效（5条）；常见卡点：思维复制与老师分身（4条）；常见卡点：公域引流与曝光（3条）；常见卡点：数字人讲课与展示（3条）。",
+      "parent": "kg-scenario-knowledge-base",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 6,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-pain-system-integration",
+      "label": "系统接入待验证",
+      "displayLabel": "公域引流与曝光-系统接入待验证",
+      "type": "variable",
+      "summary": "ERP、业务系统或平台数据接入存在测试、权限、结构或替代方案问题。",
+      "insight": "来源：行业知识图谱 / 常见卡点；支持记录数 3，置信度 中。关联关系：常见卡点：公域引流与曝光（2条）；常见卡点：内容与文案生成（2条）；常见卡点：思维复制与老师分身（2条）；常见卡点：知识库与资料沉淀（2条）；常见卡点：销售提效（2条）。",
+      "parent": "kg-scenario-public-traffic",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "PAIN_POINT",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-product-enterprise-ai",
+      "label": "企业AI化",
+      "displayLabel": "企业AI化",
+      "type": "capability",
+      "summary": "面向企业经营、销售、内容、数据和交付场景的AI化服务版本。",
+      "insight": "来源：行业知识图谱 / 产品版本；支持记录数 97，置信度 高。关联关系：覆盖AI能力：智能体编排（17条）；覆盖AI能力：思维克隆体（15条）；覆盖应用场景：思维复制与老师分身（15条）；覆盖应用场景：内容与文案生成（12条）；覆盖AI能力：内容生成AI（12条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-cap-ai-basic",
+        "kg-pain-delivery-not-started"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 2,
+      "sourceNodeType": "PRODUCT_VERSION",
+      "sourceSupportCount": 97,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-product-ip-stage",
+      "label": "IP阶段",
+      "displayLabel": "IP阶段",
+      "type": "capability",
+      "summary": "面向个人IP、内容流量、课程转化和知识产品化的服务阶段。",
+      "insight": "来源：行业知识图谱 / 产品版本；支持记录数 72，置信度 高。关联关系：暂无高频关系。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-pain-business-model-validation"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 1,
+      "sourceNodeType": "PRODUCT_VERSION",
+      "sourceSupportCount": 72,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-scenario-community-qa",
+      "label": "社群问答与客户服务",
+      "displayLabel": "私域与社群客户经营-社群问答与客户服务",
+      "type": "problem",
+      "summary": "面向社群自动答疑、问题推荐、客服知识调用和服务标准化。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-private-domain",
+      "children": [],
+      "agents": [
+        "agent-005",
+        "agent-008",
+        "agent-009",
+        "agent-012",
+        "agent-013",
+        "agent-052",
+        "agent-007"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-content-copywriting",
+      "label": "内容与文案生成",
+      "displayLabel": "IP与内容商业化-内容与文案生成",
+      "type": "problem",
+      "summary": "面向文案、内容获客、海报、素材和产品表达的生成式AI应用。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 12，置信度 高。关联关系：包含应用场景：IP与内容商业化（12条）；覆盖应用场景：企业AI化（12条）；包含应用场景：企业经营AI化（12条）；由AI能力支撑：内容生成AI（12条）；包含应用场景：教育培训与知识服务（10条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [
+        "kg-cap-agent-orchestration",
+        "kg-cap-content-ai",
+        "kg-cap-media-automation",
+        "kg-pain-adoption-uncertain",
+        "kg-pain-process-rules"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 5,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 12,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-scenario-curriculum-rebuild",
+      "label": "教材与知识体系重构",
+      "displayLabel": "教育培训与知识服务-教材与知识体系重构",
+      "type": "problem",
+      "summary": "对知识、教材、课程体系进行清洗、重构和产品化表达。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-education",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-008"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-customer-activation",
+      "label": "老客激活与裂变",
+      "displayLabel": "IP与内容商业化-老客激活与裂变",
+      "type": "problem",
+      "summary": "激活老客户、服务新客户、裂变新客户与转介绍承接。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；包含应用场景：教育培训与知识服务（2条）；包含应用场景：数字人与AI分身（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-customer-segmentation",
+      "label": "客户分层与画像",
+      "displayLabel": "IP与内容商业化-客户分层与画像",
+      "type": "problem",
+      "summary": "通过客户档案、画像和分层提升服务、营销与销售精准度。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；常见需求：中小企业（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；由AI能力支撑：客户画像与分层（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [
+        "kg-cap-customer-profile"
+      ],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-data-structuring",
+      "label": "数据结构化与Excel转JSON",
+      "displayLabel": "IP与内容商业化-数据结构化与Excel转JSON",
+      "type": "problem",
+      "summary": "将表格、资料和业务数据结构化为JSON、知识库或系统可用数据。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；包含应用场景：数字人与AI分身（2条）；由AI能力支撑：思维克隆体（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-digital-human-teaching",
+      "label": "数字人讲课与展示",
+      "displayLabel": "企业经营AI化-数字人讲课与展示",
+      "type": "problem",
+      "summary": "利用数字人完成课程讲解、内容展示和规模化表达。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 11，置信度 高。关联关系：覆盖应用场景：企业AI化（11条）；包含应用场景：企业经营AI化（11条）；包含应用场景：教育培训与知识服务（11条）；包含应用场景：数字人与AI分身（11条）；由AI能力支撑：数字人（11条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-cap-digital-human"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 11,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-scenario-enrollment-course",
+      "label": "招生增长与课程承接",
+      "displayLabel": "企业经营AI化-招生增长与课程承接",
+      "type": "problem",
+      "summary": "面向招生增长、体验包设计、线下课转化、工作坊和课程承接。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 10，置信度 高。关联关系：覆盖应用场景：企业AI化（10条）；包含应用场景：企业经营AI化（10条）；包含应用场景：教育培训与知识服务（10条）；包含应用场景：销售成交与招商增长（10条）；包含应用场景：IP与内容商业化（8条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-pain-participation-low",
+        "kg-pain-feedback-waiting"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 2,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 10,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-scenario-erp-integration",
+      "label": "ERP与系统接入",
+      "displayLabel": "生产库存与ERP数据化-ERP与系统接入",
+      "type": "problem",
+      "summary": "连接ERP、业务系统或平台数据，支持统计、自动化和分析。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-theme-manufacturing-erp",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-018"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-frontend-diagnosis",
+      "label": "前端网站与诊断入口",
+      "displayLabel": "企业经营AI化-前端网站与诊断入口",
+      "type": "problem",
+      "summary": "建设前端网站、诊断入口或获客入口，承接用户咨询与转化。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 4，置信度 中。关联关系：覆盖应用场景：企业AI化（4条）；包含应用场景：企业经营AI化（4条）；由AI能力支撑：网站与诊断入口（4条）；包含应用场景：数据资产与知识库（4条）；包含应用场景：销售成交与招商增长（4条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-cap-website-entry"
+      ],
+      "agents": [
+        "agent-005",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 4,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-inventory-stats",
+      "label": "生产库存统计",
+      "displayLabel": "IP与内容商业化-生产库存统计",
+      "type": "problem",
+      "summary": "围绕生产流程、库存数据、计算规则和经营统计的AI辅助分析。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；常见需求：中小企业（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；包含应用场景：教育培训与知识服务（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-005",
+        "agent-019",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-knowledge-base",
+      "label": "知识库与资料沉淀",
+      "displayLabel": "企业经营AI化-知识库与资料沉淀",
+      "type": "problem",
+      "summary": "将资料、经验、问答和交付资产沉淀为可检索、可复用的知识库。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 7，置信度 中。关联关系：覆盖应用场景：企业AI化（7条）；包含应用场景：企业经营AI化（7条）；包含应用场景：数据资产与知识库（7条）；包含应用场景：销售成交与招商增长（7条）；包含应用场景：IP与内容商业化（6条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-pain-scope-sprawl",
+        "kg-pain-complex-automation-later",
+        "kg-pain-material-gap"
+      ],
+      "agents": [
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-018",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 3,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 7,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-live-review",
+      "label": "直播复盘",
+      "displayLabel": "IP与内容商业化-直播复盘",
+      "type": "problem",
+      "summary": "用AI进行直播内容复盘、话术沉淀、素材提炼和改进建议生成。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 3，置信度 中。关联关系：包含应用场景：IP与内容商业化（3条）；常见需求：中小企业（3条）；覆盖应用场景：企业AI化（3条）；包含应用场景：企业经营AI化（3条）；包含应用场景：教育培训与知识服务（3条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [
+        "kg-cap-live-review"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-media-batch-processing",
+      "label": "批量剪辑与物料处理",
+      "displayLabel": "IP与内容商业化-批量剪辑与物料处理",
+      "type": "problem",
+      "summary": "面向视频、物料、剪辑和素材下载处理的AI工具链。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；由AI能力支撑：内容生成AI（2条）；由AI能力支撑：思维克隆体（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-scenario-mind-clone",
+      "label": "思维复制与老师分身",
+      "displayLabel": "企业经营AI化-思维复制与老师分身",
+      "type": "problem",
+      "summary": "将专家经验、销售方法或老师风格复制为思维体、分身或镜像。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 15，置信度 高。关联关系：覆盖应用场景：企业AI化（15条）；包含应用场景：企业经营AI化（15条）；由AI能力支撑：思维克隆体（15条）；包含应用场景：数字人与AI分身（15条）；包含应用场景：IP与内容商业化（12条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-cap-mind-clone",
+        "kg-cap-knowledge-retrieval",
+        "kg-cap-data-integration"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 3,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 15,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-scenario-private-domain-conversion",
+      "label": "私域转化",
+      "displayLabel": "IP与内容商业化-私域转化",
+      "type": "problem",
+      "summary": "围绕私域用户培育、转化、低价成交和后续承接的增长流程。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 5，置信度 中。关联关系：包含应用场景：IP与内容商业化（5条）；覆盖应用场景：企业AI化（5条）；包含应用场景：企业经营AI化（5条）；包含应用场景：教育培训与知识服务（5条）；包含应用场景：私域与社群客户经营（5条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [
+        "kg-cap-private-domain-ops"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 5,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-productized-monetization",
+      "label": "产品化变现",
+      "displayLabel": "IP与内容商业化-产品化变现",
+      "type": "problem",
+      "summary": "将知识、服务或商业模式包装为可售卖产品、项目或轻课。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 3，置信度 中。关联关系：包含应用场景：IP与内容商业化（3条）；覆盖应用场景：企业AI化（3条）；包含应用场景：企业经营AI化（3条）；包含应用场景：教育培训与知识服务（3条）；常见需求：一人公司（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-public-traffic",
+      "label": "公域引流与曝光",
+      "displayLabel": "IP与内容商业化-公域引流与曝光",
+      "type": "problem",
+      "summary": "通过公域平台、IP流量、GEO曝光和投流运营获取外部流量。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 8，置信度 中。关联关系：包含应用场景：IP与内容商业化（8条）；覆盖应用场景：企业AI化（8条）；包含应用场景：企业经营AI化（8条）；包含应用场景：教育培训与知识服务（6条）；常见需求：中小企业（5条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [
+        "kg-pain-system-integration"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 8,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-sales-enablement",
+      "label": "销售提效",
+      "displayLabel": "企业经营AI化-销售提效",
+      "type": "problem",
+      "summary": "通过销售AI、话术、诊断入口和线索承接提升销售效率与成交质量。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 9，置信度 中。关联关系：覆盖应用场景：企业AI化（9条）；包含应用场景：企业经营AI化（9条）；包含应用场景：销售成交与招商增长（9条）；常见需求：中小企业（8条）；由AI能力支撑：销售AI（8条）。",
+      "parent": "kg-theme-enterprise-ai",
+      "children": [
+        "kg-cap-sales-ai"
+      ],
+      "agents": [
+        "agent-005",
+        "agent-008",
+        "agent-007",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003"
+      ],
+      "count": 1,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 9,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-scenario-team-training-replication",
+      "label": "团队培训与能力复制",
+      "displayLabel": "IP与内容商业化-团队培训与能力复制",
+      "type": "problem",
+      "summary": "将核心经验复制给团队，用于培训、模式复制和人效提升。",
+      "insight": "来源：行业知识图谱 / 应用场景；支持记录数 2，置信度 低。关联关系：包含应用场景：IP与内容商业化（2条）；覆盖应用场景：企业AI化（2条）；包含应用场景：企业经营AI化（2条）；常见卡点：需求发散需收敛（2条）；包含应用场景：教育培训与知识服务（2条）。",
+      "parent": "kg-theme-ip-content",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "BUSINESS_SCENARIO",
+      "sourceSupportCount": 2,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-theme-agents-automation",
+      "label": "智能体与工具自动化",
+      "displayLabel": "智能体与工具自动化",
+      "type": "industry",
+      "summary": "围绕智能体、自动化工具、Codex工作流和AI应用编排的主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 17，置信度 高。关联关系：依赖AI能力：智能体编排（17条）；包含应用场景：内容与文案生成（8条）；依赖AI能力：内容生成AI（8条）；依赖AI能力：思维克隆体（8条）；包含应用场景：思维复制与老师分身（8条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-cap-auto-qa"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 1,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 17,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-data-knowledge",
+      "label": "数据资产与知识库",
+      "displayLabel": "数据资产与知识库",
+      "type": "industry",
+      "summary": "围绕资料沉淀、知识库、数据管理、系统接入和结构化处理的主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 12，置信度 高。关联关系：依赖AI能力：思维克隆体（7条）；包含应用场景：思维复制与老师分身（7条）；依赖AI能力：智能体编排（7条）；包含应用场景：知识库与资料沉淀（7条）；包含应用场景：销售提效（7条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-cap-ai-reading",
+        "kg-cap-excel-json",
+        "kg-pain-human-review"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005",
+        "agent-018"
+      ],
+      "count": 3,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 12,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-digital-human",
+      "label": "数字人与AI分身",
+      "displayLabel": "数字人与AI分身",
+      "type": "industry",
+      "summary": "围绕数字人、老师分身、思维克隆体和AI镜像的表达与交付主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 18，置信度 高。关联关系：依赖AI能力：思维克隆体（15条）；包含应用场景：思维复制与老师分身（15条）；依赖AI能力：数字人（11条）；包含应用场景：数字人讲课与展示（11条）；包含应用场景：内容与文案生成（10条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 0,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 18,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-education",
+      "label": "教育培训与知识服务",
+      "displayLabel": "教育培训与知识服务",
+      "type": "industry",
+      "summary": "面向知识体系、课程、教材、招生、伴读、工作坊和线下课的知识服务主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 20，置信度 高。关联关系：依赖AI能力：数字人（11条）；包含应用场景：数字人讲课与展示（11条）；包含应用场景：内容与文案生成（10条）；依赖AI能力：内容生成AI（10条）；依赖AI能力：思维克隆体（10条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-delivery-offline-course",
+        "kg-scenario-curriculum-rebuild"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 2,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 20,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-enterprise-ai",
+      "label": "企业经营AI化",
+      "displayLabel": "企业经营AI化",
+      "type": "industry",
+      "summary": "围绕管理、销售、内容、数据、流程的企业AI应用主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 97，置信度 高。关联关系：依赖AI能力：智能体编排（17条）；依赖AI能力：思维克隆体（15条）；包含应用场景：思维复制与老师分身（15条）；包含应用场景：内容与文案生成（12条）；依赖AI能力：内容生成AI（12条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-scenario-mind-clone",
+        "kg-scenario-digital-human-teaching",
+        "kg-scenario-enrollment-course",
+        "kg-scenario-sales-enablement",
+        "kg-scenario-knowledge-base",
+        "kg-scenario-frontend-diagnosis"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-028",
+        "agent-039",
+        "agent-040"
+      ],
+      "count": 6,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 97,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-finance-planning",
+      "label": "保险与财富规划服务",
+      "displayLabel": "保险与财富规划服务",
+      "type": "industry",
+      "summary": "围绕保险、财富规划和顾问式服务的知识与销售支持主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 1，置信度 低。关联关系：暂无高频关系。",
+      "parent": "kg-industry-knowledge",
+      "children": [],
+      "agents": [
+        "agent-003",
+        "agent-005",
+        "agent-030",
+        "agent-001",
+        "agent-004",
+        "agent-008",
+        "agent-032"
+      ],
+      "count": 0,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 1,
+      "sourceConfidence": "低"
+    },
+    {
+      "id": "kg-theme-ip-content",
+      "label": "IP与内容商业化",
+      "displayLabel": "IP与内容商业化",
+      "type": "industry",
+      "summary": "围绕个人IP、公域内容、流量获取、直播复盘、文案和产品化变现的主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 95，置信度 高。关联关系：包含应用场景：内容与文案生成（12条）；依赖AI能力：内容生成AI（12条）；依赖AI能力：思维克隆体（12条）；包含应用场景：思维复制与老师分身（12条）；依赖AI能力：数字人（10条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-scenario-content-copywriting",
+        "kg-scenario-public-traffic",
+        "kg-scenario-private-domain-conversion",
+        "kg-scenario-productized-monetization",
+        "kg-scenario-live-review",
+        "kg-scenario-team-training-replication",
+        "kg-scenario-customer-segmentation",
+        "kg-scenario-media-batch-processing",
+        "kg-scenario-data-structuring",
+        "kg-scenario-inventory-stats",
+        "kg-scenario-customer-activation"
+      ],
+      "agents": [
+        "agent-018",
+        "agent-019",
+        "agent-030",
+        "agent-035",
+        "agent-010",
+        "agent-020",
+        "agent-021"
+      ],
+      "count": 11,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 95,
+      "sourceConfidence": "高"
+    },
+    {
+      "id": "kg-theme-manufacturing-erp",
+      "label": "生产库存与ERP数据化",
+      "displayLabel": "生产库存与ERP数据化",
+      "type": "industry",
+      "summary": "围绕生产流程、库存统计、ERP接入和经营数据统计的数字化主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 3，置信度 中。关联关系：依赖AI能力：思维克隆体（3条）；包含应用场景：思维复制与老师分身（3条）；包含应用场景：内容与文案生成（2条）；依赖AI能力：内容生成AI（2条）；依赖AI能力：数字人（2条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-scenario-erp-integration"
+      ],
+      "agents": [
+        "agent-030",
+        "agent-018",
+        "agent-019",
+        "agent-035",
+        "agent-005",
+        "agent-028",
+        "agent-039"
+      ],
+      "count": 1,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 3,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-theme-private-domain",
+      "label": "私域与社群客户经营",
+      "displayLabel": "私域与社群客户经营",
+      "type": "industry",
+      "summary": "面向私域转化、社群问答、老客激活、新客裂变和转介绍承接的客户经营主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 7，置信度 中。关联关系：依赖AI能力：思维克隆体（6条）；包含应用场景：思维复制与老师分身（6条）；包含应用场景：销售提效（6条）；依赖AI能力：数字人（5条）；包含应用场景：数字人讲课与展示（5条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [
+        "kg-scenario-community-qa"
+      ],
+      "agents": [
+        "agent-005",
+        "agent-008",
+        "agent-009",
+        "agent-012",
+        "agent-013",
+        "agent-052",
+        "agent-007"
+      ],
+      "count": 1,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 7,
+      "sourceConfidence": "中"
+    },
+    {
+      "id": "kg-theme-sales-growth",
+      "label": "销售成交与招商增长",
+      "displayLabel": "销售成交与招商增长",
+      "type": "industry",
+      "summary": "围绕销售提效、成交提升、招商增长和诊断承接的业务增长主题。",
+      "insight": "来源：行业知识图谱 / 行业主题；支持记录数 26，置信度 高。关联关系：依赖AI能力：思维克隆体（12条）；包含应用场景：思维复制与老师分身（12条）；依赖AI能力：智能体编排（12条）；包含应用场景：招生增长与课程承接（10条）；依赖AI能力：数字人（9条）。",
+      "parent": "kg-industry-knowledge",
+      "children": [],
+      "agents": [
+        "agent-018",
+        "agent-030",
+        "agent-035",
+        "agent-001",
+        "agent-003",
+        "agent-004",
+        "agent-005"
+      ],
+      "count": 0,
+      "sourceNodeType": "INDUSTRY_THEME",
+      "sourceSupportCount": 26,
+      "sourceConfidence": "高"
     }
   ],
   "edges": [
@@ -2542,6 +4172,542 @@
       "relationType": "maps_to_capability",
       "relationLabel": "高端服务-长期关系",
       "sortOrder": 4
+    },
+    {
+      "id": "root-brief->kg-industry-knowledge",
+      "source": "root-brief",
+      "target": "kg-industry-knowledge",
+      "relationType": "starts_from_industry",
+      "relationLabel": "AI服务行业知识图谱",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-content-copywriting->kg-cap-agent-orchestration",
+      "source": "kg-scenario-content-copywriting",
+      "target": "kg-cap-agent-orchestration",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "内容与文案生成-智能体编排",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-product-enterprise-ai->kg-cap-ai-basic",
+      "source": "kg-product-enterprise-ai",
+      "target": "kg-cap-ai-basic",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "企业AI化-AI基础配置与功能讲解",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-data-knowledge->kg-cap-ai-reading",
+      "source": "kg-theme-data-knowledge",
+      "target": "kg-cap-ai-reading",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "数据资产与知识库-AI伴读",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-agents-automation->kg-cap-auto-qa",
+      "source": "kg-theme-agents-automation",
+      "target": "kg-cap-auto-qa",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "智能体与工具自动化-自动问答与推荐",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-content-copywriting->kg-cap-content-ai",
+      "source": "kg-scenario-content-copywriting",
+      "target": "kg-cap-content-ai",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "内容与文案生成-内容生成AI",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-scenario-customer-segmentation->kg-cap-customer-profile",
+      "source": "kg-scenario-customer-segmentation",
+      "target": "kg-cap-customer-profile",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "客户分层与画像-客户画像与分层",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-mind-clone->kg-cap-data-integration",
+      "source": "kg-scenario-mind-clone",
+      "target": "kg-cap-data-integration",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "思维复制与老师分身-数据接入与系统集成",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-scenario-digital-human-teaching->kg-cap-digital-human",
+      "source": "kg-scenario-digital-human-teaching",
+      "target": "kg-cap-digital-human",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "数字人讲课与展示-数字人",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-data-knowledge->kg-cap-excel-json",
+      "source": "kg-theme-data-knowledge",
+      "target": "kg-cap-excel-json",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "数据资产与知识库-Excel/JSON数据处理",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-scenario-mind-clone->kg-cap-knowledge-retrieval",
+      "source": "kg-scenario-mind-clone",
+      "target": "kg-cap-knowledge-retrieval",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "思维复制与老师分身-知识库与检索",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-scenario-live-review->kg-cap-live-review",
+      "source": "kg-scenario-live-review",
+      "target": "kg-cap-live-review",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "直播复盘-直播复盘分析",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-content-copywriting->kg-cap-media-automation",
+      "source": "kg-scenario-content-copywriting",
+      "target": "kg-cap-media-automation",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "内容与文案生成-视频与素材自动化",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-scenario-mind-clone->kg-cap-mind-clone",
+      "source": "kg-scenario-mind-clone",
+      "target": "kg-cap-mind-clone",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "思维复制与老师分身-思维克隆体",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-private-domain-conversion->kg-cap-private-domain-ops",
+      "source": "kg-scenario-private-domain-conversion",
+      "target": "kg-cap-private-domain-ops",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "私域转化-私域运营自动化",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-sales-enablement->kg-cap-sales-ai",
+      "source": "kg-scenario-sales-enablement",
+      "target": "kg-cap-sales-ai",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "销售提效-销售AI",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-frontend-diagnosis->kg-cap-website-entry",
+      "source": "kg-scenario-frontend-diagnosis",
+      "target": "kg-cap-website-entry",
+      "relationType": "kg_decomposes_to_capability",
+      "relationLabel": "前端网站与诊断入口-网站与诊断入口",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-industry-knowledge->kg-customer-type-one-person-company",
+      "source": "kg-industry-knowledge",
+      "target": "kg-customer-type-one-person-company",
+      "relationType": "kg_context_customer",
+      "relationLabel": "一人公司",
+      "sortOrder": 13
+    },
+    {
+      "id": "kg-industry-knowledge->kg-customer-type-sme",
+      "source": "kg-industry-knowledge",
+      "target": "kg-customer-type-sme",
+      "relationType": "kg_context_customer",
+      "relationLabel": "中小企业",
+      "sortOrder": 14
+    },
+    {
+      "id": "kg-cap-agent-orchestration->kg-delivery-agent-count",
+      "source": "kg-cap-agent-orchestration",
+      "target": "kg-delivery-agent-count",
+      "relationType": "kg_decomposes_to_asset",
+      "relationLabel": "智能体编排-智能体交付",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-cap-ai-basic->kg-delivery-basic-config",
+      "source": "kg-cap-ai-basic",
+      "target": "kg-delivery-basic-config",
+      "relationType": "kg_decomposes_to_asset",
+      "relationLabel": "AI基础配置与功能讲解-基础配置与功能讲解",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-cap-digital-human->kg-delivery-digital-human",
+      "source": "kg-cap-digital-human",
+      "target": "kg-delivery-digital-human",
+      "relationType": "kg_decomposes_to_asset",
+      "relationLabel": "数字人-数字人拍摄与加工",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-cap-mind-clone->kg-delivery-mind-clone",
+      "source": "kg-cap-mind-clone",
+      "target": "kg-delivery-mind-clone",
+      "relationType": "kg_decomposes_to_asset",
+      "relationLabel": "思维克隆体-思维克隆体操作及技术交付",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-education->kg-delivery-offline-course",
+      "source": "kg-theme-education",
+      "target": "kg-delivery-offline-course",
+      "relationType": "kg_decomposes_to_asset",
+      "relationLabel": "教育培训与知识服务-线下课/工作坊承接",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-content-copywriting->kg-pain-adoption-uncertain",
+      "source": "kg-scenario-content-copywriting",
+      "target": "kg-pain-adoption-uncertain",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "内容与文案生成-使用落地待验证",
+      "sortOrder": 4
+    },
+    {
+      "id": "kg-product-ip-stage->kg-pain-business-model-validation",
+      "source": "kg-product-ip-stage",
+      "target": "kg-pain-business-model-validation",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "IP阶段-商业模式待验证",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-knowledge-base->kg-pain-complex-automation-later",
+      "source": "kg-scenario-knowledge-base",
+      "target": "kg-pain-complex-automation-later",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "知识库与资料沉淀-复杂自动化后置",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-product-enterprise-ai->kg-pain-delivery-not-started",
+      "source": "kg-product-enterprise-ai",
+      "target": "kg-pain-delivery-not-started",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "企业AI化-交付启动滞后",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-scenario-enrollment-course->kg-pain-feedback-waiting",
+      "source": "kg-scenario-enrollment-course",
+      "target": "kg-pain-feedback-waiting",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "招生增长与课程承接-等待反馈或回访",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-theme-data-knowledge->kg-pain-human-review",
+      "source": "kg-theme-data-knowledge",
+      "target": "kg-pain-human-review",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "数据资产与知识库-自动化需人审",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-scenario-knowledge-base->kg-pain-material-gap",
+      "source": "kg-scenario-knowledge-base",
+      "target": "kg-pain-material-gap",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "知识库与资料沉淀-资料待补齐",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-scenario-enrollment-course->kg-pain-participation-low",
+      "source": "kg-scenario-enrollment-course",
+      "target": "kg-pain-participation-low",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "招生增长与课程承接-参与度不足",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-content-copywriting->kg-pain-process-rules",
+      "source": "kg-scenario-content-copywriting",
+      "target": "kg-pain-process-rules",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "内容与文案生成-业务流程规则待明确",
+      "sortOrder": 5
+    },
+    {
+      "id": "kg-scenario-knowledge-base->kg-pain-scope-sprawl",
+      "source": "kg-scenario-knowledge-base",
+      "target": "kg-pain-scope-sprawl",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "知识库与资料沉淀-需求发散需收敛",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-scenario-public-traffic->kg-pain-system-integration",
+      "source": "kg-scenario-public-traffic",
+      "target": "kg-pain-system-integration",
+      "relationType": "kg_decomposes_to_variable",
+      "relationLabel": "公域引流与曝光-系统接入待验证",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-industry-knowledge->kg-product-enterprise-ai",
+      "source": "kg-industry-knowledge",
+      "target": "kg-product-enterprise-ai",
+      "relationType": "kg_context_product",
+      "relationLabel": "企业AI化",
+      "sortOrder": 11
+    },
+    {
+      "id": "kg-industry-knowledge->kg-product-ip-stage",
+      "source": "kg-industry-knowledge",
+      "target": "kg-product-ip-stage",
+      "relationType": "kg_context_product",
+      "relationLabel": "IP阶段",
+      "sortOrder": 12
+    },
+    {
+      "id": "kg-theme-private-domain->kg-scenario-community-qa",
+      "source": "kg-theme-private-domain",
+      "target": "kg-scenario-community-qa",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "私域与社群客户经营-社群问答与客户服务",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-content-copywriting",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-content-copywriting",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-内容与文案生成",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-education->kg-scenario-curriculum-rebuild",
+      "source": "kg-theme-education",
+      "target": "kg-scenario-curriculum-rebuild",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "教育培训与知识服务-教材与知识体系重构",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-customer-activation",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-customer-activation",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-老客激活与裂变",
+      "sortOrder": 11
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-customer-segmentation",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-customer-segmentation",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-客户分层与画像",
+      "sortOrder": 7
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-data-structuring",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-data-structuring",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-数据结构化与Excel转JSON",
+      "sortOrder": 9
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-digital-human-teaching",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-digital-human-teaching",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-数字人讲课与展示",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-enrollment-course",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-enrollment-course",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-招生增长与课程承接",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-theme-manufacturing-erp->kg-scenario-erp-integration",
+      "source": "kg-theme-manufacturing-erp",
+      "target": "kg-scenario-erp-integration",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "生产库存与ERP数据化-ERP与系统接入",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-frontend-diagnosis",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-frontend-diagnosis",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-前端网站与诊断入口",
+      "sortOrder": 6
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-inventory-stats",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-inventory-stats",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-生产库存统计",
+      "sortOrder": 10
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-knowledge-base",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-knowledge-base",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-知识库与资料沉淀",
+      "sortOrder": 5
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-live-review",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-live-review",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-直播复盘",
+      "sortOrder": 5
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-media-batch-processing",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-media-batch-processing",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-批量剪辑与物料处理",
+      "sortOrder": 8
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-mind-clone",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-mind-clone",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-思维复制与老师分身",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-private-domain-conversion",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-private-domain-conversion",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-私域转化",
+      "sortOrder": 3
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-productized-monetization",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-productized-monetization",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-产品化变现",
+      "sortOrder": 4
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-public-traffic",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-public-traffic",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-公域引流与曝光",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-theme-enterprise-ai->kg-scenario-sales-enablement",
+      "source": "kg-theme-enterprise-ai",
+      "target": "kg-scenario-sales-enablement",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "企业经营AI化-销售提效",
+      "sortOrder": 4
+    },
+    {
+      "id": "kg-theme-ip-content->kg-scenario-team-training-replication",
+      "source": "kg-theme-ip-content",
+      "target": "kg-scenario-team-training-replication",
+      "relationType": "kg_decomposes_to_problem",
+      "relationLabel": "IP与内容商业化-团队培训与能力复制",
+      "sortOrder": 6
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-agents-automation",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-agents-automation",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "智能体与工具自动化",
+      "sortOrder": 6
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-data-knowledge",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-data-knowledge",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "数据资产与知识库",
+      "sortOrder": 7
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-digital-human",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-digital-human",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "数字人与AI分身",
+      "sortOrder": 5
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-education",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-education",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "教育培训与知识服务",
+      "sortOrder": 4
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-enterprise-ai",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-enterprise-ai",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "企业经营AI化",
+      "sortOrder": 1
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-finance-planning",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-finance-planning",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "保险与财富规划服务",
+      "sortOrder": 10
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-ip-content",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-ip-content",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "IP与内容商业化",
+      "sortOrder": 2
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-manufacturing-erp",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-manufacturing-erp",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "生产库存与ERP数据化",
+      "sortOrder": 9
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-private-domain",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-private-domain",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "私域与社群客户经营",
+      "sortOrder": 8
+    },
+    {
+      "id": "kg-industry-knowledge->kg-theme-sales-growth",
+      "source": "kg-industry-knowledge",
+      "target": "kg-theme-sales-growth",
+      "relationType": "kg_contains_theme",
+      "relationLabel": "销售成交与招商增长",
+      "sortOrder": 3
     }
   ],
   "agents": [
