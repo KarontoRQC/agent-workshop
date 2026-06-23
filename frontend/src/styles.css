@@ -941,41 +941,6 @@ button {
     linear-gradient(180deg, rgba(255, 247, 220, 0.018), transparent);
 }
 
-.graph-summary {
-  position: absolute;
-  left: clamp(300px, 30vw, 410px);
-  top: 18px;
-  z-index: 4;
-  width: min(360px, calc(100% - 430px));
-  pointer-events: none;
-}
-
-.graph-summary span,
-.graph-summary p {
-  color: var(--faint);
-}
-
-.graph-summary span {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 10px;
-  letter-spacing: 0;
-}
-
-.graph-summary strong {
-  display: block;
-  color: #fff1c6;
-  font-size: 19px;
-  font-weight: 760;
-}
-
-.graph-summary p {
-  max-width: 330px;
-  margin: 7px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .graph-toolbar {
   position: absolute;
   top: 14px;
@@ -1624,13 +1589,8 @@ button {
     bottom: 122px;
   }
 
-  .graph-summary,
   .graph-toolbar {
     left: min(384px, calc(100vw - 64px));
-  }
-
-  .graph-summary {
-    width: min(360px, calc(100% - 48px));
   }
 
   .control-dock {

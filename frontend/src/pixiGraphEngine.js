@@ -14,6 +14,11 @@ const colors = {
   amber: 0xd7a936,
   amberHot: 0xffd765,
   amberDeep: 0x3a2b13,
+  copper: 0xe68b4a,
+  teal: 0x54c6b2,
+  mint: 0x9cd9aa,
+  sky: 0x79aeca,
+  blush: 0xe6a06f,
   lineWhite: 0xf4efe4,
   cream: 0xded6c4,
   green: 0x8d9e7d,
@@ -24,7 +29,6 @@ const colors = {
 
 const TRANSITION_MS = 860;
 const CAMERA_EASE = 0.16;
-const IDLE_FRAME_MS = 34;
 
 export async function createPixiGraphEngine(mount, handlers = {}) {
   const app = new Application();
@@ -71,7 +75,6 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   let animationFrame = 0;
   let animationUntil = 0;
   let idleFrame = 0;
-  let lastIdleDrawAt = 0;
   let dragFrame = 0;
   let hoverKey = "";
 
@@ -148,13 +151,10 @@ export async function createPixiGraphEngine(mount, handlers = {}) {
   function startIdleAnimationLoop() {
     if (idleFrame) return;
 
-    const step = (now) => {
+    const step = () => {
       if (destroyed) return;
 
-      if (!document.hidden && now - lastIdleDrawAt >= IDLE_FRAME_MS) {
-        lastIdleDrawAt = now;
-        if (!animationFrame) redraw();
-      }
+      if (!document.hidden && !animationFrame) redraw();
 
       idleFrame = window.requestAnimationFrame(step);
     };
@@ -727,7 +727,8 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
   params.layout.nodes.forEach((node) => {
     const state = getNodeState(node, relation, params, elapsed);
     const entry = getNodeEntry(nodeLayer, labelLayer, node.id);
-    const { group, aura, halo, ring, core, pin, hit } = entry;
+    const { group, aura, halo, orbit, ring, core, facet, shine, pin, hit } = entry;
+    const accent = nodeAccentColor(node, state);
 
     entry.node = node;
     entry.handlers = handlers;
@@ -738,6 +739,8 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
 
     aura.clear();
     aura
+      .circle(node.x, node.y, node.radius + state.aura + 9)
+      .fill({ color: accent, alpha: state.auraAlpha * 0.42 })
       .circle(node.x, node.y, node.radius + state.aura)
       .fill({ color: colors.amber, alpha: state.auraAlpha });
 
@@ -746,26 +749,35 @@ function renderNodes(nodeLayer, labelLayer, params, handlers, controls) {
       halo
         .circle(node.x, node.y, node.radius + 12 + Math.sin(elapsed * 4 + node.ring) * 2)
         .stroke({
-          color: colors.amberHot,
+          color: state.hot ? colors.amberHot : accent,
           alpha: 0.08 + state.highlight * 0.18,
           width: 1,
         });
     }
 
+    orbit.clear();
+    drawNodeOrbit(orbit, node, state, elapsed, accent);
+
     ring.clear();
     ring
       .circle(node.x, node.y, node.radius + 3.6)
-      .fill({ color: colors.black, alpha: isMajorNode(node) ? 0.78 : 0.86 })
+      .fill({ color: colors.black, alpha: isMajorNode(node) ? 0.72 : 0.82 })
       .stroke({
-        color: state.hot ? colors.amberHot : state.related ? colors.amber : colors.dust,
-        alpha: state.hot ? 0.92 : state.related ? 0.54 : 0.16,
-        width: state.hot ? 1.55 : 0.9,
+        color: state.hot ? colors.amberHot : state.related ? accent : colors.dust,
+        alpha: state.hot ? 0.94 : state.related ? 0.62 : 0.22,
+        width: state.hot ? 1.8 : state.related ? 1.25 : 0.9,
       });
 
     core.clear();
     core
       .circle(node.x, node.y, node.radius)
       .fill({ color: nodeCoreColor(node, state), alpha: nodeCoreAlpha(node, state) });
+
+    facet.clear();
+    drawNodeFacet(facet, node, state, accent);
+
+    shine.clear();
+    drawNodeSpark(shine, node, state, elapsed, accent);
 
     pin.clear();
     if (node.dragged) {
@@ -833,6 +845,9 @@ function getNodeEntry(nodeLayer, labelLayer, nodeId) {
     label: null,
     labelLayer,
     labelStyleKey: "",
+    orbit: new Graphics(),
+    facet: new Graphics(),
+    shine: new Graphics(),
   };
 
   entry.hit.eventMode = "static";
@@ -844,7 +859,7 @@ function getNodeEntry(nodeLayer, labelLayer, nodeId) {
     entry.controls.startDrag(entry.node, event);
   });
 
-  entry.group.addChild(entry.aura, entry.halo, entry.ring, entry.core, entry.pin, entry.hit);
+  entry.group.addChild(entry.aura, entry.halo, entry.orbit, entry.ring, entry.core, entry.facet, entry.shine, entry.pin, entry.hit);
   nodeLayer.addChild(entry.group);
   entries.set(nodeId, entry);
   return entry;
@@ -1180,13 +1195,102 @@ function cubicPoint(curve, t) {
   };
 }
 
+function nodeAccentColor(node, state = {}) {
+  if (state.hot) return colors.amberHot;
+  if (node.type === "industry" || node.kind === "industry") return colors.amber;
+  if (node.type === "problem") return colors.copper;
+  if (node.type === "capability") return colors.teal;
+  if (node.type === "asset" || node.type === "action") return colors.mint;
+  if (node.type === "variable") return colors.sky;
+  return colors.cream;
+}
+
+function drawNodeOrbit(graphics, node, state, elapsed, accent) {
+  if (node.kind === "ghost") return;
+  if (node.kind === "context" && !state.related && !state.hot) return;
+
+  const major = isMajorNode(node);
+  const baseRadius = node.radius + (major ? 15 : node.kind === "industry" ? 10 : 7);
+  const spin = elapsed * (state.hot ? 1.28 : state.related ? 0.72 : 0.38) + (node.ring || 0) * 0.84;
+  const alpha = major ? 0.34 : state.hot ? 0.46 : state.related ? 0.28 : 0.12;
+  const width = major ? 1.3 : state.hot ? 1.15 : 0.78;
+
+  drawArcSegment(graphics, node.x, node.y, baseRadius, spin, spin + Math.PI * 0.58, major ? 24 : 16);
+  graphics.stroke({ color: accent, alpha, width });
+
+  drawArcSegment(graphics, node.x, node.y, baseRadius + (major ? 8 : 4), spin + Math.PI * 1.08, spin + Math.PI * 1.42, 12);
+  graphics.stroke({ color: colors.lineWhite, alpha: alpha * 0.58, width: Math.max(0.55, width * 0.62) });
+
+  if (major || state.hot) {
+    drawArcSegment(graphics, node.x, node.y, baseRadius + 13, -spin * 0.62, -spin * 0.62 + Math.PI * 0.32, 10);
+    graphics.stroke({ color: colors.amberHot, alpha: alpha * 0.86, width: 1 });
+  }
+}
+
+function drawNodeFacet(graphics, node, state, accent) {
+  const major = isMajorNode(node);
+  const r = node.radius;
+  const highlightAlpha = major ? 0.18 : state.hot ? 0.2 : state.related ? 0.13 : 0.08;
+
+  graphics
+    .circle(node.x - r * 0.24, node.y - r * 0.28, Math.max(2.2, r * 0.42))
+    .fill({ color: colors.lineWhite, alpha: highlightAlpha })
+    .circle(node.x + r * 0.3, node.y + r * 0.26, Math.max(1.6, r * 0.2))
+    .fill({ color: accent, alpha: highlightAlpha * 0.84 });
+
+  if (major) {
+    graphics
+      .circle(node.x, node.y, r * 0.72)
+      .stroke({ color: colors.amberHot, alpha: 0.18 + state.highlight * 0.12, width: 0.8 })
+      .circle(node.x, node.y, r * 0.42)
+      .stroke({ color: colors.lineWhite, alpha: 0.1, width: 0.55 });
+  }
+}
+
+function drawNodeSpark(graphics, node, state, elapsed, accent) {
+  if (node.kind === "ghost" || node.kind === "context") return;
+
+  const major = isMajorNode(node);
+  const count = major ? 3 : state.hot ? 2 : state.related || node.type === "industry" ? 1 : 0;
+  if (!count) return;
+
+  const baseRadius = node.radius + (major ? 18 : 9);
+  const alpha = major ? 0.62 : state.hot ? 0.78 : 0.42;
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = elapsed * (0.9 + index * 0.18) + index * Math.PI * 0.74 + (node.ring || 0) * 0.66;
+    const sparkX = node.x + Math.cos(angle) * (baseRadius + index * 2.6);
+    const sparkY = node.y + Math.sin(angle) * (baseRadius + index * 2.6);
+    const size = major ? 2.2 - index * 0.28 : 1.75 - index * 0.22;
+
+    graphics
+      .circle(sparkX, sparkY, Math.max(1.05, size))
+      .fill({ color: index === 0 ? colors.amberHot : accent, alpha: alpha * (1 - index * 0.16) })
+      .circle(sparkX, sparkY, Math.max(2.6, size * 2.2))
+      .fill({ color: accent, alpha: alpha * 0.11 });
+  }
+}
+
+function drawArcSegment(graphics, x, y, radius, start, end, segments = 16) {
+  for (let index = 0; index <= segments; index += 1) {
+    const angle = start + ((end - start) * index) / segments;
+    const pointX = x + Math.cos(angle) * radius;
+    const pointY = y + Math.sin(angle) * radius;
+    if (index === 0) graphics.moveTo(pointX, pointY);
+    else graphics.lineTo(pointX, pointY);
+  }
+}
+
 function nodeCoreColor(node, state) {
   if (isMajorNode(node)) return colors.amberDeep;
-  if (state.hot && node.kind !== "context") return node.type === "industry" ? colors.amber : colors.amberHot;
+  if (state.hot && node.kind !== "context") return node.type === "industry" ? colors.amber : nodeAccentColor(node, state);
   if (node.kind === "context" || node.kind === "ghost") return colors.dust;
-  if (node.kind === "leaf") return node.type === "problem" ? colors.amber : colors.cream;
+  if (node.kind === "leaf") return nodeAccentColor(node, state);
   if (node.type === "industry") return colors.cream;
-  if (node.type === "problem") return colors.amber;
+  if (node.type === "problem") return colors.copper;
+  if (node.type === "capability") return colors.teal;
+  if (node.type === "asset" || node.type === "action") return colors.mint;
+  if (node.type === "variable") return colors.sky;
   return colors.cream;
 }
 
