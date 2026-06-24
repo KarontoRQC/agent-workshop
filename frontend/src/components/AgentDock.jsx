@@ -97,6 +97,7 @@ function ChatTurn({ turn, currentStatus }) {
   const summary = agentRecommendation.SUMMARY;
   const recommendedAgents = agentRecommendation.agents || [];
   const isStreaming = turn.status === "streaming" && currentStatus === "streaming";
+  const isReplyHeld = Boolean(turn.replyHold);
   const hasAssistantContent =
     ack ||
     directReply ||
@@ -121,21 +122,20 @@ function ChatTurn({ turn, currentStatus }) {
           <Waveform size={15} weight="duotone" />
         </span>
         <div className="agent-bubble">
-          {isStreaming && (
+          {(isStreaming || isReplyHeld) && (
             <div className="agent-message-meta">
               <span>智能助手</span>
-              <em>生成中</em>
+              <em>{isReplyHeld ? "正在思考" : "生成中"}</em>
             </div>
           )}
 
           {directReply && <AssistantText>{directReply}</AssistantText>}
           {ack && <AssistantText>{ack}</AssistantText>}
-          {path && (
-            <PathResultCard path={path} active={isStreaming && !explanation} />
-          )}
+          {path && <PathResultCard path={path} active={isStreaming && !explanation} />}
           {explanation && <AssistantText>{explanation}</AssistantText>}
-          {recommendationAck && <AssistantText>{recommendationAck}</AssistantText>}
-          {recommendedAgents.length > 0 && (
+
+          {!isReplyHeld && recommendationAck && <AssistantText>{recommendationAck}</AssistantText>}
+          {!isReplyHeld && recommendedAgents.length > 0 && (
             <section className="agent-recommendation-section" aria-label="推荐智能体组合">
               <div className="agent-section-heading">
                 <Sparkle size={14} weight="bold" />
@@ -154,8 +154,8 @@ function ChatTurn({ turn, currentStatus }) {
               </div>
             </section>
           )}
-          {summary && <AssistantText>{summary}</AssistantText>}
-          {isStreaming && !hasAssistantContent && <TypingLine />}
+          {!isReplyHeld && summary && <AssistantText>{summary}</AssistantText>}
+          {(isReplyHeld || (isStreaming && !hasAssistantContent)) && <TypingLine />}
 
           {turn.error && <p className="agent-error">{turn.error}</p>}
         </div>

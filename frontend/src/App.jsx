@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ClockCounterClockwise,
-  CubeTransparent,
   Network,
   PlugsConnected,
 } from "@phosphor-icons/react";
@@ -18,6 +17,7 @@ import { ControlDock } from "./components/ControlDock.jsx";
 import { KnowledgeGraph } from "./components/KnowledgeGraph.jsx";
 import { RecommendationRail } from "./components/RecommendationRail.jsx";
 import { streamCozeChat } from "./cozeChatClient.js";
+import baiLogo from "./assets/bailogo.png";
 
 const GRAPH_PATH_STEP_MS = 980;
 
@@ -42,13 +42,7 @@ function TopBar({ mode, setMode }) {
   return (
     <header className="top-bar">
       <div className="brand-lockup">
-        <span className="brand-glyph">
-          <CubeTransparent size={24} weight="duotone" />
-        </span>
-        <div>
-          <strong>智能体知识图谱</strong>
-          <span>Agentic Knowledge Atlas</span>
-        </div>
+        <img className="brand-logo" src={baiLogo} alt="中隐" />
       </div>
 
       <nav className="top-pills" aria-label="系统状态">
@@ -100,13 +94,17 @@ export function App() {
     seen: new Set(),
     timer: null,
     playing: false,
+    activeTurnId: null,
+    completionPending: false,
+    holdingReply: false,
+    graphStarted: false,
   });
   const hasRecommendedAgents = agentStream.workflow.agentRecommendation.agents.length > 0;
 
   useEffect(() => {
     return () => {
       agentRequestRef.current?.abort();
-      clearGraphPathAnimation();
+      clearGraphPathAnimation({ releaseHold: false });
     };
   }, []);
 
@@ -132,17 +130,102 @@ export function App() {
     setMode(nodeId === ROOT_ID ? "atlas" : "path");
   }
 
-  function clearGraphPathAnimation() {
+  function clearGraphPathAnimation({ releaseHold = true } = {}) {
     const animation = graphPathAnimationRef.current;
 
     if (animation.timer) {
       window.clearTimeout(animation.timer);
     }
 
+    if (releaseHold && animation.activeTurnId && animation.holdingReply) {
+      setTurnReplyHold(animation.activeTurnId, false);
+    }
+
     animation.queue = [];
     animation.seen = new Set();
     animation.timer = null;
     animation.playing = false;
+    animation.activeTurnId = null;
+    animation.completionPending = false;
+    animation.holdingReply = false;
+    animation.graphStarted = false;
+  }
+
+  function setTurnReplyHold(turnId, replyHold) {
+    if (!turnId) return;
+
+    setAgentTurns((current) =>
+      current.map((turn) => (turn.id === turnId ? { ...turn, replyHold } : turn)),
+    );
+  }
+
+  function beginGraphReplyHold() {
+    const animation = graphPathAnimationRef.current;
+    const turnId = animation.activeTurnId;
+
+    if (!turnId || animation.holdingReply) return;
+
+    animation.holdingReply = true;
+    setTurnReplyHold(turnId, true);
+  }
+
+  function completeTurn(turnId) {
+    setAgentStream((current) => ({
+      ...current,
+      status: current.status === "streaming" ? "completed" : current.status,
+    }));
+    setAgentTurns((current) =>
+      current.map((turn) =>
+        turn.id === turnId && turn.status === "streaming" ? { ...turn, status: "completed" } : turn,
+      ),
+    );
+  }
+
+  function completeTurnWhenGraphReady(turnId) {
+    const animation = graphPathAnimationRef.current;
+    const graphIsAnimating =
+      animation.activeTurnId === turnId &&
+      animation.graphStarted &&
+      (animation.holdingReply || animation.playing || Boolean(animation.timer) || animation.queue.length > 0);
+
+    if (animation.activeTurnId === turnId && animation.holdingReply && !animation.graphStarted) {
+      setTurnReplyHold(turnId, false);
+      animation.holdingReply = false;
+    }
+
+    if (graphIsAnimating) {
+      animation.completionPending = true;
+      return;
+    }
+
+    completeTurn(turnId);
+
+    if (animation.activeTurnId === turnId) {
+      animation.activeTurnId = null;
+      animation.completionPending = false;
+      animation.holdingReply = false;
+    }
+  }
+
+  function releaseGraphReplyHoldIfIdle() {
+    const animation = graphPathAnimationRef.current;
+
+    if (animation.playing || animation.timer || animation.queue.length > 0) return;
+
+    const turnId = animation.activeTurnId;
+
+    if (turnId && animation.holdingReply) {
+      setTurnReplyHold(turnId, false);
+    }
+
+    animation.holdingReply = false;
+
+    if (turnId && animation.completionPending) {
+      animation.completionPending = false;
+      completeTurn(turnId);
+      animation.activeTurnId = null;
+      animation.graphStarted = false;
+    }
   }
 
   function enqueueGraphPathNode(node) {
@@ -153,6 +236,8 @@ export function App() {
     const animation = graphPathAnimationRef.current;
     if (animation.seen.has(nodeId)) return;
 
+    animation.graphStarted = true;
+    beginGraphReplyHold();
     animation.seen.add(nodeId);
     animation.queue.push(node);
     playNextGraphPathNode();
@@ -171,6 +256,7 @@ export function App() {
     const node = animation.queue.shift();
     if (!node) {
       animation.playing = false;
+      releaseGraphReplyHoldIfIdle();
       return;
     }
 
@@ -202,6 +288,7 @@ export function App() {
 
     agentRequestRef.current?.abort();
     clearGraphPathAnimation();
+    graphPathAnimationRef.current.activeTurnId = turnId;
     agentRequestRef.current = controller;
 
     setDraft("");
@@ -213,6 +300,7 @@ export function App() {
         status: "streaming",
         workflow: createEmptyAgentWorkflow(),
         error: "",
+        replyHold: false,
       },
     ]);
     setAgentStream({
@@ -231,6 +319,10 @@ export function App() {
         onContentDelta(event) {
           const section = getWorkflowSection(event);
           if (!section) return;
+
+          if (section === "knowledgeGraph") {
+            beginGraphReplyHold();
+          }
 
           const content = event.content || "";
           setAgentStream((current) => ({
@@ -353,11 +445,16 @@ export function App() {
             ),
           );
 
-          enqueueGraphPathNodes(nodes);
+          if (nodes.length > 0) {
+            enqueueGraphPathNodes(nodes);
+          } else {
+            releaseGraphReplyHoldIfIdle();
+          }
         },
         onWorkflowError(event) {
           const message = formatWorkflowError(event);
 
+          setTurnReplyHold(turnId, false);
           setAgentStream((current) => ({
             ...current,
             status: "error",
@@ -368,29 +465,16 @@ export function App() {
           );
         },
         onCompleted() {
-          setAgentStream((current) => ({
-            ...current,
-            status: "completed",
-          }));
-          setAgentTurns((current) =>
-            current.map((turn) => (turn.id === turnId ? { ...turn, status: "completed" } : turn)),
-          );
+          completeTurnWhenGraphReady(turnId);
         },
       });
 
-      setAgentStream((current) => ({
-        ...current,
-        status: current.status === "streaming" ? "completed" : current.status,
-      }));
-      setAgentTurns((current) =>
-        current.map((turn) =>
-          turn.id === turnId && turn.status === "streaming" ? { ...turn, status: "completed" } : turn,
-        ),
-      );
+      completeTurnWhenGraphReady(turnId);
     } catch (error) {
       if (error.name === "AbortError") return;
 
       const message = error.message || "智能助手连接失败";
+      setTurnReplyHold(turnId, false);
       setAgentStream((current) => ({
         ...current,
         status: "error",
