@@ -44,14 +44,14 @@ const industryOrbit = [
 ];
 
 const fanConfig = {
-  leftTop: { start: 2.42, spread: 1.28, distance: 128, labelLimit: 3 },
-  top: { start: -2.34, spread: 1.48, distance: 126, labelLimit: 2 },
-  rightTop: { start: -0.72, spread: 1.24, distance: 134, labelLimit: 3 },
-  rightMid: { start: -0.46, spread: 0.92, distance: 138, labelLimit: 3 },
-  bottomRight: { start: 0.38, spread: 1.28, distance: 132, labelLimit: 2 },
-  bottom: { start: 0.86, spread: 1.42, distance: 130, labelLimit: 2 },
-  leftLow: { start: 2.58, spread: 1.3, distance: 130, labelLimit: 2 },
-  focus: { start: -1.15, spread: 2.36, distance: 225, labelLimit: 8 },
+  leftTop: { start: 2.42, spread: 1.34, distance: 142, labelLimit: 3 },
+  top: { start: -2.34, spread: 1.54, distance: 140, labelLimit: 2 },
+  rightTop: { start: -0.72, spread: 1.3, distance: 148, labelLimit: 3 },
+  rightMid: { start: -0.46, spread: 0.98, distance: 152, labelLimit: 3 },
+  bottomRight: { start: 0.38, spread: 1.34, distance: 146, labelLimit: 2 },
+  bottom: { start: 0.86, spread: 1.48, distance: 144, labelLimit: 2 },
+  leftLow: { start: 2.58, spread: 1.36, distance: 144, labelLimit: 2 },
+  focus: { start: -1.15, spread: 2.44, distance: 250, labelLimit: 8 },
 };
 
 const centerFanBias = {
@@ -195,7 +195,7 @@ function addChildRing(nodes, links, anchor, options = {}) {
         ring: ring + 1,
         kind: "leaf",
         limit: Math.min(getChildren(child.id).length, 4),
-        distance: mode === "atlas" ? 76 : 68,
+        distance: mode === "atlas" ? 90 : 82,
         labelLimit: 0,
       });
     }
@@ -233,8 +233,8 @@ function keepOutsideFocusHalo(x, y, minDistance) {
 function focusChildPositionFrom(anchor, index, total, lineageDepth) {
   if (total > 10 && lineageDepth <= 2) {
     const angle = -Math.PI / 2 + (Math.PI * 2 * index) / total;
-    const radiusX = total > 14 ? 300 : 268;
-    const radiusY = total > 14 ? 214 : 190;
+    const radiusX = total > 14 ? 326 : 292;
+    const radiusY = total > 14 ? 232 : 208;
 
     return {
       x: clamp(anchor.x + Math.cos(angle) * radiusX, 76, VIEWBOX.width - 76),
@@ -248,7 +248,7 @@ function focusChildPositionFrom(anchor, index, total, lineageDepth) {
   const start = denseLeafSet ? -1.28 : opensRight ? -1.12 : total > 7 ? -1.18 : -1.06;
   const spread = denseLeafSet ? Math.PI * 1.58 : opensRight ? Math.PI * 1.24 : total > 7 ? Math.PI * 1.76 : Math.PI * 1.48;
   const angle = start + (spread * index) / Math.max(total - 1, 1);
-  const distance = (denseLeafSet ? 244 : opensRight ? 192 : 220) + (index % 3) * 24 + noise(index + 91) * 14;
+  const distance = (denseLeafSet ? 268 : opensRight ? 210 : 240) + (index % 3) * 24 + noise(index + 91) * 14;
   return {
     x: anchor.x + Math.cos(angle) * distance,
     y: anchor.y + Math.sin(angle) * distance * 0.74,
@@ -260,7 +260,7 @@ function siblingPositionFrom(anchor, index, total) {
   const start = 1.92;
   const spread = Math.PI * 1.18;
   const angle = start + (spread * index) / Math.max(total - 1, 1);
-  const distance = 122 + (index % 2) * 18 + noise(index + 142) * 10;
+  const distance = 138 + (index % 2) * 20 + noise(index + 142) * 10;
   return {
     x: anchor.x + Math.cos(angle) * distance,
     y: anchor.y + Math.sin(angle) * distance * 0.72,
@@ -363,7 +363,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
           ring: 2,
           kind: "branch",
           limit: Math.min(getChildren(id).length, 6),
-          distance: mode === "atlas" ? 82 : 74,
+          distance: mode === "atlas" ? 96 : 86,
           labelLimit: mode === "atlas" ? 2 : 0,
         });
       }
@@ -459,7 +459,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
       target: child.id,
       kind: "main",
       strength: 0.72,
-      idealDistance: useDenseFocusRing ? 238 : undefined,
+      idealDistance: useDenseFocusRing ? 264 : undefined,
       ring: childRing,
     });
 
@@ -470,7 +470,7 @@ export function buildGraphLayout({ focusId, depth = 2, mode = "path" }) {
         ring: childRing + 1,
         kind: "leaf",
         limit: 5,
-        distance: 76,
+        distance: 88,
         labelLimit: 0,
       });
     }
