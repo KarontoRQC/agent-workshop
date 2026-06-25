@@ -1,4 +1,5 @@
-const apiBaseUrl = import.meta.env.DEV ? "/api" : import.meta.env.VITE_API_BASE_URL || "/api";
+const DEFAULT_API_BASE_URL = "http://106.52.56.14/agent-workshop-api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
 const API_BASE_URL = apiBaseUrl.replace(/\/+$/, "");
 const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
 

@@ -1,4 +1,5 @@
-import { ArrowSquareOut, Package, SealCheck, Sparkle } from "@phosphor-icons/react";
+import { CaretUp, Package, SealCheck, Sparkle, UserCircle } from "@phosphor-icons/react";
+import { getAgentAvatar, getAgentAvatarAlt } from "../agentAvatars.js";
 import { agentCatalog, getNode } from "../agentAdapter.js";
 
 const catalogAgents = Object.values(agentCatalog);
@@ -54,18 +55,29 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
         <span className="mono">AI AGENT DRAW</span>
         <h2>智能体抽卡推荐</h2>
         <p>
-          {isLeafSelection
-            ? `当前选中：${contextNode.label} / 焦点：${focus.label}`
-            : `当前焦点：${focus?.label || "行业智能体作战图谱"}`}
+          {isLeafSelection ? (
+            <>
+              当前选中：<strong>{contextNode.label}</strong> / 焦点：<strong>{focus.label}</strong>
+            </>
+          ) : (
+            <>
+              当前焦点：<strong>{focus?.label || "行业智能体作战图谱"}</strong>
+            </>
+          )}
         </p>
       </header>
 
       <section className="draw-status-panel" aria-label="抽卡进度">
         <div className="draw-status-copy">
-          <SealCheck size={18} weight="fill" />
+          <span className="draw-status-icon" aria-hidden="true">
+            <SealCheck size={20} weight="fill" />
+          </span>
           <span>{isDrawing ? "Agent 正在解析命盘" : "推荐结果已展开"}</span>
         </div>
-        <strong>{String(agents.length).padStart(2, "0")}</strong>
+        <div className="draw-status-count" aria-hidden="true">
+          <strong>{String(agents.length).padStart(2, "0")}</strong>
+          <CaretUp size={18} weight="bold" />
+        </div>
       </section>
 
       <div className="draw-stage" aria-label="抽卡式推荐智能体列表">
@@ -79,8 +91,13 @@ export function RecommendationRail({ focusId, selectedId, recommendedAgents = []
 
       <footer className="rail-package draw-package">
         <div className="draw-summary">
-          <span>生成结果</span>
-          <strong>{agents.length} 个智能体</strong>
+          <span>
+            <Package size={17} weight="bold" />
+            生成结果
+          </span>
+          <strong>
+            <b>{agents.length}</b> 个智能体
+          </strong>
         </div>
         <button type="button" className="rail-action" onClick={handlePackageAgents} disabled={!launchTargets.length}>
           <Package size={16} weight="bold" />
@@ -96,6 +113,9 @@ function FlipAgentCard({ agent, index }) {
   const rank = String(agent.rank || index + 1).padStart(2, "0");
   const running = agent.streamStatus === "streaming";
   const rarity = getAgentRarity(agent, index);
+  const avatar = agent.avatar || getAgentAvatar(agent);
+  const avatarAlt = getAgentAvatarAlt(agent);
+  const displayName = stripRankPrefix(agent.name);
 
   return (
     <article
@@ -104,39 +124,23 @@ function FlipAgentCard({ agent, index }) {
       tabIndex={0}
       aria-label={`${agent.name} 推荐卡`}
     >
-      <div className="agent-flip-card-inner">
-        <div className="agent-flip-face agent-flip-front">
-          <div className="card-rune" aria-hidden="true">
-            <span>{rank}</span>
-          </div>
-          <div className="agent-card-topline">
-            <span className="rank">{rarity.label}</span>
-            <span className="agent-status-pill">{running ? "抽取中" : agent.stageLabel}</span>
-          </div>
-          <div className="agent-card-main">
-            <span className="agent-dot" />
-            <strong>{stripRankPrefix(agent.name)}</strong>
-            <small>{agent.metaLabel}</small>
-          </div>
-          <div className="agent-card-foot">
-            <span>契合度</span>
-            <strong>{agent.scoreLabel}</strong>
-          </div>
+      <div className="agent-card-shell">
+        <span className="rank">{rarity.label || rank}</span>
+        <span className="agent-status-pill">{running ? "抽取中" : agent.stageLabel}</span>
+        <div className={`card-rune ${avatar ? "has-avatar" : ""}`} aria-hidden="true">
+          {avatar ? <img src={avatar} alt={avatarAlt} loading="lazy" /> : <span>{rank}</span>}
         </div>
-
-        <div className="agent-flip-face agent-flip-back">
-          <div>
-            <span className="agent-card-kicker">推荐说明</span>
-            <p className="agent-card-reason">{agent.reason || (running ? "Agent 正在补全推荐理由..." : agent.fallbackReason)}</p>
-          </div>
-          {agent.launchTarget ? (
-            <a className="agent-card-link" href={agent.launchTarget} target="_blank" rel="noreferrer">
-              <span>{agent.launchLabel}</span>
-              <ArrowSquareOut size={14} weight="bold" />
-            </a>
-          ) : (
-            <span className="agent-card-link-muted">等待入口</span>
-          )}
+        <div className="agent-card-main">
+          <span className="agent-dot" />
+          <strong title={displayName}>{displayName}</strong>
+          <small>
+            <UserCircle size={15} weight="duotone" />
+            {agent.metaLabel}
+          </small>
+        </div>
+        <div className="agent-card-foot">
+          <span>契合度</span>
+          <strong>{agent.scoreLabel}</strong>
         </div>
       </div>
     </article>
@@ -157,6 +161,7 @@ function enrichRecommendedAgent(agent) {
   const agentKey = agent.agent_key || agent.agentKey || agent.id;
   const catalogAgent = findCatalogAgent(name, agentKey);
   const endpoint = agent.endpoint || agent.url || agent.link || agent.jump_url || catalogAgent?.endpoint || "";
+  const avatar = getAgentAvatar({ ...catalogAgent, ...agent, agentKey: agentKey || catalogAgent?.agentKey, name, endpoint });
   const metaLabel = catalogAgent ? `${catalogAgent.functionLabel} / ${catalogAgent.typeLabel}` : agent.stage || "推荐生成中";
   const stageLabel = agent.stage || catalogAgent?.functionLabel || "推荐";
   const scoreLabel = catalogAgent?.score || agent.score || (agent.streamStatus === "completed" ? "完成" : "生成中");
@@ -168,6 +173,7 @@ function enrichRecommendedAgent(agent) {
     id: agent.id || catalogAgent?.id,
     agentKey: agentKey || catalogAgent?.agentKey,
     name,
+    avatar,
     endpoint,
     canOpen: Boolean(launchTarget?.href),
     metaLabel,

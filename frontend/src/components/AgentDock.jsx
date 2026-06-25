@@ -1,12 +1,15 @@
 import { useEffect, useRef } from "react";
 import {
-  CaretRight,
   ChatCircleText,
+  Crosshair,
   GitBranch,
   PaperPlaneTilt,
   Sparkle,
+  SquaresFour,
+  UsersThree,
   Waveform,
 } from "@phosphor-icons/react";
+import { getAgentAvatar, getAgentAvatarAlt } from "../agentAvatars.js";
 
 const STATUS_LABELS = {
   idle: "在线",
@@ -14,6 +17,8 @@ const STATUS_LABELS = {
   completed: "已完成",
   error: "异常",
 };
+
+const AGENT_NAME = "我不是古神";
 
 export function AgentDock({ draft, setDraft, onSend, status = "idle", turns = [] }) {
   const threadRef = useRef(null);
@@ -48,7 +53,7 @@ export function AgentDock({ draft, setDraft, onSend, status = "idle", turns = []
           <Waveform size={18} weight="duotone" />
         </span>
         <div className="agent-heading">
-          <strong>路径选择 Agent</strong>
+          <strong>{AGENT_NAME}</strong>
           <span>监听业务输入，推动星图聚焦</span>
         </div>
         <em className={`agent-status agent-status-${status}`}>{STATUS_LABELS[status]}</em>
@@ -57,8 +62,34 @@ export function AgentDock({ draft, setDraft, onSend, status = "idle", turns = []
       <div className="agent-thread" ref={threadRef} aria-live="polite">
         {!hasTurns && (
           <div className="agent-empty">
-            <ChatCircleText size={18} />
-            <p>把业务问题发过来，我会给出路径建议。</p>
+            <div className="agent-empty-orbit" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <span className="agent-empty-core">
+                <ChatCircleText size={42} weight="duotone" />
+              </span>
+            </div>
+            <div className="agent-empty-copy">
+              <strong>
+                路径<span>已待命</span>
+              </strong>
+              <p>把业务问题发过来，我会给出路径建议。</p>
+            </div>
+            <div className="agent-empty-tags" aria-hidden="true">
+              <span>
+                <SquaresFour size={16} weight="bold" />
+                行业
+              </span>
+              <span>
+                <UsersThree size={16} weight="bold" />
+                人群
+              </span>
+              <span>
+                <Crosshair size={16} weight="bold" />
+                需求
+              </span>
+            </div>
           </div>
         )}
 
@@ -69,15 +100,18 @@ export function AgentDock({ draft, setDraft, onSend, status = "idle", turns = []
 
       <form className="agent-composer" onSubmit={handleSubmit}>
         <div className="agent-composer-row">
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isStreaming ? "Agent 正在生成..." : "随时询问任何问题..."}
-            rows={1}
-            disabled={isStreaming}
-          />
-          <button type="submit" aria-label="发送给 Agent" disabled={!draft.trim() || isStreaming}>
+          <div className="agent-input-shell">
+            <Sparkle size={18} weight="fill" aria-hidden="true" />
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isStreaming ? `${AGENT_NAME}正在生成...` : "随时询问任何问题..."}
+              rows={1}
+              disabled={isStreaming}
+            />
+          </div>
+          <button type="submit" aria-label={`发送给${AGENT_NAME}`} disabled={!draft.trim() || isStreaming}>
             <PaperPlaneTilt size={18} weight="fill" />
           </button>
         </div>
@@ -140,6 +174,7 @@ function ChatTurn({ turn, currentStatus }) {
               <div className="agent-section-heading">
                 <Sparkle size={14} weight="bold" />
                 <span>推荐智能体组合</span>
+                <small>为你生成 3 个阶段的提升方案</small>
                 <i />
               </div>
               <div className="agent-recommendation-list">
@@ -169,36 +204,72 @@ function AssistantText({ children }) {
 }
 
 function PathResultCard({ path, active }) {
+  const segments = getPathSegments(path);
+  const demandTags = segments.slice(0, 3);
+  const routeLabel = getRouteLabel(segments, path);
+
   return (
     <div className={`agent-path-card ${active ? "is-running" : ""}`}>
-      <span className="agent-path-icon">
-        <GitBranch size={22} weight="bold" />
-      </span>
-      <div className="agent-path-copy">
-        <strong>知识图谱路径</strong>
-        <p>{path}</p>
+      <div className="agent-path-panel agent-path-demand">
+        <div className="agent-path-heading">
+          <Crosshair size={15} weight="bold" />
+          <strong>已识别需求</strong>
+        </div>
+        <div className="agent-path-tags">
+          {demandTags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+        <p>该路径包含销售话术、跟进策略等内容，可有效提升业务推进能力。</p>
       </div>
-      <StatusChip active={active} />
+      <div className="agent-path-panel agent-path-route">
+        <div className="agent-path-heading">
+          <GitBranch size={15} weight="bold" />
+          <strong>推荐知识图谱路径</strong>
+        </div>
+        <div className="agent-path-pill" title={path}>
+          {routeLabel}
+        </div>
+        <em className="agent-path-status">{active ? "路径匹配中" : "路径已匹配完成"}</em>
+      </div>
     </div>
   );
 }
 
 function AgentRecommendationCard({ agent, index, active }) {
-  const rank = agent.rank || index + 1;
   const name = agent.agent_name || agent.name || "智能体生成中";
   const reason = agent.reason || (active ? "推荐理由生成中..." : "");
+  const stage = agent.stage || getFallbackAgentStage(index);
+  const status = getRecommendationStatus(active, index);
+  const variant = ["gold", "violet", "blue"][index % 3];
+  const avatar = getAgentAvatar(agent);
+  const avatarAlt = getAgentAvatarAlt(agent);
 
   return (
-    <article className={`agent-recommendation-card ${active ? "is-running" : ""}`}>
-      <span className="agent-recommendation-rank">{rank}</span>
+    <article className={`agent-recommendation-card agent-recommendation-${variant} ${active ? "is-running" : ""}`}>
+      <span className={`agent-recommendation-icon ${avatar ? "has-avatar" : ""}`} aria-hidden="true">
+        {avatar ? (
+          <img src={avatar} alt={avatarAlt} loading="lazy" />
+        ) : (
+          <>
+            {variant === "gold" && <SquaresFour size={22} weight="fill" />}
+            {variant === "violet" && <Sparkle size={22} weight="fill" />}
+            {variant === "blue" && <Crosshair size={22} weight="bold" />}
+          </>
+        )}
+      </span>
       <div className="agent-recommendation-copy">
-        <strong>{name}</strong>
-        {agent.stage && <em>{agent.stage}</em>}
+        <div className="agent-recommendation-head">
+          <div className="agent-recommendation-title">
+            <strong>{name}</strong>
+            <span className={`agent-recommendation-state agent-recommendation-state-${status.tone}`}>{status.label}</span>
+          </div>
+        </div>
+        <div className="agent-recommendation-meta">
+          <em>{stage}</em>
+          <span className="agent-recommendation-subtitle">{stage}阶段</span>
+        </div>
         {reason && <p>{reason}</p>}
-      </div>
-      <div className="agent-recommendation-side">
-        <StatusChip active={active} />
-        <CaretRight size={16} weight="bold" />
       </div>
     </article>
   );
@@ -210,6 +281,48 @@ function StatusChip({ active }) {
       {active ? "生成中" : "完成"}
     </em>
   );
+}
+
+function getPathSegments(path) {
+  return String(path || "")
+    .split(/\s*(?:>|›|→|->|-|—|–|\/|、|，|,)\s*/g)
+    .flatMap(expandPathSegment)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function expandPathSegment(segment) {
+  const industryMatch = segment.match(/^(.+?行业)(.+)$/);
+  if (industryMatch) {
+    return [industryMatch[1], industryMatch[2]];
+  }
+
+  return [segment];
+}
+
+function getRouteLabel(segments, fallback) {
+  if (segments.length >= 3) {
+    return `${segments.slice(0, -1).join("")} › ${segments[segments.length - 1]}`;
+  }
+
+  return segments.join(" › ") || fallback;
+}
+
+function getFallbackAgentStage(index) {
+  return ["核心阶段", "需求挖掘", "精准定位"][index % 3];
+}
+
+function getRecommendationStatus(active, index) {
+  if (active) {
+    return { label: "生成中", tone: "running" };
+  }
+
+  return [
+    { label: "已就绪", tone: "ready" },
+    { label: "推荐", tone: "recommend" },
+    { label: "可执行", tone: "actionable" },
+  ][index % 3];
 }
 
 function getRecommendedAgentKey(agent, index) {

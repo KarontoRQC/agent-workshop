@@ -29,7 +29,7 @@ const colors = {
 
 const TRANSITION_MS = 860;
 const CAMERA_EASE = 0.16;
-const VISUAL_HEARTBEAT_MS = 1000 / 24;
+const VISUAL_HEARTBEAT_MS = 1000 / 60;
 const PHYSICS_SETTLE_TAIL_MS = 1500;
 const MAX_PHYSICS_STEP = 7.5;
 const MIN_PHYSICS_STEP = 0.28;
@@ -1284,7 +1284,7 @@ function makeLabelStyle(node, state) {
   const isCenter = isMajorNode(node);
 
   return {
-    fontFamily: "Inter, Microsoft YaHei UI, sans-serif",
+    fontFamily: "HarmonyOS Sans SC, MiSans, Noto Sans SC, Microsoft YaHei UI, sans-serif",
     fontSize: node.kind === "focus" ? 18 : node.kind === "anchor" ? 15 : node.kind === "origin" ? 14 : node.kind === "leaf" ? 11 : 13,
     fontWeight: isCenter ? "800" : "650",
     fill: isCenter || state.hot ? 0xfff3c5 : colors.label,
