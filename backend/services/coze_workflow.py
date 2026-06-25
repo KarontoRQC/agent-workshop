@@ -160,14 +160,18 @@ def _iter_chat_workflow_stream(
         return
 
     summary = ""
+    recommendation_thinking_process = ""
 
     for event in iter_tagged_events(
         recommendation_upstream,
         section_tags=RECOMMENDER_TAGS,
         section_stream_emitters={"RECOMMENDED_AGENTS": RecommendedAgentsStreamEmitter},
     ):
-        if event.get("event") == "content.delta" and event.get("type") == "SUMMARY":
-            summary += event.get("content", "")
+        if event.get("event") == "content.delta":
+            if event.get("type") == "SUMMARY":
+                summary += event.get("content", "")
+            elif event.get("type") == "THINKING_PROCESS":
+                recommendation_thinking_process += event.get("content", "")
 
         if event.get("event") in {"chat.completed", "message.completed", "done"}:
             continue
@@ -178,6 +182,7 @@ def _iter_chat_workflow_stream(
         "workflow.stage.completed",
         AGENT_RECOMMENDATION_STAGE,
         summary=summary.strip(),
+        thinking_process=recommendation_thinking_process.strip(),
     )
     yield _workflow_event("chat.completed", status="completed")
     yield _workflow_event("workflow.completed", status="completed")

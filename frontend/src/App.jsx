@@ -24,6 +24,7 @@ const GRAPH_PATH_STEP_MS = 980;
 function createEmptyAgentWorkflow() {
   return {
     knowledgeGraph: {
+      THINKING_PROCESS: "",
       ACK: "",
       DIRECT_REPLY: "",
       KG_PATH: "",
@@ -31,6 +32,7 @@ function createEmptyAgentWorkflow() {
       graphPath: null,
     },
     agentRecommendation: {
+      THINKING_PROCESS: "",
       ACK: "",
       SUMMARY: "",
       agents: [],
@@ -529,11 +531,14 @@ export function App() {
 }
 
 function getWorkflowSection(event) {
-  if (event.stage === "knowledge_graph" && ["ACK", "DIRECT_REPLY", "KG_PATH", "EXPLANATION"].includes(event.type)) {
+  if (
+    event.stage === "knowledge_graph" &&
+    ["THINKING_PROCESS", "ACK", "DIRECT_REPLY", "KG_PATH", "EXPLANATION"].includes(event.type)
+  ) {
     return "knowledgeGraph";
   }
 
-  if (event.stage === "agent_recommendation" && ["ACK", "SUMMARY"].includes(event.type)) {
+  if (event.stage === "agent_recommendation" && ["THINKING_PROCESS", "ACK", "SUMMARY"].includes(event.type)) {
     return "agentRecommendation";
   }
 

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  CaretDown,
   ChatCircleText,
   Crosshair,
   GitBranch,
@@ -123,10 +124,12 @@ export function AgentDock({ draft, setDraft, onSend, status = "idle", turns = []
 function ChatTurn({ turn, currentStatus }) {
   const knowledgeGraph = turn.workflow?.knowledgeGraph || {};
   const agentRecommendation = turn.workflow?.agentRecommendation || {};
+  const thinkingProcess = knowledgeGraph.THINKING_PROCESS;
   const ack = knowledgeGraph.ACK;
   const directReply = (knowledgeGraph.DIRECT_REPLY || "").trimStart();
   const path = knowledgeGraph.KG_PATH;
   const explanation = knowledgeGraph.EXPLANATION;
+  const recommendationThinkingProcess = agentRecommendation.THINKING_PROCESS;
   const recommendationAck = agentRecommendation.ACK;
   const summary = agentRecommendation.SUMMARY;
   const recommendedAgents = agentRecommendation.agents || [];
@@ -134,9 +137,11 @@ function ChatTurn({ turn, currentStatus }) {
   const isReplyHeld = Boolean(turn.replyHold);
   const hasAssistantContent =
     ack ||
+    thinkingProcess ||
     directReply ||
     path ||
     explanation ||
+    recommendationThinkingProcess ||
     recommendationAck ||
     recommendedAgents.length > 0 ||
     summary ||
@@ -164,10 +169,17 @@ function ChatTurn({ turn, currentStatus }) {
           )}
 
           {directReply && <AssistantText>{directReply}</AssistantText>}
+          {thinkingProcess && <ThinkingProcessCard content={thinkingProcess} active={isStreaming && !ack} />}
           {ack && <AssistantText>{ack}</AssistantText>}
           {path && <PathResultCard path={path} active={isStreaming && !explanation} />}
           {explanation && <AssistantText>{explanation}</AssistantText>}
 
+          {!isReplyHeld && recommendationThinkingProcess && (
+            <ThinkingProcessCard
+              content={recommendationThinkingProcess}
+              active={isStreaming && !recommendationAck && recommendedAgents.length === 0 && !summary}
+            />
+          )}
           {!isReplyHeld && recommendationAck && <AssistantText>{recommendationAck}</AssistantText>}
           {!isReplyHeld && recommendedAgents.length > 0 && (
             <section className="agent-recommendation-section" aria-label="推荐智能体组合">
@@ -201,6 +213,44 @@ function ChatTurn({ turn, currentStatus }) {
 
 function AssistantText({ children }) {
   return <p className="agent-assistant-text">{children}</p>;
+}
+
+function ThinkingProcessCard({ content, active }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isOpen = active || isExpanded;
+  const toggleLabel = isOpen ? "收起深度思考" : "展开深度思考";
+
+  useEffect(() => {
+    if (active) {
+      setIsExpanded(false);
+    }
+  }, [active]);
+
+  return (
+    <section
+      className={`agent-thinking-card ${active ? "is-running" : "is-collapsed"} ${isOpen ? "is-open" : ""}`}
+      aria-label="深度思考"
+      title={active ? "" : toggleLabel}
+    >
+      <button
+        type="button"
+        className="agent-thinking-heading"
+        onClick={() => {
+          if (!active) {
+            setIsExpanded((current) => !current);
+          }
+        }}
+        aria-expanded={isOpen}
+        aria-label={toggleLabel}
+      >
+        <Sparkle size={14} weight="fill" />
+        <strong>深度思考</strong>
+        <StatusChip active={active} />
+        <CaretDown className="agent-thinking-caret" size={14} weight="bold" aria-hidden="true" />
+      </button>
+      {isOpen && <p>{content}</p>}
+    </section>
+  );
 }
 
 function PathResultCard({ path, active }) {
