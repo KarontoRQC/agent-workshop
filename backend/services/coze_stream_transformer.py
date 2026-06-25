@@ -2,6 +2,7 @@ import json
 
 
 ROUTE_PLANNER_TAGS = {
+    "THINKING_PROCESS": ("<THINKING_PROCESS>", "</THINKING_PROCESS>"),
     "ACK": ("<ACK>", "</ACK>"),
     "KG_PATH": ("<KG_PATH>", "</KG_PATH>"),
     "EXPLANATION": ("<EXPLANATION>", "</EXPLANATION>"),

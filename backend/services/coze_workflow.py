@@ -86,6 +86,7 @@ def _iter_chat_workflow_stream(
 
     selected_route = route_sections.get("KG_PATH", "").strip()
     route_explanation = route_sections.get("EXPLANATION", "").strip()
+    thinking_process = route_sections.get("THINKING_PROCESS", "").strip()
 
     if not selected_route:
         direct_reply = "".join(direct_reply_parts).strip()
@@ -100,6 +101,7 @@ def _iter_chat_workflow_stream(
             KNOWLEDGE_GRAPH_STAGE,
             selected_route=selected_route,
             route_explanation=route_explanation,
+            thinking_process=thinking_process,
             direct_reply=direct_reply,
             route_matched=False,
         )
@@ -128,6 +130,7 @@ def _iter_chat_workflow_stream(
         KNOWLEDGE_GRAPH_STAGE,
         selected_route=selected_route,
         route_explanation=route_explanation,
+        thinking_process=thinking_process,
         graph_path=graph_path,
     )
 
