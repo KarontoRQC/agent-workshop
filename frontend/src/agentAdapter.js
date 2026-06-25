@@ -1,4 +1,5 @@
 import graphPack from "../../data/agent_graph_pack.json";
+import { AGENT_GATEWAY_URL } from "./apiConfig.js";
 
 export const ROOT_ID = graphPack.rootId;
 export const libraryStats = graphPack.stats;
@@ -21,7 +22,7 @@ export const agentCatalog = Object.fromEntries(
       ...agent,
       agentKey: agent.agentKey || agent.id,
       provider: agent.provider || "local",
-      endpoint: agent.endpoint || "/api/agent-gateway/chat",
+      endpoint: agent.endpoint || AGENT_GATEWAY_URL,
     },
   ]),
 );
@@ -124,7 +125,7 @@ export function buildJumpPayload(focusId, source = "graph") {
     focusType: focus.type,
     path,
     providerStrategy: "backend-gateway",
-    gatewayEndpoint: "/api/agent-gateway/chat",
+    gatewayEndpoint: AGENT_GATEWAY_URL,
     targetProvider: "coze-or-chatgpt-gpt",
     recommendedAgents: packageAgents.map((agent) => ({
       name: agent.name,
@@ -148,7 +149,7 @@ export function invokeAgentJump(agent, focusId = ROOT_ID) {
 export function buildCozeGatewayDraft({ agent, focusId, userMessage, conversationId }) {
   const focus = getNode(focusId);
   return {
-    endpoint: "/api/agent-gateway/chat",
+    endpoint: AGENT_GATEWAY_URL,
     method: "POST",
     provider: agent.provider || "coze",
     agentKey: agent.agentKey,
