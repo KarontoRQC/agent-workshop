@@ -424,22 +424,25 @@ export function App() {
             ),
           );
         },
-        onGraphNode(node) {
-          enqueueGraphPathNode(node);
+        onGraphNode(node, event) {
+          if (isNodeInRouteContext(node, event?.route)) {
+            enqueueGraphPathNode(node);
+          }
         },
         onGraphPathResolved(event) {
-          const nodes = Array.isArray(event.nodes) ? event.nodes : [];
+          const nodes = sanitizeGraphPathNodes(Array.isArray(event.nodes) ? event.nodes : [], event.route);
+          const graphPathEvent = { ...event, nodes };
 
           setAgentStream((current) => ({
             ...current,
-            workflow: setWorkflowGraphPath(current.workflow, event),
+            workflow: setWorkflowGraphPath(current.workflow, graphPathEvent),
           }));
           setAgentTurns((current) =>
             current.map((turn) =>
               turn.id === turnId
                 ? {
                     ...turn,
-                    workflow: setWorkflowGraphPath(turn.workflow, event),
+                    workflow: setWorkflowGraphPath(turn.workflow, graphPathEvent),
                   }
               : turn,
             ),
@@ -645,4 +648,60 @@ function formatWorkflowError(event) {
   if (event.detail?.msg) return event.detail.msg;
   if (event.detail && typeof event.detail === "string") return event.detail;
   return event.error || "智能体推荐阶段失败";
+}
+
+function sanitizeGraphPathNodes(nodes, routeText) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return [];
+
+  const filteredNodes = nodes.filter((node) => isNodeInRouteContext(node, routeText));
+  if (filteredNodes.length > 0) return filteredNodes;
+
+  return getRouteAnchorNodes(routeText);
+}
+
+function isNodeInRouteContext(node, routeText) {
+  const anchors = getRouteAnchorNodes(routeText);
+  if (anchors.length === 0) return true;
+
+  const nodeId = node?.id;
+  if (!nodeId || !graphModel[nodeId]) return false;
+
+  return anchors.some((anchor) => nodeId === anchor.id || isDescendantOf(nodeId, anchor.id));
+}
+
+function getRouteAnchorNodes(routeText) {
+  const parts = splitRouteText(routeText).map(normalizeRouteText).filter(Boolean);
+  if (parts.length === 0) return [];
+
+  return Object.values(graphModel).filter((node) => {
+    const isIndustryAnchor = node.type === "industry" || node.parent === ROOT_ID;
+    if (!isIndustryAnchor) return false;
+
+    const labels = [node.label, node.displayLabel].map(normalizeRouteText);
+    return labels.some((label) => parts.includes(label));
+  });
+}
+
+function isDescendantOf(nodeId, ancestorId) {
+  let cursor = graphModel[nodeId];
+  const seen = new Set();
+
+  while (cursor && !seen.has(cursor.id)) {
+    if (cursor.id === ancestorId) return true;
+    seen.add(cursor.id);
+    cursor = graphModel[cursor.parent];
+  }
+
+  return false;
+}
+
+function splitRouteText(routeText) {
+  return String(routeText || "")
+    .split(/\s*(?:>|›|→|->|-|—|–|\/|、|，|,)\s*/g)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeRouteText(value) {
+  return String(value || "").replace(/\s+/g, "").toLowerCase();
 }

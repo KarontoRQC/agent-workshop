@@ -1,5 +1,6 @@
 import json
 import os
+from collections import defaultdict
 
 
 ROOT_ID = "root-brief"
@@ -19,9 +20,17 @@ class GraphPathResolver:
         nodes = graph_pack.get("nodes", [])
         edges = graph_pack.get("edges", [])
         node_by_id = {node.get("id"): node for node in nodes}
-        node_by_label = {normalize_text(node.get("label")): node for node in nodes}
+        nodes_by_label = defaultdict(list)
+        children_by_parent = defaultdict(list)
 
-        route_nodes = self._resolve_route_nodes(route_text, node_by_label, node_by_id)
+        for node in nodes:
+            nodes_by_label[normalize_text(node.get("label"))].append(node)
+            display_label = normalize_text(node.get("displayLabel"))
+            if display_label:
+                nodes_by_label[display_label].append(node)
+            children_by_parent[node.get("parent")].append(node)
+
+        route_nodes = self._resolve_route_nodes(route_text, nodes_by_label, node_by_id, children_by_parent)
         route_node_ids = [node["id"] for node in route_nodes]
         route_edges = _find_path_edges(edges, [self.root_id, *route_node_ids])
 
@@ -39,26 +48,34 @@ class GraphPathResolver:
 
         return self._graph_pack
 
-    def _resolve_route_nodes(self, route_text, node_by_label, node_by_id):
+    def _resolve_route_nodes(self, route_text, nodes_by_label, node_by_id, children_by_parent):
         parts = split_route_text(route_text)
         resolved = []
+        current_parent_id = self.root_id
 
         for part in parts:
-            node = node_by_label.get(normalize_text(part))
+            normalized_part = normalize_text(part)
+            candidates = nodes_by_label.get(normalized_part, [])
+            node = _pick_contextual_node(candidates, current_parent_id, node_by_id, self.root_id)
+
+            if not node and resolved:
+                node = _find_contextual_match(part, current_parent_id, children_by_parent, node_by_id)
 
             if node:
-                resolved.append(node)
+                resolved.extend(_ancestors_after_root(node, node_by_id, self.root_id))
+                current_parent_id = node.get("id")
 
         if resolved:
             return _dedupe_nodes(resolved)
 
-        return self._resolve_by_suffix(route_text, node_by_label, node_by_id)
+        return self._resolve_by_suffix(route_text, nodes_by_label, node_by_id)
 
-    def _resolve_by_suffix(self, route_text, node_by_label, node_by_id):
+    def _resolve_by_suffix(self, route_text, nodes_by_label, node_by_id):
         normalized_route = normalize_text(route_text)
         matches = [
             node
-            for label, node in node_by_label.items()
+            for label, nodes in nodes_by_label.items()
+            for node in nodes
             if label and (label in normalized_route or is_subsequence(label, normalized_route))
         ]
 
@@ -83,7 +100,18 @@ def split_route_text(route_text):
 
     return [
         part.strip()
-        for part in text.replace("—", "-").replace("–", "-").split("-")
+        for part in (
+            text.replace("—", "-")
+            .replace("–", "-")
+            .replace("›", "-")
+            .replace(">", "-")
+            .replace("→", "-")
+            .replace("/", "-")
+            .replace("、", "-")
+            .replace("，", "-")
+            .replace(",", "-")
+            .split("-")
+        )
         if part.strip()
     ]
 
@@ -180,6 +208,76 @@ def _dedupe_nodes(nodes):
         output.append(node)
 
     return output
+
+
+def _pick_contextual_node(candidates, parent_id, node_by_id, root_id):
+    unique_candidates = _dedupe_nodes(candidates)
+
+    if not unique_candidates:
+        return None
+
+    direct_child = next((node for node in unique_candidates if node.get("parent") == parent_id), None)
+    if direct_child:
+        return direct_child
+
+    descendant = next(
+        (node for node in unique_candidates if _is_descendant_of(node, parent_id, node_by_id)),
+        None,
+    )
+    if descendant:
+        return descendant
+
+    if parent_id != root_id:
+        return None
+
+    return max(
+        unique_candidates,
+        key=lambda node: (
+            _node_depth(node, node_by_id, root_id),
+            len(normalize_text(node.get("label"))),
+        ),
+    )
+
+
+def _find_contextual_match(part, parent_id, children_by_parent, node_by_id):
+    normalized_part = normalize_text(part)
+    queue = list(children_by_parent.get(parent_id, []))
+    matches = []
+
+    while queue:
+        node = queue.pop(0)
+        label = normalize_text(node.get("label"))
+
+        if label and (label in normalized_part or normalized_part in label or is_subsequence(label, normalized_part)):
+            matches.append(node)
+
+        queue.extend(children_by_parent.get(node.get("id"), []))
+
+    if not matches:
+        return None
+
+    return max(
+        matches,
+        key=lambda node: (
+            _node_depth(node, node_by_id, parent_id),
+            len(normalize_text(node.get("label"))),
+        ),
+    )
+
+
+def _is_descendant_of(node, ancestor_id, node_by_id):
+    cursor = node
+    seen = set()
+
+    while cursor and cursor.get("id") not in seen:
+        node_id = cursor.get("id")
+        if node_id == ancestor_id:
+            return True
+
+        seen.add(node_id)
+        cursor = node_by_id.get(cursor.get("parent"))
+
+    return False
 
 
 def _node_depth(node, node_by_id, root_id):

@@ -39,6 +39,15 @@ export const initialAgentMessages = [
   },
 ];
 
+const NODE_KEYWORD_ALIASES = {
+  "industry-education": ["教培", "培训", "辅导", "老师", "学员", "课程", "家长", "续费", "试听"],
+  "industry-beauty": ["美业", "美容", "美发", "门店项目", "顾问成交", "到店"],
+  "industry-catering": ["餐饮", "外卖", "菜单", "翻台", "加盟店"],
+  "industry-baijiu": ["白酒", "酒商", "代理商", "招商会"],
+  "industry-local-life": ["本地生活", "团购", "核销", "探店"],
+  "industry-enterprise": ["企服", "企业服务", "销售线索", "方案生成"],
+};
+
 export function getNode(id) {
   if (graphModel[id]) return graphModel[id];
   return {
@@ -181,7 +190,7 @@ export function askRoutingAgent(message, currentFocusId = ROOT_ID) {
   const lower = text.toLowerCase();
   const candidates = graphPack.nodes
     .filter((node) => node.id !== ROOT_ID)
-    .filter((node) => text.includes(node.label) || lower.includes(String(node.label).toLowerCase()))
+    .filter((node) => matchesRoutingText(node, text, lower))
     .sort((a, b) => {
       const order = {
         industry: 1,
@@ -212,4 +221,17 @@ export function askRoutingAgent(message, currentFocusId = ROOT_ID) {
       .slice(0, 5)
       .map((node) => node.label),
   };
+}
+
+function matchesRoutingText(node, text, lower) {
+  const label = String(node.label || "");
+  const displayLabel = String(node.displayLabel || "");
+  const aliases = NODE_KEYWORD_ALIASES[node.id] || [];
+
+  return (
+    (label && text.includes(label)) ||
+    (displayLabel && text.includes(displayLabel)) ||
+    lower.includes(label.toLowerCase()) ||
+    aliases.some((alias) => text.includes(alias) || lower.includes(alias.toLowerCase()))
+  );
 }
