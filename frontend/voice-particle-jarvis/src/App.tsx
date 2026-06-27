@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, CornerDownRight, MessageCircle, Mic, MicOff, RotateCcw, Sparkles, Volume2 } from 'lucide-react';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
@@ -31,6 +31,12 @@ const preferredVoiceHints = [
 ];
 
 const avoidedVoiceHints = ['zira', 'hazel', 'susan', 'zira desktop', 'female', 'aria', 'jenny', 'emma'];
+
+type SpeechCallbacks = {
+  onEnd?: () => void;
+  onPulse?: () => void;
+  onStart?: () => void;
+};
 
 function voiceScore(voice: SpeechSynthesisVoice) {
   const name = voice.name.toLowerCase();
@@ -78,7 +84,7 @@ function primeSpeechOutput() {
   window.speechSynthesis.resume();
 }
 
-function speakNow(text: string) {
+function speakNow(text: string, callbacks: SpeechCallbacks) {
   const voice = selectMatureEnglishVoice();
   const utterance = new SpeechSynthesisUtterance(polishSpokenLine(text));
 
@@ -91,40 +97,98 @@ function speakNow(text: string) {
     utterance.voice = voice;
   }
 
+  utterance.onstart = () => callbacks.onStart?.();
+  utterance.onboundary = () => callbacks.onPulse?.();
+  utterance.onend = () => callbacks.onEnd?.();
+  utterance.onerror = () => callbacks.onEnd?.();
+
   window.speechSynthesis.cancel();
   window.speechSynthesis.resume();
   window.speechSynthesis.speak(utterance);
   window.setTimeout(() => window.speechSynthesis.resume(), 120);
 }
 
-function speak(text: string) {
+function speak(text: string, callbacks: SpeechCallbacks = {}) {
   if (!('speechSynthesis' in window)) {
-    return;
+    return false;
   }
 
   primeSpeechOutput();
 
   if (window.speechSynthesis.getVoices().length > 0) {
-    speakNow(text);
-    return;
+    speakNow(text, callbacks);
+    return true;
   }
 
+  let didSpeak = false;
   const speakAfterVoicesLoad = () => {
+    if (didSpeak) {
+      return;
+    }
+
+    didSpeak = true;
     window.speechSynthesis.removeEventListener('voiceschanged', speakAfterVoicesLoad);
-    speakNow(text);
+    speakNow(text, callbacks);
   };
 
   window.speechSynthesis.addEventListener('voiceschanged', speakAfterVoicesLoad);
   window.setTimeout(speakAfterVoicesLoad, 700);
+  return true;
 }
 
 export default function App() {
+  const speechEndTimerRef = useRef<number | null>(null);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [typedMessage, setTypedMessage] = useState('');
   const [replySource, setReplySource] = useState<'placeholder' | 'endpoint'>('placeholder');
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: 'Good evening, sir. Systems are online, and I am standing by.' },
   ]);
+
+  const clearSpeechEndTimer = useCallback(() => {
+    if (speechEndTimerRef.current !== null) {
+      window.clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+  }, []);
+
+  const beginSpeechOutput = useCallback(() => {
+    clearSpeechEndTimer();
+    setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
+  }, [clearSpeechEndTimer]);
+
+  const pulseSpeechOutput = useCallback(() => {
+    setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
+  }, []);
+
+  const finishSpeechOutput = useCallback(() => {
+    clearSpeechEndTimer();
+    setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
+  }, [clearSpeechEndTimer]);
+
+  const speakWithParticleOutput = useCallback(
+    (text: string) => {
+      beginSpeechOutput();
+
+      const estimatedDuration = Math.min(12000, Math.max(4200, text.length * 78));
+      const startedAt = performance.now();
+      const finishAfterMinimum = () => {
+        const elapsed = performance.now() - startedAt;
+        const remaining = Math.max(0, Math.min(estimatedDuration, 3600) - elapsed);
+
+        clearSpeechEndTimer();
+        speechEndTimerRef.current = window.setTimeout(finishSpeechOutput, remaining);
+      };
+      const queued = speak(text, {
+        onEnd: finishAfterMinimum,
+        onPulse: pulseSpeechOutput,
+        onStart: beginSpeechOutput,
+      });
+
+      speechEndTimerRef.current = window.setTimeout(finishSpeechOutput, queued ? estimatedDuration : 3600);
+    },
+    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
+  );
 
   const submitMessage = useCallback(
     async (raw: string) => {
@@ -151,8 +215,7 @@ export default function App() {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
         });
-        setSettings((current) => ({ ...current, energy: 0.96, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
-        speak(response.text);
+        speakWithParticleOutput(response.text);
       } catch {
         const fallback = 'The reasoning end point is not connected yet, sir. Local operations remain online.';
         setReplySource('placeholder');
@@ -160,15 +223,10 @@ export default function App() {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: fallback }];
         });
-        setSettings((current) => ({ ...current, energy: 0.88, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
-        speak(fallback);
+        speakWithParticleOutput(fallback);
       }
-
-      window.setTimeout(() => {
-        setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-      }, 3600);
     },
-    [messages],
+    [messages, speakWithParticleOutput],
   );
 
   const voice = useVoiceControl(submitMessage);
@@ -176,7 +234,8 @@ export default function App() {
 
   useEffect(() => {
     primeSpeechOutput();
-  }, []);
+    return () => clearSpeechEndTimer();
+  }, [clearSpeechEndTimer]);
 
   const statusText = useMemo(() => {
     if (!voice.supported) {
@@ -212,11 +271,7 @@ export default function App() {
 
   const previewVoice = () => {
     primeSpeechOutput();
-    setSettings((current) => ({ ...current, energy: 0.9, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
-    speak('Good evening, sir. Systems are online, and I am standing by.');
-    window.setTimeout(() => {
-      setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-    }, 3600);
+    speakWithParticleOutput('Good evening, sir. Systems are online, and I am standing by.');
   };
 
   const toggleListening = () => {

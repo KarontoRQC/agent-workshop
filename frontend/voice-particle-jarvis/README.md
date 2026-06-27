@@ -13,7 +13,7 @@ The first screen is the actual experience: a central 3D particle orb, natural de
 - Browser `speechSynthesis` output tuned toward a mature English male voice when the OS/browser provides a matching voice.
 - A one-click voice preview control in the bottom hint row, useful for testing the current voice profile without waiting for a model reply.
 - A blank AI model slot through `VITE_AI_CHAT_ENDPOINT`, with local English placeholder replies as the fallback.
-- An automatic cinematic loop where the camera pushes into the orb and particles recompose into smaller spheres.
+- A stable orb that keeps its main form; voice output drives whole-orb breathing, brightness, and particle size instead of ending in a small-sphere recomposition.
 
 ## Run
 
@@ -42,7 +42,7 @@ The app scores available English voices and prefers mature male-leaning candidat
 
 Voice quality still depends on the user's OS and browser voice packs. If no matching voice is available, the app falls back to the browser's default English voice.
 
-Click the bottom `Preview voice profile` control to trigger a short spoken line and confirm the browser is allowing speech output.
+Click the bottom `Preview voice profile` control to trigger a short spoken line and confirm the browser is allowing speech output. During speech, the whole particle orb pulses with simulated output energy and speech boundary events.
 
 ## Model Endpoint
 

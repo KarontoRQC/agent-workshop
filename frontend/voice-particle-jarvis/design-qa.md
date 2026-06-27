@@ -17,7 +17,7 @@ Final result: passed
 | Voice preview | passed | The bottom voice hint is a click target that primes speech output and plays a short mature AI-butler line. |
 | Audio response path | passed | Microphone energy can drive particle pulse, radius, brightness, and point size after browser permission is granted. |
 | Model slot | passed | The AI endpoint remains configurable through `VITE_AI_CHAT_ENDPOINT`; local English placeholder replies keep the demo flow alive. |
-| Cinematic loop | passed | The animation loop includes a camera push-in and visible recomposition into smaller particle spheres. |
+| Voice-output motion | passed | The small-sphere recomposition was removed; voice output now drives whole-orb breathing, brightness, particle size, and speech-boundary pulses. |
 | Responsive layout | passed | Desktop and 390px mobile viewport checks keep the orb, dialogue cards, and input controls visible. |
 | Build | passed | `npm run build` completes; Vite reports only the expected Three.js chunk-size warning. |
 
