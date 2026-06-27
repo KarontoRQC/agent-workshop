@@ -1,0 +1,524 @@
+import { useEffect, useRef } from 'react';
+import * as THREE from 'three';
+import type { DialogueMode, ParticleSettings } from '../types';
+
+type ParticleFieldProps = {
+  audioLevel: number;
+  settings: ParticleSettings;
+};
+
+const TAU = Math.PI * 2;
+const SEED_STRIDE = 10;
+const S_A = 0;
+const S_B = 1;
+const S_C = 2;
+const S_D = 3;
+const S_E = 4;
+const S_ROLE = 5;
+const S_BAND = 6;
+const S_WIDTH = 7;
+const S_FLOW = 8;
+const S_SHADE = 9;
+
+const ROLE_CORE = 0;
+const ROLE_SHELL = 1;
+const ROLE_RIBBON = 2;
+const ROLE_HALO = 3;
+
+type StoryState = {
+  cluster: number;
+  push: number;
+};
+
+const CLUSTER_CENTERS: Array<[number, number, number]> = [
+  [-0.56, 0.42, 1.08],
+  [0.06, 0.92, 1.46],
+  [0.72, 0.48, 1.18],
+  [1.22, 0.98, 1.58],
+  [0.3, 0.12, 1.68],
+];
+
+const STREAM_OFFSETS = [-0.1, 0.11];
+const STREAM_PHASES = [0, 0.34];
+
+const modePalettes: Record<DialogueMode, THREE.Color[]> = {
+  idle: ['#f7fbff', '#9cc7ff', '#4f96ff', '#173571'].map((color) => new THREE.Color(color)),
+  listening: ['#ffffff', '#c8e7ff', '#6ab5ff', '#1f62d8'].map((color) => new THREE.Color(color)),
+  thinking: ['#f4fbff', '#8ed0ff', '#5b8cff', '#16306b'].map((color) => new THREE.Color(color)),
+  speaking: ['#ffffff', '#e7f5ff', '#93d4ff', '#2f7aff'].map((color) => new THREE.Color(color)),
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function mix(from: number, to: number, amount: number) {
+  return from + (to - from) * amount;
+}
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const nextValue = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return nextValue * nextValue * (3 - 2 * nextValue);
+}
+
+function sphericalToPoint(theta: number, latitude: number, radius: number, target: THREE.Vector3) {
+  const horizontal = Math.cos(latitude);
+
+  target.set(
+    Math.cos(theta) * horizontal * radius,
+    Math.sin(latitude) * radius * 0.94,
+    Math.sin(theta) * horizontal * radius * 0.96,
+  );
+}
+
+function createParticleTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 96;
+  canvas.height = 96;
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    return null;
+  }
+
+  const gradient = context.createRadialGradient(48, 48, 0, 48, 48, 48);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.22, 'rgba(255, 255, 255, 0.92)');
+  gradient.addColorStop(0.56, 'rgba(255, 255, 255, 0.22)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 96, 96);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+export default function ParticleField({ audioLevel, settings }: ParticleFieldProps) {
+  const audioLevelRef = useRef(audioLevel);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef(settings);
+
+  useEffect(() => {
+    audioLevelRef.current = audioLevel;
+  }, [audioLevel]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+
+    if (!host) {
+      return undefined;
+    }
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020614, 0.055);
+
+    const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
+    camera.position.set(0, 0.08, 9.2);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: true,
+    });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x020614, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    host.appendChild(renderer.domElement);
+
+    const width = host.clientWidth || window.innerWidth;
+    const particleCount = width < 720 ? 12800 : 22000;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const seeds = new Float32Array(particleCount * SEED_STRIDE);
+    const target = new THREE.Vector3();
+    const clusterTarget = new THREE.Vector3();
+
+    for (let index = 0; index < particleCount; index += 1) {
+      const seedOffset = index * SEED_STRIDE;
+      const mix = index / particleCount;
+      const role = mix < 0.07 ? ROLE_CORE : mix < 0.43 ? ROLE_SHELL : mix < 0.72 ? ROLE_RIBBON : ROLE_HALO;
+      const randomA = Math.random();
+      const randomB = Math.random();
+      const randomC = Math.random();
+      const randomD = Math.random();
+      const randomE = Math.random();
+
+      seeds[seedOffset + S_A] = randomA;
+      seeds[seedOffset + S_B] = randomB;
+      seeds[seedOffset + S_C] = randomC;
+      seeds[seedOffset + S_D] = randomD;
+      seeds[seedOffset + S_E] = randomE;
+      seeds[seedOffset + S_ROLE] = role;
+      seeds[seedOffset + S_BAND] = Math.floor(randomA * 5);
+      seeds[seedOffset + S_WIDTH] = (randomB - 0.5) * 0.13;
+      seeds[seedOffset + S_FLOW] = randomC * 0.38 + 0.72;
+      seeds[seedOffset + S_SHADE] = randomD;
+
+      positions[index * 3] = (randomA - 0.5) * 0.35;
+      positions[index * 3 + 1] = (randomB - 0.5) * 0.35;
+      positions[index * 3 + 2] = (randomC - 0.5) * 0.35;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0xffffff,
+      depthWrite: false,
+      map: createParticleTexture(),
+      opacity: 0.96,
+      size: width < 720 ? 0.033 : 0.029,
+      sizeAttenuation: true,
+      transparent: true,
+      vertexColors: true,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    points.scale.setScalar(width < 720 ? 0.78 : 0.9);
+    scene.add(points);
+
+    const pointer = new THREE.Vector2(0, 0);
+    const startTime = performance.now();
+    let lastFrameTime = startTime;
+    let animationId = 0;
+    let pulsePower = 0;
+    let lastPulseSeed = settingsRef.current.pulseSeed;
+
+    const resize = () => {
+      const nextWidth = Math.max(1, host.clientWidth || window.innerWidth);
+      const nextHeight = Math.max(1, host.clientHeight || window.innerHeight);
+      camera.aspect = nextWidth / nextHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nextWidth, nextHeight);
+    };
+
+    const updatePointer = (event: PointerEvent) => {
+      const bounds = host.getBoundingClientRect();
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+      pointer.y = -(((event.clientY - bounds.top) / bounds.height) * 2 - 1);
+    };
+
+    const triggerPulse = () => {
+      pulsePower = Math.max(pulsePower, 1);
+    };
+
+    const writeTarget = (
+      index: number,
+      time: number,
+      currentSettings: ParticleSettings,
+      voiceEnergy: number,
+      story: StoryState,
+    ) => {
+      const seedOffset = index * SEED_STRIDE;
+      const role = seeds[seedOffset + S_ROLE];
+      const shade = seeds[seedOffset + S_SHADE];
+      const phase = seeds[seedOffset + S_E] * TAU;
+      const statePressure =
+        currentSettings.mode === 'speaking'
+          ? 0.18
+          : currentSettings.mode === 'listening'
+            ? 0.13
+            : currentSettings.mode === 'thinking'
+              ? 0.09
+              : 0.04;
+      const breath = Math.sin(time * 1.1 + phase) * 0.025;
+      const restrainedPulse = (voiceEnergy * 0.13 + pulsePower * 0.1 + statePressure) * (0.7 + shade * 0.3);
+
+      if (role === ROLE_CORE) {
+        const theta = seeds[seedOffset + S_A] * TAU + time * 0.035;
+        const latitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.92, 0.92));
+        const radius = 0.36 + seeds[seedOffset + S_C] * 0.78 + breath + restrainedPulse * 0.18;
+
+        sphericalToPoint(theta, latitude, radius, target);
+        let light = 0.62;
+
+        if (story.cluster > 0) {
+          const clusterIndex = Math.floor(seeds[seedOffset + S_D] * CLUSTER_CENTERS.length);
+          const clusterTheta = seeds[seedOffset + S_A] * TAU + time * (0.11 + clusterIndex * 0.012);
+          const clusterLatitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.96, 0.96));
+          const clusterRadius = 0.08 + seeds[seedOffset + S_C] * 0.13 + voiceEnergy * 0.02;
+          const center = CLUSTER_CENTERS[clusterIndex] ?? CLUSTER_CENTERS[0];
+
+          sphericalToPoint(clusterTheta, clusterLatitude, clusterRadius, clusterTarget);
+          clusterTarget.x += center[0];
+          clusterTarget.y += center[1];
+          clusterTarget.z += center[2];
+          target.lerp(clusterTarget, story.cluster);
+          light = mix(light, 1.28, story.cluster);
+        }
+
+        return light;
+      }
+
+      if (role === ROLE_RIBBON) {
+        const band = seeds[seedOffset + S_BAND];
+        const direction = band % 2 === 0 ? 1 : -1;
+        const flow = (seeds[seedOffset + S_A] + direction * time * 0.022 * seeds[seedOffset + S_FLOW]) % 1;
+        const normalizedFlow = flow < 0 ? flow + 1 : flow;
+        const theta = normalizedFlow * TAU + band * 0.78;
+        const ribbonCurve =
+          Math.sin(normalizedFlow * TAU * (1.05 + band * 0.05) + band * 1.2) * 0.34 +
+          Math.sin(normalizedFlow * TAU * 2.15 + band * 0.72) * 0.11;
+        const latitude = clamp(ribbonCurve + seeds[seedOffset + S_WIDTH], -1.05, 1.05);
+        const ridge = 0.5 + Math.cos(normalizedFlow * TAU * 3 + band * 1.7) * 0.5;
+        const localWave = Math.max(0, Math.sin(normalizedFlow * TAU * 4 - time * 2.6 + phase)) * voiceEnergy;
+        const radius = 2.46 + ridge * 0.16 + breath + restrainedPulse * 0.34 + localWave * 0.16;
+
+        sphericalToPoint(theta, latitude, radius, target);
+        let light = 1.42 + ridge * 0.72 + localWave * 0.42;
+
+        if (story.cluster > 0) {
+          const clusterIndex = Math.floor(seeds[seedOffset + S_D] * CLUSTER_CENTERS.length);
+          const clusterTheta = seeds[seedOffset + S_A] * TAU + time * (0.1 + clusterIndex * 0.014);
+          const clusterLatitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.96, 0.96));
+          const clusterRadius = 0.1 + seeds[seedOffset + S_C] * 0.17 + localWave * 0.04;
+          const center = CLUSTER_CENTERS[clusterIndex] ?? CLUSTER_CENTERS[0];
+
+          sphericalToPoint(clusterTheta, clusterLatitude, clusterRadius, clusterTarget);
+          clusterTarget.x += center[0];
+          clusterTarget.y += center[1];
+          clusterTarget.z += center[2];
+          target.lerp(clusterTarget, story.cluster);
+          light = mix(light, 1.72, story.cluster);
+        }
+
+        return light;
+      }
+
+      const theta = seeds[seedOffset + S_A] * TAU + Math.sin(time * 0.18 + phase) * 0.014;
+      const latitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.96, 0.96));
+      const fixedFold =
+        Math.sin(theta * 3.2 + latitude * 4.6) * 0.055 +
+        Math.cos(theta * 5.4 - latitude * 2.1) * 0.04;
+
+      if (role === ROLE_HALO) {
+        const orbitBand = Math.floor(seeds[seedOffset + S_C] * STREAM_OFFSETS.length);
+        const direction = orbitBand % 2 === 0 ? 1 : -1;
+        const orbit = (seeds[seedOffset + S_A] + direction * time * (0.013 + seeds[seedOffset + S_FLOW] * 0.004)) % 1;
+        const normalizedOrbit = orbit < 0 ? orbit + 1 : orbit;
+        const bandPhase = STREAM_PHASES[orbitBand] ?? 0;
+        const u = normalizedOrbit * TAU + bandPhase;
+        const wideScatter = (seeds[seedOffset + S_B] - 0.5) * (0.42 + seeds[seedOffset + S_D] * 0.24);
+        const laneScatter = seeds[seedOffset + S_WIDTH] * 1.8;
+        const twist = u * 0.52 + phase * 0.16 + bandPhase * 1.4;
+        const frontArc = smoothstep(-0.24, 0.82, Math.sin(u));
+        const orbitDepth = Math.pow(frontArc, 1.55);
+        const clump =
+          Math.pow(0.5 + Math.sin(u * 3.4 + phase) * 0.5, 2.8) * 0.7 +
+          Math.pow(0.5 + Math.sin(u * 5.2 - phase * 0.7) * 0.5, 4) * 0.35;
+        const restrainedEscape = Math.max(0, Math.sin(time * 1.35 + phase)) * (0.04 + voiceEnergy * 0.09);
+        const radius =
+          2.62 +
+          Math.cos(u * 2.1 + bandPhase) * 0.08 +
+          wideScatter * Math.cos(twist) * 0.34 +
+          fixedFold * 0.18 +
+          restrainedEscape;
+        const streamOffset = (STREAM_OFFSETS[orbitBand] ?? 0) + Math.sin(u * 2.4 + phase) * 0.035;
+        const ySpread = wideScatter * Math.sin(twist) * 0.8 + laneScatter * 0.42;
+        const x = Math.cos(u) * (radius + laneScatter * 0.2);
+        const y =
+          streamOffset +
+          Math.sin(u * 1.75 + bandPhase) * 0.11 +
+          ySpread;
+        const z = Math.sin(u) * (radius * 0.84 + wideScatter * Math.cos(twist) * 0.18);
+        const roll = -0.045;
+        const cosRoll = Math.cos(roll);
+        const sinRoll = Math.sin(roll);
+
+        target.set(x * cosRoll - y * sinRoll, x * sinRoll + y * cosRoll, z);
+        let light = 0.28 + orbitDepth * 0.62 + clump * 0.26 + restrainedEscape * 0.62;
+
+        if (story.cluster > 0) {
+          const clusterIndex = Math.floor(seeds[seedOffset + S_D] * CLUSTER_CENTERS.length);
+          const clusterTheta = seeds[seedOffset + S_A] * TAU + time * (0.08 + clusterIndex * 0.01);
+          const clusterLatitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.96, 0.96));
+          const clusterRadius = 0.12 + seeds[seedOffset + S_C] * 0.22 + restrainedEscape * 0.04;
+          const center = CLUSTER_CENTERS[clusterIndex] ?? CLUSTER_CENTERS[0];
+
+          sphericalToPoint(clusterTheta, clusterLatitude, clusterRadius, clusterTarget);
+          clusterTarget.x += center[0];
+          clusterTarget.y += center[1];
+          clusterTarget.z += center[2];
+          target.lerp(clusterTarget, story.cluster);
+          light = mix(light, 1.38, story.cluster);
+        }
+
+        return light;
+      }
+
+      const surfaceRipple = Math.sin(time * 1.65 + theta * 2 + latitude * 3 + phase) * (0.012 + voiceEnergy * 0.018);
+      const radius = 2.25 + fixedFold + surfaceRipple + breath + restrainedPulse * 0.12;
+
+      sphericalToPoint(theta, latitude, radius, target);
+      let light = 0.26 + Math.max(0, fixedFold) * 2.4 + voiceEnergy * 0.06;
+
+      if (story.cluster > 0) {
+        const clusterIndex = Math.floor(seeds[seedOffset + S_D] * CLUSTER_CENTERS.length);
+        const clusterTheta = seeds[seedOffset + S_A] * TAU + time * (0.075 + clusterIndex * 0.012);
+        const clusterLatitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.96, 0.96));
+        const clusterRadius = 0.09 + seeds[seedOffset + S_C] * 0.15 + voiceEnergy * 0.018;
+        const center = CLUSTER_CENTERS[clusterIndex] ?? CLUSTER_CENTERS[0];
+
+        sphericalToPoint(clusterTheta, clusterLatitude, clusterRadius, clusterTarget);
+        clusterTarget.x += center[0];
+        clusterTarget.y += center[1];
+        clusterTarget.z += center[2];
+        target.lerp(clusterTarget, story.cluster);
+        light = mix(light, 1.1, story.cluster);
+      }
+
+      return light;
+    };
+
+    const animate = () => {
+      const currentSettings = settingsRef.current;
+      const frameNow = performance.now();
+      const delta = Math.min((frameNow - lastFrameTime) / 1000, 0.05);
+      const elapsed = (frameNow - startTime) / 1000;
+      const liveMicEnergy = audioLevelRef.current;
+      const syntheticSpeech = currentSettings.mode === 'speaking' ? 0.18 + Math.max(0, Math.sin(elapsed * 9.5)) * 0.28 : 0;
+      const voiceEnergy = Math.min(1, Math.max(liveMicEnergy, syntheticSpeech));
+      const palette = modePalettes[currentSettings.mode];
+      const storyCycle = (elapsed % 34) / 34;
+      const push =
+        smoothstep(0.36, 0.58, storyCycle) *
+        (1 - smoothstep(0.9, 1, storyCycle));
+      const cluster =
+        smoothstep(0.48, 0.66, storyCycle) *
+        (1 - smoothstep(0.9, 1, storyCycle));
+      const story: StoryState = { cluster, push };
+      lastFrameTime = frameNow;
+
+      if (lastPulseSeed !== currentSettings.pulseSeed) {
+        lastPulseSeed = currentSettings.pulseSeed;
+        triggerPulse();
+      }
+
+      for (let index = 0; index < particleCount; index += 1) {
+        const offset = index * 3;
+        const seedOffset = index * SEED_STRIDE;
+        const role = seeds[seedOffset + S_ROLE];
+        const shapeLight = writeTarget(index, elapsed, currentSettings, voiceEnergy, story);
+        const lerpAmount = role === ROLE_RIBBON ? 0.095 : role === ROLE_HALO ? 0.045 : 0.07;
+
+        if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
+          target.set(0, 0, 0);
+        }
+
+        const pointerX = pointer.x * 4.4;
+        const pointerY = pointer.y * 2.8;
+        const dx = target.x - pointerX;
+        const dy = target.y - pointerY;
+        const influence = Math.exp(-(dx * dx + dy * dy) * 0.48) * 0.055;
+        target.x += dx * influence;
+        target.y += dy * influence;
+        target.z += influence * 0.42;
+
+        positions[offset] += (target.x - positions[offset]) * lerpAmount;
+        positions[offset + 1] += (target.y - positions[offset + 1]) * lerpAmount;
+        positions[offset + 2] += (target.z - positions[offset + 2]) * lerpAmount;
+
+        if (
+          !Number.isFinite(positions[offset]) ||
+          !Number.isFinite(positions[offset + 1]) ||
+          !Number.isFinite(positions[offset + 2])
+        ) {
+          positions[offset] = 0;
+          positions[offset + 1] = 0;
+          positions[offset + 2] = 0;
+        }
+
+        const color = palette[(index + Math.floor(seeds[seedOffset + S_D] * palette.length)) % palette.length];
+        const px = positions[offset];
+        const py = positions[offset + 1];
+        const pz = positions[offset + 2];
+        const radius = Math.max(0.001, Math.hypot(px, py, pz));
+        const nx = px / radius;
+        const ny = py / radius;
+        const nz = pz / radius;
+        const frontLight = clamp(0.68 + pz * 0.18, 0.28, 1.46);
+        const keyLight = clamp(nx * -0.36 + ny * 0.52 + nz * 0.78, 0, 1);
+        const fillLight = clamp(nx * 0.12 + ny * 0.12 + nz * 0.32 + 0.24, 0, 0.72);
+        const rimLight = Math.pow(clamp(1 - Math.abs(nz), 0, 1), 2.2) * (0.34 + keyLight * 0.44);
+        const lowerShadow = smoothstep(0.1, 0.88, -ny * 0.72 - nx * 0.24 - nz * 0.18 + 0.28);
+        const densityNoise = seeds[seedOffset + S_SHADE] * 0.2;
+        const densityLight = clamp(keyLight * 0.86 + fillLight * 0.38 + rimLight * 0.58 + densityNoise - lowerShadow * 0.48, 0.04, 1.34);
+        const sphereWeight =
+          role === ROLE_HALO
+            ? clamp(0.5 + rimLight * 0.24 + keyLight * 0.42 + frontLight * 0.24, 0.24, 1.34)
+            : role === ROLE_CORE
+              ? clamp(0.72 + keyLight * 0.34 + frontLight * 0.14, 0.5, 1.28)
+              : role === ROLE_RIBBON
+                ? clamp(0.42 + densityLight * 1.1 + rimLight * 0.44, 0.18, 1.58)
+                : clamp(0.16 + densityLight * 1.16, 0.06, 1.26);
+        const specular = Math.pow(keyLight, 5.2) * (role === ROLE_HALO ? 0.18 : 0.62);
+        const shimmer =
+          (shapeLight + Math.sin(elapsed * 1.35 + seeds[seedOffset + S_E] * TAU) * 0.045 + voiceEnergy * 0.08) *
+            frontLight *
+            sphereWeight +
+          specular;
+        const baseGlow = role === ROLE_CORE ? 0.08 : role === ROLE_HALO ? 0.018 : 0.026;
+
+        colors[offset] = color.r * (shimmer + baseGlow);
+        colors[offset + 1] = color.g * (shimmer + baseGlow);
+        colors[offset + 2] = color.b * (shimmer + baseGlow);
+      }
+
+      geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.color.needsUpdate = true;
+
+      points.rotation.y += delta * (0.018 + currentSettings.energy * 0.012 + push * 0.008);
+      points.rotation.x = Math.sin(elapsed * 0.1) * 0.028 + push * 0.045;
+      points.rotation.z = Math.sin(elapsed * 0.075) * 0.012;
+      pulsePower = Math.max(0, pulsePower - delta * 1.35);
+
+      const targetSize = (width < 720 ? 0.032 : 0.028) + voiceEnergy * 0.006 + pulsePower * 0.004;
+      material.size += (targetSize - material.size) * 0.08;
+      const cameraX = mix(pointer.x * 0.36, 0.54 + pointer.x * 0.08, push);
+      const cameraY = mix(0.08 + pointer.y * 0.18, 0.64 + pointer.y * 0.06, push);
+      const cameraZ = mix(9.2, 5.42, push);
+      const lookAtX = mix(0, 0.34, push);
+      const lookAtY = mix(0, 0.56, push);
+      const lookAtZ = mix(0, 1.42, push);
+
+      camera.fov += (mix(48, 38, push) - camera.fov) * 0.04;
+      camera.updateProjectionMatrix();
+
+      camera.position.x += (cameraX - camera.position.x) * 0.04;
+      camera.position.y += (cameraY - camera.position.y) * 0.04;
+      camera.position.z += (cameraZ - camera.position.z) * 0.04;
+      camera.lookAt(lookAtX, lookAtY, lookAtZ);
+      renderer.render(scene, camera);
+      animationId = requestAnimationFrame(animate);
+    };
+
+    resize();
+    animate();
+
+    window.addEventListener('resize', resize);
+    host.addEventListener('pointermove', updatePointer);
+    host.addEventListener('pointerdown', triggerPulse);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', resize);
+      host.removeEventListener('pointermove', updatePointer);
+      host.removeEventListener('pointerdown', triggerPulse);
+      geometry.dispose();
+      material.map?.dispose();
+      material.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, []);
+
+  return <div className="particle-field" ref={hostRef} data-testid="particle-field" />;
+}

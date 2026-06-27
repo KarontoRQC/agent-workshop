@@ -1,0 +1,52 @@
+# Voice Particle JARVIS
+
+A standalone Vite + React + Three.js prototype for a JARVIS-like AI dialogue surface.
+
+The first screen is the actual experience: a central 3D particle orb, natural density rings, voice/text input, browser speech output, and a placeholder model endpoint for later integration.
+
+## What It Tests
+
+- A stable 3D particle orb that feels like an AI presence instead of a generic visualizer.
+- A natural orbital particle stream where brightness comes from particle density and lighting rather than hard white lines.
+- Voice input through the browser Web Speech API.
+- Microphone energy driving particle pulse, radius, brightness, and point size.
+- Browser `speechSynthesis` output tuned toward a mature English male voice when the OS/browser provides a matching voice.
+- A blank AI model slot through `VITE_AI_CHAT_ENDPOINT`, with local English placeholder replies as the fallback.
+- An automatic cinematic loop where the camera pushes into the orb and particles recompose into smaller spheres.
+
+## Run
+
+```powershell
+npm install
+npm run dev -- --host 127.0.0.1 --port 5178
+```
+
+Open:
+
+```text
+http://127.0.0.1:5178/
+```
+
+## Build
+
+```powershell
+npm run build
+```
+
+Vite may warn that the Three.js chunk is larger than 500 kB. That is expected for this prototype.
+
+## Voice Notes
+
+The app prefers English male browser voices whose names include candidates such as `Daniel`, `George`, `Guy`, `David`, `Mark`, `Alex`, or `English Male`. It then lowers pitch and slows the speech rate to create a steadier AI-butler feel.
+
+Voice quality still depends on the user's OS and browser voice packs. If no matching voice is available, the app falls back to the browser's default English voice.
+
+## Model Endpoint
+
+Leave the model slot empty for local demo mode, or provide an endpoint with:
+
+```text
+VITE_AI_CHAT_ENDPOINT=https://your-endpoint.example/chat
+```
+
+The endpoint integration lives in `src/lib/aiClient.ts`.
