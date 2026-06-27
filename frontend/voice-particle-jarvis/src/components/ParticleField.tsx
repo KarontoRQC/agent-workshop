@@ -25,12 +25,12 @@ const ROLE_SHELL = 1;
 const ROLE_RIBBON = 2;
 const ROLE_HALO = 3;
 
-const STREAM_OFFSETS = [-0.09, 0.12, -0.02, 0.06];
+const STREAM_OFFSETS = [-0.09, 0.12, -0.03, 0.08];
 const STREAM_PHASES = [0, 1.7, 3.1, 4.5];
 const STREAM_DIRECTIONS = [1, -1, 1, -1];
 const STREAM_TILTS = [-0.08, 0.34, -0.58, 0.68];
 const STREAM_DEPTHS = [0.9, 0.84, 0.92, 0.8];
-const STREAM_LIGHTS = [0.78, 0.6, 0.36, 0.3];
+const STREAM_LIGHTS = [0.9, 0.74, 0.66, 0.58];
 
 const modePalettes: Record<DialogueMode, THREE.Color[]> = {
   idle: ['#f7fbff', '#9cc7ff', '#4f96ff', '#173571'].map((color) => new THREE.Color(color)),
@@ -128,7 +128,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
     for (let index = 0; index < particleCount; index += 1) {
       const seedOffset = index * SEED_STRIDE;
       const mix = index / particleCount;
-      const role = mix < 0.07 ? ROLE_CORE : mix < 0.52 ? ROLE_SHELL : mix < 0.76 ? ROLE_RIBBON : ROLE_HALO;
+      const role = mix < 0.07 ? ROLE_CORE : mix < 0.5 ? ROLE_SHELL : mix < 0.74 ? ROLE_RIBBON : ROLE_HALO;
       const randomA = Math.random();
       const randomB = Math.random();
       const randomC = Math.random();
@@ -256,7 +256,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
 
       if (role === ROLE_HALO) {
         const bandSeed = seeds[seedOffset + S_C];
-        const orbitBand = bandSeed < 0.42 ? 0 : bandSeed < 0.78 ? 1 : bandSeed < 0.91 ? 2 : 3;
+        const orbitBand = bandSeed < 0.34 ? 0 : bandSeed < 0.64 ? 1 : bandSeed < 0.84 ? 2 : 3;
         const direction = STREAM_DIRECTIONS[orbitBand] ?? 1;
         const orbitSpeed = 0.011 + seeds[seedOffset + S_FLOW] * 0.004 + orbitBand * 0.0008;
         const orbit =
@@ -267,8 +267,10 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         const normalizedOrbit = orbit < 0 ? orbit + 1 : orbit;
         const bandPhase = STREAM_PHASES[orbitBand] ?? 0;
         const u = normalizedOrbit * TAU + bandPhase * 0.35;
-        const wideScatter = (seeds[seedOffset + S_B] - 0.5) * (0.24 + seeds[seedOffset + S_D] * 0.14);
-        const laneScatter = seeds[seedOffset + S_WIDTH] * 1.05;
+        const outerWrapBand = orbitBand >= 2;
+        const wideScatter =
+          (seeds[seedOffset + S_B] - 0.5) * (0.34 + seeds[seedOffset + S_D] * 0.22) * (outerWrapBand ? 1.28 : 1);
+        const laneScatter = seeds[seedOffset + S_WIDTH] * (outerWrapBand ? 1.9 : 1.55);
         const twist = u * 0.56 + phase * 0.12 + bandPhase;
         const clump =
           Math.pow(0.5 + Math.sin(u * 3.4 + phase) * 0.5, 2.8) * 0.7 +
@@ -287,13 +289,13 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
           fixedFold * 0.18 +
           restrainedEscape;
         const streamOffset = (STREAM_OFFSETS[orbitBand] ?? 0) + Math.sin(u * 2.4 + phase) * 0.035;
-        const tubeOffset = wideScatter * Math.cos(twist) * 0.16;
-        const localX = Math.cos(u) * (radius + tubeOffset + laneScatter * 0.1);
+        const tubeOffset = wideScatter * Math.cos(twist) * 0.2;
+        const localX = Math.cos(u) * (radius + tubeOffset + laneScatter * 0.16);
         const localY =
           streamOffset +
-          Math.sin(u * 1.75 + bandPhase) * 0.07 +
-          wideScatter * Math.sin(twist) * 0.42 +
-          laneScatter * 0.28;
+          Math.sin(u * 1.75 + bandPhase) * 0.075 +
+          wideScatter * Math.sin(twist) * 0.5 +
+          laneScatter * 0.34;
         const localZ = Math.sin(u) * (radius * (STREAM_DEPTHS[orbitBand] ?? 0.86)) + tubeOffset * 0.42;
         const cosTilt = Math.cos(planeTilt);
         const sinTilt = Math.sin(planeTilt);
@@ -309,10 +311,23 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         const y = yawedX * sinRoll + tiltedY * cosRoll;
         const z = yawedZ;
         const orbitDepth = Math.pow(smoothstep(-2.1, 2.35, z), 1.35);
+        const projectedRim = Math.hypot(x * 0.9, y * 1.12);
+        const sideWrap = smoothstep(1.62, 2.38, projectedRim) * (0.72 + Math.max(0, -x) * 0.08);
+        const topWrap = smoothstep(1.08, 2.12, y) * smoothstep(0.55, 1.85, Math.abs(x));
+        const leftUpperWrap = smoothstep(0.45, 1.55, y) * smoothstep(0.32, 1.72, -x) * (outerWrapBand ? 1 : 0.42);
         const streamLight = STREAM_LIGHTS[orbitBand] ?? 0.5;
 
         target.set(x, y, z);
-        return (0.24 + orbitDepth * 0.58 + clump * 0.18 + restrainedEscape * 0.26 + voiceBeat * 0.1) * streamLight;
+        return (
+          0.26 +
+          orbitDepth * 0.54 +
+          sideWrap * 0.32 +
+          topWrap * 0.18 +
+          leftUpperWrap * 0.34 +
+          clump * 0.2 +
+          restrainedEscape * 0.22 +
+          voiceBeat * 0.09
+        ) * streamLight;
       }
 
       const surfaceRipple =
