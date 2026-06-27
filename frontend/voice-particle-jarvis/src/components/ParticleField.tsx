@@ -25,8 +25,12 @@ const ROLE_SHELL = 1;
 const ROLE_RIBBON = 2;
 const ROLE_HALO = 3;
 
-const STREAM_OFFSETS = [-0.1, 0.11];
-const STREAM_PHASES = [0, 0.34];
+const STREAM_OFFSETS = [-0.09, 0.12, -0.02, 0.06];
+const STREAM_PHASES = [0, 1.7, 3.1, 4.5];
+const STREAM_DIRECTIONS = [1, -1, 1, -1];
+const STREAM_TILTS = [-0.08, 0.34, -0.58, 0.68];
+const STREAM_DEPTHS = [0.9, 0.84, 0.92, 0.8];
+const STREAM_LIGHTS = [0.78, 0.6, 0.36, 0.3];
 
 const modePalettes: Record<DialogueMode, THREE.Color[]> = {
   idle: ['#f7fbff', '#9cc7ff', '#4f96ff', '#173571'].map((color) => new THREE.Color(color)),
@@ -49,8 +53,8 @@ function sphericalToPoint(theta: number, latitude: number, radius: number, targe
 
   target.set(
     Math.cos(theta) * horizontal * radius,
-    Math.sin(latitude) * radius * 0.94,
-    Math.sin(theta) * horizontal * radius * 0.96,
+    Math.sin(latitude) * radius,
+    Math.sin(theta) * horizontal * radius,
   );
 }
 
@@ -124,7 +128,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
     for (let index = 0; index < particleCount; index += 1) {
       const seedOffset = index * SEED_STRIDE;
       const mix = index / particleCount;
-      const role = mix < 0.07 ? ROLE_CORE : mix < 0.43 ? ROLE_SHELL : mix < 0.72 ? ROLE_RIBBON : ROLE_HALO;
+      const role = mix < 0.07 ? ROLE_CORE : mix < 0.52 ? ROLE_SHELL : mix < 0.76 ? ROLE_RIBBON : ROLE_HALO;
       const randomA = Math.random();
       const randomB = Math.random();
       const randomC = Math.random();
@@ -251,46 +255,69 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         Math.cos(theta * 5.4 - latitude * 2.1) * 0.04;
 
       if (role === ROLE_HALO) {
-        const orbitBand = Math.floor(seeds[seedOffset + S_C] * STREAM_OFFSETS.length);
-        const direction = orbitBand % 2 === 0 ? 1 : -1;
-        const orbit = (seeds[seedOffset + S_A] + direction * time * (0.013 + seeds[seedOffset + S_FLOW] * 0.004)) % 1;
+        const bandSeed = seeds[seedOffset + S_C];
+        const orbitBand = bandSeed < 0.42 ? 0 : bandSeed < 0.78 ? 1 : bandSeed < 0.91 ? 2 : 3;
+        const direction = STREAM_DIRECTIONS[orbitBand] ?? 1;
+        const orbitSpeed = 0.011 + seeds[seedOffset + S_FLOW] * 0.004 + orbitBand * 0.0008;
+        const orbit =
+          (seeds[seedOffset + S_A] +
+            direction * time * orbitSpeed +
+            Math.sin(time * 0.055 + phase + orbitBand) * 0.008) %
+          1;
         const normalizedOrbit = orbit < 0 ? orbit + 1 : orbit;
         const bandPhase = STREAM_PHASES[orbitBand] ?? 0;
-        const u = normalizedOrbit * TAU + bandPhase;
-        const wideScatter = (seeds[seedOffset + S_B] - 0.5) * (0.42 + seeds[seedOffset + S_D] * 0.24);
-        const laneScatter = seeds[seedOffset + S_WIDTH] * 1.8;
-        const twist = u * 0.52 + phase * 0.16 + bandPhase * 1.4;
-        const frontArc = smoothstep(-0.24, 0.82, Math.sin(u));
-        const orbitDepth = Math.pow(frontArc, 1.55);
+        const u = normalizedOrbit * TAU + bandPhase * 0.35;
+        const wideScatter = (seeds[seedOffset + S_B] - 0.5) * (0.24 + seeds[seedOffset + S_D] * 0.14);
+        const laneScatter = seeds[seedOffset + S_WIDTH] * 1.05;
+        const twist = u * 0.56 + phase * 0.12 + bandPhase;
         const clump =
           Math.pow(0.5 + Math.sin(u * 3.4 + phase) * 0.5, 2.8) * 0.7 +
           Math.pow(0.5 + Math.sin(u * 5.2 - phase * 0.7) * 0.5, 4) * 0.35;
         const restrainedEscape = Math.max(0, Math.sin(time * 1.15 + phase)) * (0.035 + voiceEnergy * 0.04 + voiceBeat * 0.1);
+        const planeDirection = orbitBand % 2 === 0 ? 1 : -1;
+        const planeYaw =
+          bandPhase +
+          planeDirection * time * (0.082 + orbitBand * 0.009) +
+          Math.sin(time * 0.11 + bandPhase) * 0.34;
+        const planeTilt = (STREAM_TILTS[orbitBand] ?? 0) + Math.sin(time * 0.075 + bandPhase) * 0.24 + voiceBeat * 0.035;
+        const planeRoll = Math.sin(time * 0.067 + phase * 0.12 + bandPhase) * 0.11;
         const radius =
-          2.62 +
-          Math.cos(u * 2.1 + bandPhase) * 0.08 +
-          wideScatter * Math.cos(twist) * 0.34 +
+          2.4 +
+          Math.cos(u * 2.1 + bandPhase) * 0.06 +
           fixedFold * 0.18 +
           restrainedEscape;
         const streamOffset = (STREAM_OFFSETS[orbitBand] ?? 0) + Math.sin(u * 2.4 + phase) * 0.035;
-        const ySpread = wideScatter * Math.sin(twist) * 0.8 + laneScatter * 0.42;
-        const x = Math.cos(u) * (radius + laneScatter * 0.2);
-        const y =
+        const tubeOffset = wideScatter * Math.cos(twist) * 0.16;
+        const localX = Math.cos(u) * (radius + tubeOffset + laneScatter * 0.1);
+        const localY =
           streamOffset +
-          Math.sin(u * 1.75 + bandPhase) * 0.11 +
-          ySpread;
-        const z = Math.sin(u) * (radius * 0.84 + wideScatter * Math.cos(twist) * 0.18);
-        const roll = -0.045;
-        const cosRoll = Math.cos(roll);
-        const sinRoll = Math.sin(roll);
+          Math.sin(u * 1.75 + bandPhase) * 0.07 +
+          wideScatter * Math.sin(twist) * 0.42 +
+          laneScatter * 0.28;
+        const localZ = Math.sin(u) * (radius * (STREAM_DEPTHS[orbitBand] ?? 0.86)) + tubeOffset * 0.42;
+        const cosTilt = Math.cos(planeTilt);
+        const sinTilt = Math.sin(planeTilt);
+        const tiltedY = localY * cosTilt - localZ * sinTilt;
+        const tiltedZ = localY * sinTilt + localZ * cosTilt;
+        const cosYaw = Math.cos(planeYaw);
+        const sinYaw = Math.sin(planeYaw);
+        const yawedX = localX * cosYaw + tiltedZ * sinYaw;
+        const yawedZ = -localX * sinYaw + tiltedZ * cosYaw;
+        const cosRoll = Math.cos(planeRoll);
+        const sinRoll = Math.sin(planeRoll);
+        const x = yawedX * cosRoll - tiltedY * sinRoll;
+        const y = yawedX * sinRoll + tiltedY * cosRoll;
+        const z = yawedZ;
+        const orbitDepth = Math.pow(smoothstep(-2.1, 2.35, z), 1.35);
+        const streamLight = STREAM_LIGHTS[orbitBand] ?? 0.5;
 
-        target.set(x * cosRoll - y * sinRoll, x * sinRoll + y * cosRoll, z);
-        return 0.28 + orbitDepth * 0.62 + clump * 0.26 + restrainedEscape * 0.42 + voiceBeat * 0.14;
+        target.set(x, y, z);
+        return (0.24 + orbitDepth * 0.58 + clump * 0.18 + restrainedEscape * 0.26 + voiceBeat * 0.1) * streamLight;
       }
 
       const surfaceRipple =
-        Math.sin(time * 1.32 + theta * 2 + latitude * 3 + phase) * (0.01 + voiceEnergy * 0.006 + voiceBeat * 0.014);
-      const radius = 2.25 + fixedFold + surfaceRipple + breath + restrainedPulse * 0.22;
+        Math.sin(time * 1.18 + theta * 2 + latitude * 3 + phase) * (0.006 + voiceEnergy * 0.003 + voiceBeat * 0.004);
+      const radius = 2.3 + fixedFold * 0.32 + surfaceRipple + breath * 0.22;
 
       sphericalToPoint(theta, latitude, radius, target);
       return 0.26 + Math.max(0, fixedFold) * 2.4 + voiceEnergy * 0.08 + voiceBeat * 0.2;
@@ -339,8 +366,14 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
 
         const speechExpansion =
           currentSettings.mode === 'speaking'
-            ? 1 + voiceEnergy * 0.075 + voiceBeat * 0.07 + pulsePower * 0.012
-            : 1 + voiceEnergy * 0.018;
+            ? role === ROLE_SHELL
+              ? 1 + voiceEnergy * 0.006
+              : role === ROLE_HALO
+                ? 1 + voiceEnergy * 0.018 + voiceBeat * 0.018 + pulsePower * 0.004
+                : 1 + voiceEnergy * 0.065 + voiceBeat * 0.06 + pulsePower * 0.01
+            : role === ROLE_SHELL
+              ? 1
+              : 1 + voiceEnergy * 0.014;
         target.multiplyScalar(speechExpansion);
 
         const pointerX = pointer.x * 4.4;
@@ -416,7 +449,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
       const baseScale = width < 720 ? 0.78 : 0.9;
       const outputScale =
         currentSettings.mode === 'speaking'
-          ? 0.04 + voiceEnergy * 0.13 + voiceBeat * 0.085
+          ? 0.03 + voiceEnergy * 0.075 + voiceBeat * 0.04
           : voiceEnergy * 0.018;
       points.scale.setScalar(baseScale * (1 + outputScale + pulsePower * 0.018));
 
