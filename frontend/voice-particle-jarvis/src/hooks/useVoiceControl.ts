@@ -53,11 +53,14 @@ function getSpeechRecognition() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
 }
 
-export function useVoiceControl(onCommand: (command: string) => void) {
+export function useVoiceControl(onCommand: (command: string) => void, language = 'zh-CN') {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
+  const keepAliveRef = useRef(false);
+  const languageRef = useRef(language);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const restartTimerRef = useRef(0);
   const onCommandRef = useRef(onCommand);
   const Recognition = useMemo(getSpeechRecognition, []);
   const supported = Boolean(Recognition);
@@ -66,11 +69,38 @@ export function useVoiceControl(onCommand: (command: string) => void) {
     onCommandRef.current = onCommand;
   }, [onCommand]);
 
-  const stop = useCallback(() => {
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
-    setListening(false);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = 0;
+    }
   }, []);
+
+  const pause = useCallback(() => {
+    clearRestartTimer();
+
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+
+    if (recognition) {
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+      recognition.abort();
+    }
+
+    setListening(false);
+  }, [clearRestartTimer]);
+
+  const stop = useCallback(() => {
+    keepAliveRef.current = false;
+    pause();
+    setListening(false);
+  }, [pause]);
 
   const start = useCallback(() => {
     if (!Recognition) {
@@ -78,76 +108,102 @@ export function useVoiceControl(onCommand: (command: string) => void) {
       return;
     }
 
+    keepAliveRef.current = true;
+    clearRestartTimer();
+
     if (recognitionRef.current) {
-      stop();
+      return;
     }
 
-    const recognition = new Recognition();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+    const beginRecognition = () => {
+      if (!keepAliveRef.current || recognitionRef.current) {
+        return;
+      }
 
-    recognition.onstart = () => {
-      setError('');
-      setListening(true);
-    };
+      const recognition = new Recognition();
+      recognition.lang = languageRef.current;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
 
-    recognition.onend = () => {
-      setListening(false);
-      recognitionRef.current = null;
-    };
+      recognition.onstart = () => {
+        setError('');
+        setListening(true);
+      };
 
-    recognition.onerror = (event) => {
-      setError(event.error);
-      setListening(false);
-    };
+      recognition.onend = () => {
+        recognitionRef.current = null;
+        setListening(false);
 
-    recognition.onresult = (event) => {
-      let finalText = '';
-      let interimText = '';
+        if (keepAliveRef.current) {
+          restartTimerRef.current = window.setTimeout(beginRecognition, 220);
+        }
+      };
 
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        const piece = result[0]?.transcript ?? '';
+      recognition.onerror = (event) => {
+        if (event.error !== 'no-speech') {
+          setError(event.error);
+        }
+        setListening(false);
+      };
 
-        if (result.isFinal) {
-          finalText += piece;
-        } else {
-          interimText += piece;
+      recognition.onresult = (event) => {
+        let finalText = '';
+        let interimText = '';
+
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const piece = result[0]?.transcript ?? '';
+
+          if (result.isFinal) {
+            finalText += piece;
+          } else {
+            interimText += piece;
+          }
+        }
+
+        const nextTranscript = (finalText || interimText).trim();
+
+        if (nextTranscript) {
+          setTranscript(nextTranscript);
+        }
+
+        if (finalText.trim()) {
+          onCommandRef.current(finalText.trim());
+        }
+      };
+
+      try {
+        recognitionRef.current = recognition;
+        recognition.start();
+      } catch (startError) {
+        recognitionRef.current = null;
+        const message = startError instanceof Error ? startError.message : 'Speech start failed';
+        setError(message);
+        setListening(false);
+
+        if (keepAliveRef.current) {
+          restartTimerRef.current = window.setTimeout(beginRecognition, 420);
         }
       }
-
-      const nextTranscript = (finalText || interimText).trim();
-
-      if (nextTranscript) {
-        setTranscript(nextTranscript);
-      }
-
-      if (finalText.trim()) {
-        onCommandRef.current(finalText.trim());
-      }
     };
 
-    try {
-      recognition.start();
-      recognitionRef.current = recognition;
-    } catch (startError) {
-      const message = startError instanceof Error ? startError.message : 'Speech start failed';
-      setError(message);
-      setListening(false);
-    }
-  }, [Recognition, stop]);
+    beginRecognition();
+  }, [Recognition, clearRestartTimer]);
 
   useEffect(() => {
     return () => {
+      keepAliveRef.current = false;
+      clearRestartTimer();
       recognitionRef.current?.abort();
     };
-  }, []);
+  }, [clearRestartTimer]);
 
   return {
     error,
     listening,
+    pause,
+    resume: start,
     start,
     stop,
     supported,
