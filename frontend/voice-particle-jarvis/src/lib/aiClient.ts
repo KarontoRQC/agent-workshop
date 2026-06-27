@@ -6,10 +6,10 @@ type ChatResponse = {
 };
 
 const fallbackReplies = [
-  'Acknowledged. The model endpoint is still empty, so I am keeping the local dialogue loop active.',
-  'I heard you. Once the model is connected, this line will become a real contextual response.',
-  'Understood. The visual core and voice pipeline are ready; the reasoning layer can be attached next.',
-  'Message received. For now, I will answer locally and let the particle core reflect the speaking state.',
+  'Certainly, sir. The reasoning layer is not connected yet, but local operations remain online.',
+  'Acknowledged. I am maintaining the dialogue loop and monitoring the particle core.',
+  'Understood, sir. Visual systems are stable; the reasoning module can be attached next.',
+  'Message received. I will hold position and keep the interface responsive.',
 ];
 
 function pickFallbackReply(input: string) {

@@ -14,6 +14,7 @@ Final result: passed
 | --- | --- | --- |
 | 3D particle orb | passed | The central field renders as a stable 3D particle sphere with natural density rings and restrained motion. |
 | Voice output tone | passed | Browser speech output is tuned toward a mature English male voice when a matching system voice is available. |
+| Voice preview | passed | The bottom voice hint is a click target that primes speech output and plays a short mature AI-butler line. |
 | Audio response path | passed | Microphone energy can drive particle pulse, radius, brightness, and point size after browser permission is granted. |
 | Model slot | passed | The AI endpoint remains configurable through `VITE_AI_CHAT_ENDPOINT`; local English placeholder replies keep the demo flow alive. |
 | Cinematic loop | passed | The animation loop includes a camera push-in and visible recomposition into smaller particle spheres. |

@@ -13,31 +13,60 @@ const baseSettings: ParticleSettings = {
   pulseSeed: 0,
 };
 
-const matureEnglishVoiceHints = [
+const preferredVoiceHints = [
+  'microsoft george',
+  'google uk english male',
   'daniel',
   'george',
-  'guy',
-  'david',
-  'mark',
+  'microsoft guy',
+  'microsoft david',
+  'microsoft mark',
+  'microsoft ryan',
+  'microsoft william',
+  'microsoft brian',
   'alex',
   'english male',
   'uk english male',
   'us english male',
 ];
 
+const avoidedVoiceHints = ['zira', 'hazel', 'susan', 'zira desktop', 'female', 'aria', 'jenny', 'emma'];
+
+function voiceScore(voice: SpeechSynthesisVoice) {
+  const name = voice.name.toLowerCase();
+  const lang = voice.lang.toLowerCase();
+
+  if (!lang.startsWith('en')) {
+    return -100;
+  }
+
+  if (avoidedVoiceHints.some((hint) => name.includes(hint))) {
+    return -30;
+  }
+
+  const preferredIndex = preferredVoiceHints.findIndex((hint) => name.includes(hint));
+  const preferredScore = preferredIndex >= 0 ? 80 - preferredIndex * 3 : 0;
+  const accentScore = lang === 'en-gb' ? 18 : lang.startsWith('en-gb') ? 15 : lang.startsWith('en-us') ? 8 : 4;
+  const localScore = voice.localService ? 4 : 0;
+
+  return preferredScore + accentScore + localScore;
+}
+
 function selectMatureEnglishVoice() {
   const voices = window.speechSynthesis.getVoices();
 
-  return (
-    voices.find((voice) => {
-      const name = voice.name.toLowerCase();
-      return voice.lang.toLowerCase().startsWith('en') && matureEnglishVoiceHints.some((hint) => name.includes(hint));
-    }) ??
-    voices.find((voice) => voice.lang.toLowerCase() === 'en-gb') ??
-    voices.find((voice) => voice.lang.toLowerCase().startsWith('en-us')) ??
-    voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ??
-    null
-  );
+  return voices
+    .filter((voice) => voiceScore(voice) > 0)
+    .sort((left, right) => voiceScore(right) - voiceScore(left))[0] ?? null;
+}
+
+function polishSpokenLine(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/\bAI\b/g, 'A.I.')
+    .replace(/\bendpoint\b/gi, 'end point')
+    .replace(/\bJARVIS\b/g, 'Jarvis')
+    .trim();
 }
 
 function primeSpeechOutput() {
@@ -51,12 +80,12 @@ function primeSpeechOutput() {
 
 function speakNow(text: string) {
   const voice = selectMatureEnglishVoice();
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(polishSpokenLine(text));
 
   utterance.lang = voice?.lang ?? 'en-GB';
-  utterance.rate = 0.82;
-  utterance.pitch = 0.68;
-  utterance.volume = 0.96;
+  utterance.rate = 0.74;
+  utterance.pitch = 0.52;
+  utterance.volume = 1;
 
   if (voice) {
     utterance.voice = voice;
@@ -94,7 +123,7 @@ export default function App() {
   const [typedMessage, setTypedMessage] = useState('');
   const [replySource, setReplySource] = useState<'placeholder' | 'endpoint'>('placeholder');
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, speaker: 'ai', text: 'I am listening. The model endpoint can stay empty; the particle core is online.' },
+    { id: 1, speaker: 'ai', text: 'Good evening, sir. Systems are online, and I am standing by.' },
   ]);
 
   const submitMessage = useCallback(
@@ -125,7 +154,7 @@ export default function App() {
         setSettings((current) => ({ ...current, energy: 0.96, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
         speak(response.text);
       } catch {
-        const fallback = 'The reasoning endpoint is not connected yet. I will keep the local dialogue loop alive.';
+        const fallback = 'The reasoning end point is not connected yet, sir. Local operations remain online.';
         setReplySource('placeholder');
         setMessages((current) => {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
@@ -181,6 +210,15 @@ export default function App() {
     setTypedMessage('');
   };
 
+  const previewVoice = () => {
+    primeSpeechOutput();
+    setSettings((current) => ({ ...current, energy: 0.9, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
+    speak('Good evening, sir. Systems are online, and I am standing by.');
+    window.setTimeout(() => {
+      setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
+    }, 3600);
+  };
+
   const toggleListening = () => {
     if (voice.listening) {
       voice.stop();
@@ -197,7 +235,7 @@ export default function App() {
   const reset = () => {
     setSettings(baseSettings);
     setReplySource('placeholder');
-    setMessages([{ id: Date.now(), speaker: 'ai', text: 'Online. We are starting again. The model slot is still open.' }]);
+    setMessages([{ id: Date.now(), speaker: 'ai', text: 'Systems reset. I am online and standing by, sir.' }]);
     window.speechSynthesis?.cancel();
     micLevel.stop();
   };
@@ -258,16 +296,16 @@ export default function App() {
           <button aria-label="Reset dialogue" className="icon-button quiet" type="button" onClick={reset}>
             <RotateCcw size={18} />
           </button>
-          <div className="voice-hint">
+          <button className="voice-hint" type="button" onClick={previewVoice}>
             <Volume2 size={15} />
             <span>
               {micLevel.active
                 ? `Voice energy ${(micLevel.level * 100).toFixed(0)}%`
                 : replySource === 'endpoint'
                   ? 'Model endpoint connected'
-                  : 'Model slot empty -> local placeholder'}
+                  : 'Preview voice profile'}
             </span>
-          </div>
+          </button>
         </form>
       </section>
     </main>

@@ -11,6 +11,7 @@ The first screen is the actual experience: a central 3D particle orb, natural de
 - Voice input through the browser Web Speech API.
 - Microphone energy driving particle pulse, radius, brightness, and point size.
 - Browser `speechSynthesis` output tuned toward a mature English male voice when the OS/browser provides a matching voice.
+- A one-click voice preview control in the bottom hint row, useful for testing the current voice profile without waiting for a model reply.
 - A blank AI model slot through `VITE_AI_CHAT_ENDPOINT`, with local English placeholder replies as the fallback.
 - An automatic cinematic loop where the camera pushes into the orb and particles recompose into smaller spheres.
 
@@ -37,9 +38,11 @@ Vite may warn that the Three.js chunk is larger than 500 kB. That is expected fo
 
 ## Voice Notes
 
-The app prefers English male browser voices whose names include candidates such as `Daniel`, `George`, `Guy`, `David`, `Mark`, `Alex`, or `English Male`. It then lowers pitch and slows the speech rate to create a steadier AI-butler feel.
+The app scores available English voices and prefers mature male-leaning candidates such as `Microsoft George`, `Google UK English Male`, `Daniel`, `George`, `Guy`, `David`, `Mark`, `Ryan`, `William`, `Brian`, or `Alex`. It avoids common female voice names when possible, then lowers pitch and slows the speech rate to create a steadier AI-butler feel.
 
 Voice quality still depends on the user's OS and browser voice packs. If no matching voice is available, the app falls back to the browser's default English voice.
+
+Click the bottom `Preview voice profile` control to trigger a short spoken line and confirm the browser is allowing speech output.
 
 ## Model Endpoint
 
