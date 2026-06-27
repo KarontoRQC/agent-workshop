@@ -138,6 +138,7 @@ function speak(text: string, callbacks: SpeechCallbacks = {}) {
 
 export default function App() {
   const speechEndTimerRef = useRef<number | null>(null);
+  const lastSpeechPulseAtRef = useRef(0);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [typedMessage, setTypedMessage] = useState('');
   const [replySource, setReplySource] = useState<'placeholder' | 'endpoint'>('placeholder');
@@ -154,10 +155,18 @@ export default function App() {
 
   const beginSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
+    lastSpeechPulseAtRef.current = performance.now();
     setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
   }, [clearSpeechEndTimer]);
 
   const pulseSpeechOutput = useCallback(() => {
+    const now = performance.now();
+
+    if (now - lastSpeechPulseAtRef.current < 420) {
+      return;
+    }
+
+    lastSpeechPulseAtRef.current = now;
     setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
   }, []);
 
@@ -170,11 +179,12 @@ export default function App() {
     (text: string) => {
       beginSpeechOutput();
 
-      const estimatedDuration = Math.min(12000, Math.max(4200, text.length * 78));
+      const estimatedDuration = Math.min(15000, Math.max(5600, text.length * 92));
       const startedAt = performance.now();
       const finishAfterMinimum = () => {
         const elapsed = performance.now() - startedAt;
-        const remaining = Math.max(0, Math.min(estimatedDuration, 3600) - elapsed);
+        const minimumVisualDuration = Math.min(estimatedDuration, 5200);
+        const remaining = Math.max(0, minimumVisualDuration - elapsed);
 
         clearSpeechEndTimer();
         speechEndTimerRef.current = window.setTimeout(finishSpeechOutput, remaining);
@@ -185,7 +195,7 @@ export default function App() {
         onStart: beginSpeechOutput,
       });
 
-      speechEndTimerRef.current = window.setTimeout(finishSpeechOutput, queued ? estimatedDuration : 3600);
+      speechEndTimerRef.current = window.setTimeout(finishSpeechOutput, queued ? estimatedDuration : 5200);
     },
     [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
   );

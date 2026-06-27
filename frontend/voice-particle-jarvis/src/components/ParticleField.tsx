@@ -172,6 +172,8 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
     let lastFrameTime = startTime;
     let animationId = 0;
     let pulsePower = 0;
+    let voiceEnvelope = 0;
+    let voiceBeatEnvelope = 0;
     let lastPulseSeed = settingsRef.current.pulseSeed;
 
     const resize = () => {
@@ -197,6 +199,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
       time: number,
       currentSettings: ParticleSettings,
       voiceEnergy: number,
+      voiceBeat: number,
     ) => {
       const seedOffset = index * SEED_STRIDE;
       const role = seeds[seedOffset + S_ROLE];
@@ -211,15 +214,16 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
               ? 0.09
               : 0.04;
       const breath = Math.sin(time * 1.1 + phase) * 0.025;
-      const restrainedPulse = (voiceEnergy * 0.13 + pulsePower * 0.1 + statePressure) * (0.7 + shade * 0.3);
+      const restrainedPulse =
+        (voiceEnergy * 0.16 + voiceBeat * 0.2 + pulsePower * 0.08 + statePressure) * (0.7 + shade * 0.3);
 
       if (role === ROLE_CORE) {
         const theta = seeds[seedOffset + S_A] * TAU + time * 0.035;
         const latitude = Math.asin(clamp(seeds[seedOffset + S_B] * 2 - 1, -0.92, 0.92));
-        const radius = 0.36 + seeds[seedOffset + S_C] * 0.78 + breath + restrainedPulse * 0.18;
+        const radius = 0.36 + seeds[seedOffset + S_C] * 0.78 + breath + restrainedPulse * 0.36;
 
         sphericalToPoint(theta, latitude, radius, target);
-        return 0.62 + voiceEnergy * 0.22;
+        return 0.62 + voiceEnergy * 0.16 + voiceBeat * 0.18;
       }
 
       if (role === ROLE_RIBBON) {
@@ -233,11 +237,11 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
           Math.sin(normalizedFlow * TAU * 2.15 + band * 0.72) * 0.11;
         const latitude = clamp(ribbonCurve + seeds[seedOffset + S_WIDTH], -1.05, 1.05);
         const ridge = 0.5 + Math.cos(normalizedFlow * TAU * 3 + band * 1.7) * 0.5;
-        const localWave = Math.max(0, Math.sin(normalizedFlow * TAU * 4 - time * 2.6 + phase)) * voiceEnergy;
-        const radius = 2.46 + ridge * 0.16 + breath + restrainedPulse * 0.34 + localWave * 0.16;
+        const localWave = Math.max(0, Math.sin(normalizedFlow * TAU * 3.2 - time * 1.85 + phase)) * voiceBeat;
+        const radius = 2.46 + ridge * 0.16 + breath + restrainedPulse * 0.58 + localWave * 0.12;
 
         sphericalToPoint(theta, latitude, radius, target);
-        return 1.42 + ridge * 0.72 + localWave * 0.42 + voiceEnergy * 0.18;
+        return 1.42 + ridge * 0.72 + localWave * 0.32 + voiceBeat * 0.18;
       }
 
       const theta = seeds[seedOffset + S_A] * TAU + Math.sin(time * 0.18 + phase) * 0.014;
@@ -261,7 +265,7 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         const clump =
           Math.pow(0.5 + Math.sin(u * 3.4 + phase) * 0.5, 2.8) * 0.7 +
           Math.pow(0.5 + Math.sin(u * 5.2 - phase * 0.7) * 0.5, 4) * 0.35;
-        const restrainedEscape = Math.max(0, Math.sin(time * 1.35 + phase)) * (0.04 + voiceEnergy * 0.09);
+        const restrainedEscape = Math.max(0, Math.sin(time * 1.15 + phase)) * (0.035 + voiceEnergy * 0.04 + voiceBeat * 0.1);
         const radius =
           2.62 +
           Math.cos(u * 2.1 + bandPhase) * 0.08 +
@@ -281,14 +285,15 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         const sinRoll = Math.sin(roll);
 
         target.set(x * cosRoll - y * sinRoll, x * sinRoll + y * cosRoll, z);
-        return 0.28 + orbitDepth * 0.62 + clump * 0.26 + restrainedEscape * 0.62 + voiceEnergy * 0.14;
+        return 0.28 + orbitDepth * 0.62 + clump * 0.26 + restrainedEscape * 0.42 + voiceBeat * 0.14;
       }
 
-      const surfaceRipple = Math.sin(time * 1.65 + theta * 2 + latitude * 3 + phase) * (0.012 + voiceEnergy * 0.018);
-      const radius = 2.25 + fixedFold + surfaceRipple + breath + restrainedPulse * 0.12;
+      const surfaceRipple =
+        Math.sin(time * 1.32 + theta * 2 + latitude * 3 + phase) * (0.01 + voiceEnergy * 0.006 + voiceBeat * 0.014);
+      const radius = 2.25 + fixedFold + surfaceRipple + breath + restrainedPulse * 0.22;
 
       sphericalToPoint(theta, latitude, radius, target);
-      return 0.26 + Math.max(0, fixedFold) * 2.4 + voiceEnergy * 0.18;
+      return 0.26 + Math.max(0, fixedFold) * 2.4 + voiceEnergy * 0.08 + voiceBeat * 0.2;
     };
 
     const animate = () => {
@@ -297,11 +302,22 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
       const delta = Math.min((frameNow - lastFrameTime) / 1000, 0.05);
       const elapsed = (frameNow - startTime) / 1000;
       const liveMicEnergy = audioLevelRef.current;
-      const outputWave =
-        Math.max(0, Math.sin(elapsed * 8.4)) * 0.36 +
-        Math.max(0, Math.sin(elapsed * 13.7 + 0.6)) * 0.18;
-      const syntheticSpeech = currentSettings.mode === 'speaking' ? 0.24 + outputWave : 0;
-      const voiceEnergy = Math.min(1, Math.max(liveMicEnergy, syntheticSpeech));
+      const speechBase = 0.5 + Math.sin(elapsed * 3.35) * 0.5;
+      const speechAccent = Math.pow(0.5 + Math.sin(elapsed * 5.05 + 0.75) * 0.5, 2.35);
+      const speechSwell = 0.5 + Math.sin(elapsed * 1.15 - 0.4) * 0.5;
+      const syntheticSpeech =
+        currentSettings.mode === 'speaking'
+          ? 0.42 + speechBase * 0.24 + speechAccent * 0.18 + speechSwell * 0.1
+          : 0;
+      const targetVoiceEnvelope = Math.min(1, Math.max(liveMicEnergy, syntheticSpeech));
+      const envelopeEase = targetVoiceEnvelope > voiceEnvelope ? 0.14 : 0.045;
+      voiceEnvelope += (targetVoiceEnvelope - voiceEnvelope) * envelopeEase;
+      const voiceEnergy = clamp(voiceEnvelope, 0, 1);
+      const targetVoiceBeat =
+        currentSettings.mode === 'speaking' ? speechBase * 0.58 + speechAccent * 0.27 + speechSwell * 0.15 : 0;
+      const beatEase = targetVoiceBeat > voiceBeatEnvelope ? 0.11 : 0.06;
+      voiceBeatEnvelope += (targetVoiceBeat - voiceBeatEnvelope) * beatEase;
+      const voiceBeat = clamp(voiceBeatEnvelope, 0, 1);
       const palette = modePalettes[currentSettings.mode];
       lastFrameTime = frameNow;
 
@@ -314,12 +330,18 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
         const offset = index * 3;
         const seedOffset = index * SEED_STRIDE;
         const role = seeds[seedOffset + S_ROLE];
-        const shapeLight = writeTarget(index, elapsed, currentSettings, voiceEnergy);
+        const shapeLight = writeTarget(index, elapsed, currentSettings, voiceEnergy, voiceBeat);
         const lerpAmount = role === ROLE_RIBBON ? 0.095 : role === ROLE_HALO ? 0.045 : 0.07;
 
         if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
           target.set(0, 0, 0);
         }
+
+        const speechExpansion =
+          currentSettings.mode === 'speaking'
+            ? 1 + voiceEnergy * 0.075 + voiceBeat * 0.07 + pulsePower * 0.012
+            : 1 + voiceEnergy * 0.018;
+        target.multiplyScalar(speechExpansion);
 
         const pointerX = pointer.x * 4.4;
         const pointerY = pointer.y * 2.8;
@@ -369,7 +391,10 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
                 : clamp(0.16 + densityLight * 1.16, 0.06, 1.26);
         const specular = Math.pow(keyLight, 5.2) * (role === ROLE_HALO ? 0.18 : 0.62);
         const shimmer =
-          (shapeLight + Math.sin(elapsed * 1.35 + seeds[seedOffset + S_E] * TAU) * 0.045 + voiceEnergy * 0.16) *
+          (shapeLight +
+            Math.sin(elapsed * 1.05 + seeds[seedOffset + S_E] * TAU) * 0.036 +
+            voiceEnergy * 0.15 +
+            voiceBeat * 0.14) *
             frontLight *
             sphereWeight +
           specular;
@@ -383,17 +408,24 @@ export default function ParticleField({ audioLevel, settings }: ParticleFieldPro
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.color.needsUpdate = true;
 
-      points.rotation.y += delta * (0.018 + currentSettings.energy * 0.012 + voiceEnergy * 0.01);
+      points.rotation.y += delta * (0.018 + currentSettings.energy * 0.012 + voiceEnergy * 0.008 + voiceBeat * 0.006);
       points.rotation.x = Math.sin(elapsed * 0.1) * 0.028;
       points.rotation.z = Math.sin(elapsed * 0.075) * 0.012;
       pulsePower = Math.max(0, pulsePower - delta * 1.35);
 
       const baseScale = width < 720 ? 0.78 : 0.9;
-      const outputScale = currentSettings.mode === 'speaking' ? 0.025 + voiceEnergy * 0.07 : voiceEnergy * 0.018;
+      const outputScale =
+        currentSettings.mode === 'speaking'
+          ? 0.04 + voiceEnergy * 0.13 + voiceBeat * 0.085
+          : voiceEnergy * 0.018;
       points.scale.setScalar(baseScale * (1 + outputScale + pulsePower * 0.018));
 
-      const targetSize = (width < 720 ? 0.032 : 0.028) + voiceEnergy * 0.014 + pulsePower * 0.004;
-      material.size += (targetSize - material.size) * 0.08;
+      const targetSize =
+        (width < 720 ? 0.032 : 0.028) +
+        voiceEnergy * 0.016 +
+        (currentSettings.mode === 'speaking' ? voiceBeat * 0.012 : 0) +
+        pulsePower * 0.004;
+      material.size += (targetSize - material.size) * 0.1;
       const cameraX = pointer.x * 0.36;
       const cameraY = 0.08 + pointer.y * 0.18;
       const cameraZ = 9.2;
