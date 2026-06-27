@@ -6,10 +6,10 @@ type ChatResponse = {
 };
 
 const fallbackReplies = [
-  '我先占位回应：这句话后面会交给模型理解。现在我会用粒子状态表示我听到了。',
-  '模型接口还空着，但交互链路已经预留好了：语音转文字，然后把文字送去理解层。',
-  '收到。等你接模型后，这里会变成真正的上下文对话；现在先保持本地占位。',
-  '先不接模型也可以。我们把视觉和状态机打磨好，后面只换这一层回复来源。',
+  'Acknowledged. The model endpoint is still empty, so I am keeping the local dialogue loop active.',
+  'I heard you. Once the model is connected, this line will become a real contextual response.',
+  'Understood. The visual core and voice pipeline are ready; the reasoning layer can be attached next.',
+  'Message received. For now, I will answer locally and let the particle core reflect the speaking state.',
 ];
 
 function pickFallbackReply(input: string) {

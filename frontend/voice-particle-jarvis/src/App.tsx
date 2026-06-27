@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Bot, CornerDownRight, MessageCircle, Mic, MicOff, RotateCcw, Sparkles, Volume2 } from 'lucide-react';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
@@ -40,21 +40,53 @@ function selectMatureEnglishVoice() {
   );
 }
 
-function speak(text: string) {
+function primeSpeechOutput() {
   if (!('speechSynthesis' in window)) {
     return;
   }
 
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.resume();
+}
+
+function speakNow(text: string) {
   const voice = selectMatureEnglishVoice();
+  const utterance = new SpeechSynthesisUtterance(text);
 
   utterance.lang = voice?.lang ?? 'en-GB';
   utterance.rate = 0.82;
   utterance.pitch = 0.68;
   utterance.volume = 0.96;
-  utterance.voice = voice;
+
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.resume();
   window.speechSynthesis.speak(utterance);
+  window.setTimeout(() => window.speechSynthesis.resume(), 120);
+}
+
+function speak(text: string) {
+  if (!('speechSynthesis' in window)) {
+    return;
+  }
+
+  primeSpeechOutput();
+
+  if (window.speechSynthesis.getVoices().length > 0) {
+    speakNow(text);
+    return;
+  }
+
+  const speakAfterVoicesLoad = () => {
+    window.speechSynthesis.removeEventListener('voiceschanged', speakAfterVoicesLoad);
+    speakNow(text);
+  };
+
+  window.speechSynthesis.addEventListener('voiceschanged', speakAfterVoicesLoad);
+  window.setTimeout(speakAfterVoicesLoad, 700);
 }
 
 export default function App() {
@@ -113,6 +145,10 @@ export default function App() {
   const voice = useVoiceControl(submitMessage);
   const micLevel = useMicLevel();
 
+  useEffect(() => {
+    primeSpeechOutput();
+  }, []);
+
   const statusText = useMemo(() => {
     if (!voice.supported) {
       return 'Speech unavailable';
@@ -140,6 +176,7 @@ export default function App() {
       return;
     }
 
+    primeSpeechOutput();
     void submitMessage(typedMessage);
     setTypedMessage('');
   };
