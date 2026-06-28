@@ -44,6 +44,8 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 };
 
+const COMMAND_SILENCE_MS = 2800;
+
 function getSpeechRecognition() {
   if (typeof window === 'undefined') {
     return undefined;
@@ -60,6 +62,8 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const keepAliveRef = useRef(false);
   const languageRef = useRef(language);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const commandTimerRef = useRef(0);
+  const finalTranscriptRef = useRef('');
   const restartTimerRef = useRef(0);
   const sessionRef = useRef(0);
   const onCommandRef = useRef(onCommand);
@@ -81,9 +85,44 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
     }
   }, []);
 
+  const clearCommandTimer = useCallback(() => {
+    if (commandTimerRef.current) {
+      window.clearTimeout(commandTimerRef.current);
+      commandTimerRef.current = 0;
+    }
+  }, []);
+
+  const resetTranscriptState = useCallback(() => {
+    clearCommandTimer();
+    finalTranscriptRef.current = '';
+    setTranscript('');
+  }, [clearCommandTimer]);
+
+  const scheduleCommandEmit = useCallback(
+    (sessionId: number) => {
+      clearCommandTimer();
+      commandTimerRef.current = window.setTimeout(() => {
+        if (sessionId !== sessionRef.current) {
+          return;
+        }
+
+        const command = finalTranscriptRef.current.trim();
+        commandTimerRef.current = 0;
+        finalTranscriptRef.current = '';
+
+        if (command) {
+          setTranscript(command);
+          onCommandRef.current(command);
+        }
+      }, COMMAND_SILENCE_MS);
+    },
+    [clearCommandTimer],
+  );
+
   const pause = useCallback(() => {
     sessionRef.current += 1;
     clearRestartTimer();
+    clearCommandTimer();
 
     const recognition = recognitionRef.current;
     recognitionRef.current = null;
@@ -96,15 +135,15 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
     }
 
     setListening(false);
-  }, [clearRestartTimer]);
+  }, [clearCommandTimer, clearRestartTimer]);
 
   const stop = useCallback(() => {
     keepAliveRef.current = false;
     pause();
     setError('');
-    setTranscript('');
+    resetTranscriptState();
     setListening(false);
-  }, [pause]);
+  }, [pause, resetTranscriptState]);
 
   const start = useCallback(() => {
     if (!Recognition) {
@@ -186,13 +225,26 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
         }
 
         const nextTranscript = (finalText || interimText).trim();
+        const finalTextForBuffer = finalText.trim();
+        const interimTextForDisplay = interimText.trim();
 
-        if (nextTranscript) {
-          setTranscript(nextTranscript);
+        if (finalTextForBuffer) {
+          finalTranscriptRef.current = [finalTranscriptRef.current, finalTextForBuffer].filter(Boolean).join(' ');
         }
 
-        if (finalText.trim()) {
-          onCommandRef.current(finalText.trim());
+        const displayTranscript = [finalTranscriptRef.current, interimTextForDisplay].filter(Boolean).join(' ').trim();
+
+        if (displayTranscript || nextTranscript) {
+          setTranscript(displayTranscript || nextTranscript);
+        }
+
+        if (interimTextForDisplay) {
+          clearCommandTimer();
+          return;
+        }
+
+        if (finalTranscriptRef.current.trim()) {
+          scheduleCommandEmit(sessionId);
         }
       };
 
@@ -222,9 +274,10 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
     return () => {
       keepAliveRef.current = false;
       clearRestartTimer();
+      clearCommandTimer();
       recognitionRef.current?.abort();
     };
-  }, [clearRestartTimer]);
+  }, [clearCommandTimer, clearRestartTimer]);
 
   return {
     error,
