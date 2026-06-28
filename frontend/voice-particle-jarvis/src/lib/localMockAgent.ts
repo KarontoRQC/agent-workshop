@@ -52,6 +52,29 @@ const routeIntents: RouteIntent[] = [
   },
 ];
 
+const chineseIntentMatchers = [
+  {
+    labelEn: 'content generation',
+    pattern: /\u6587\u6848|\u5185\u5bb9|\u6587\u7ae0|\u5c0f\u7ea2\u4e66|\u516c\u4f17\u53f7/,
+  },
+  {
+    labelEn: 'growth and acquisition',
+    pattern: /\u83b7\u5ba2|\u6d41\u91cf|\u589e\u957f|\u5f15\u6d41/,
+  },
+  {
+    labelEn: 'sales follow-up',
+    pattern: /\u5ba2\u6237|\u9500\u552e|\u8ddf\u8fdb|\u6210\u4ea4|crm/i,
+  },
+  {
+    labelEn: 'knowledge graph navigation',
+    pattern: /\u77e5\u8bc6\u56fe\u8c31|\u56fe\u8c31|\u8def\u5f84|\u8282\u70b9|\u5173\u7cfb/,
+  },
+  {
+    labelEn: 'analysis and reporting',
+    pattern: /\u5206\u6790|\u590d\u76d8|\u603b\u7ed3|\u5468\u62a5|\u62a5\u544a/,
+  },
+];
+
 const smallTalkReplies = [
   'I am online, sir. Voice, particles, and local reasoning are all standing by.',
   'Local mode is active. I can hold a basic conversation, classify your intent, and prepare graph-control events.',
@@ -76,6 +99,11 @@ function normalize(input: string) {
 
 function findRouteIntent(input: string) {
   const normalized = normalize(input);
+  const chineseMatch = chineseIntentMatchers.find((intent) => intent.pattern.test(input));
+
+  if (chineseMatch) {
+    return routeIntents.find((intent) => intent.labelEn === chineseMatch.labelEn);
+  }
 
   return routeIntents.find((intent) => intent.keywords.some((keyword) => normalized.includes(keyword.toLowerCase())));
 }
@@ -87,6 +115,10 @@ function pickStableReply(input: string) {
 
 function wantsCapabilities(input: string) {
   const normalized = normalize(input);
+
+  if (/\u4f60\u80fd|\u53ef\u4ee5|\u600e\u4e48|\u80fd\u804a|\u804a\u5929|\u5e2e\u6211|tts/i.test(input)) {
+    return true;
+  }
 
   return [
     'what can you do',
@@ -103,6 +135,10 @@ function wantsCapabilities(input: string) {
 
 function wantsGreeting(input: string) {
   const normalized = normalize(input);
+
+  if (/\u4f60\u597d|\u5728\u5417|\u55e8|\u54c8\u55bd/.test(input)) {
+    return true;
+  }
 
   return ['hello', 'hi', 'hey', 'jarvis', '你好', '在吗'].some((keyword) => normalized.includes(keyword));
 }

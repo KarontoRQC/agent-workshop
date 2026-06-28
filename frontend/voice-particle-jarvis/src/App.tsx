@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, Mic, MicOff, Sparkles } from 'lucide-react';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
@@ -12,6 +12,13 @@ const baseSettings: ParticleSettings = {
   energy: 0.34,
   mode: 'idle',
   pulseSeed: 0,
+};
+
+const demoGraphAction: AgentAction = {
+  confidence: 1,
+  label: 'knowledge graph preview',
+  route: ['Agent Workshop', 'Knowledge Graph', 'Path selection', 'Graph controller'],
+  type: 'focus_graph_path',
 };
 
 const preferredVoiceHints = [
@@ -68,8 +75,14 @@ const wakeWords = ['jarvis', '贾维斯', '贾贾维斯', '加维斯', '甲维�
 
 type SpeechCallbacks = {
   onEnd?: () => void;
+  onError?: (reason: string) => void;
   onPulse?: () => void;
   onStart?: () => void;
+};
+
+type SpeechOutputOptions = {
+  displayText?: string;
+  resumeListening?: boolean;
 };
 
 function extractWakeCommand(raw: string) {
@@ -92,6 +105,10 @@ function extractWakeCommand(raw: string) {
 
 function wantsSleep(raw: string) {
   const lowered = raw.trim().toLowerCase();
+
+  if (/\u9000\u4e0b|\u5f85\u547d|\u505c\u6b62\u76d1\u542c|\u505c\u4e0b|\u4f11\u7720|\u5173\u95ed\u8bed\u97f3|\u4e0d\u7528\u542c/.test(raw)) {
+    return true;
+  }
 
   return ['stand by', 'sleep', 'stop listening', '退下', '待命', '停止监听', '休眠'].some((keyword) =>
     lowered.includes(keyword),
@@ -175,19 +192,46 @@ function speakNow(text: string, callbacks: SpeechCallbacks) {
     utterance.voice = voice;
   }
 
+  let resumeTimer: number | null = null;
+  const stopResumeTimer = () => {
+    if (resumeTimer !== null) {
+      window.clearInterval(resumeTimer);
+      resumeTimer = null;
+    }
+  };
+
   utterance.onstart = () => callbacks.onStart?.();
   utterance.onboundary = () => callbacks.onPulse?.();
-  utterance.onend = () => callbacks.onEnd?.();
-  utterance.onerror = () => callbacks.onEnd?.();
+  utterance.onend = () => {
+    stopResumeTimer();
+    callbacks.onEnd?.();
+  };
+  utterance.onerror = (event) => {
+    stopResumeTimer();
+    const reason = event.error || 'Speech synthesis failed.';
+    console.warn(reason);
+    callbacks.onError?.(reason);
+    callbacks.onEnd?.();
+  };
 
   window.speechSynthesis.cancel();
   window.speechSynthesis.resume();
   window.speechSynthesis.speak(utterance);
   window.setTimeout(() => window.speechSynthesis.resume(), 120);
+  resumeTimer = window.setInterval(() => {
+    if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+      stopResumeTimer();
+      return;
+    }
+
+    window.speechSynthesis.resume();
+  }, 300);
+  window.setTimeout(stopResumeTimer, 12000);
 }
 
 function speak(text: string, callbacks: SpeechCallbacks = {}) {
   if (!('speechSynthesis' in window)) {
+    callbacks.onError?.('Speech synthesis is not available in this browser.');
     return false;
   }
 
@@ -215,16 +259,22 @@ function speak(text: string, callbacks: SpeechCallbacks = {}) {
 }
 
 export default function App() {
+  const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
-  const voiceControlRef = useRef<{ pause: () => void; resume: () => void } | null>(null);
+  const speechSessionRef = useRef(0);
+  const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
+  const micLevelRef = useRef<{ stop: () => void } | null>(null);
   const lastSpeechPulseAtRef = useRef(0);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [interfaceLanguage, setInterfaceLanguage] = useState<ConversationLanguage>('zh-CN');
-  const [lastAction, setLastAction] = useState<AgentAction | null>(null);
+  const [lastAction, setLastAction] = useState<AgentAction | null>(demoGraphEnabled ? demoGraphAction : null);
   const [lastHeard, setLastHeard] = useState('');
-  const [recognitionLanguage, setRecognitionLanguage] = useState<ConversationLanguage>('zh-CN');
+  const [manualVoiceSession, setManualVoiceSession] = useState(false);
+  const recognitionLanguage: ConversationLanguage = 'zh-CN';
+  const [currentSpeechText, setCurrentSpeechText] = useState('');
+  const [speechError, setSpeechError] = useState('');
   const [voiceAwake, setVoiceAwake] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
@@ -258,21 +308,38 @@ export default function App() {
   const finishSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
     speechOutputActiveRef.current = false;
+    setCurrentSpeechText('');
     setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
   }, [clearSpeechEndTimer]);
 
   const speakWithParticleOutput = useCallback(
-    (text: string) => {
+    (text: string, options: SpeechOutputOptions = {}) => {
+      const shouldResumeListening = options.resumeListening ?? true;
+      const speechSessionId = speechSessionRef.current + 1;
+      speechSessionRef.current = speechSessionId;
+
+      setSpeechError('');
+      setCurrentSpeechText(options.displayText ?? text);
       voiceControlRef.current?.pause();
       beginSpeechOutput();
 
       const estimatedDuration = Math.min(15000, Math.max(5600, text.length * 92));
       const startedAt = performance.now();
       const settleSpeechOutput = () => {
+        if (speechSessionId !== speechSessionRef.current) {
+          return;
+        }
+
         finishSpeechOutput();
-        window.setTimeout(() => voiceControlRef.current?.resume(), 260);
+        if (shouldResumeListening) {
+          window.setTimeout(() => voiceControlRef.current?.resume(), 260);
+        }
       };
       const finishAfterMinimum = () => {
+        if (speechSessionId !== speechSessionRef.current) {
+          return;
+        }
+
         const elapsed = performance.now() - startedAt;
         const minimumVisualDuration = Math.min(estimatedDuration, 5200);
         const remaining = Math.max(0, minimumVisualDuration - elapsed);
@@ -282,8 +349,21 @@ export default function App() {
       };
       const queued = speak(text, {
         onEnd: finishAfterMinimum,
-        onPulse: pulseSpeechOutput,
-        onStart: beginSpeechOutput,
+        onError: (reason) => {
+          if (speechSessionId === speechSessionRef.current) {
+            setSpeechError(reason);
+          }
+        },
+        onPulse: () => {
+          if (speechSessionId === speechSessionRef.current) {
+            pulseSpeechOutput();
+          }
+        },
+        onStart: () => {
+          if (speechSessionId === speechSessionRef.current) {
+            beginSpeechOutput();
+          }
+        },
       });
 
       speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration : 5200);
@@ -317,7 +397,7 @@ export default function App() {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
         });
-        speakWithParticleOutput(response.text);
+        speakWithParticleOutput(response.spokenText ?? response.text, { displayText: response.text });
       } catch {
         const fallback = 'The reasoning end point is not connected yet, sir. Local operations remain online.';
         setReplySource('local-mock');
@@ -343,30 +423,35 @@ export default function App() {
       setLastHeard(text);
       const inputLanguage = detectConversationLanguage(text);
       setInterfaceLanguage(inputLanguage);
-      setRecognitionLanguage(inputLanguage);
 
-      if (voiceAwake && wantsSleep(text)) {
+      if (wantsSleep(text)) {
+        setManualVoiceSession(false);
         setVoiceAwake(false);
         setLastAction(null);
-        speakWithParticleOutput(isChineseLanguage(inputLanguage) ? '进入待命，先生。' : 'Standing by, sir.');
+        setLastHeard('');
+        voiceControlRef.current?.stop();
+        micLevelRef.current?.stop();
+        speakWithParticleOutput('Standing by, sir.', { resumeListening: false });
         return;
       }
 
       const wakeCommand = extractWakeCommand(text);
 
       if (!voiceAwake) {
-        if (!wakeCommand) {
-          return;
-        }
-
+        setManualVoiceSession(false);
         setVoiceAwake(true);
 
-        if (wakeCommand.command) {
+        if (wakeCommand?.command) {
           void submitMessage(wakeCommand.command);
           return;
         }
 
-        speakWithParticleOutput(isChineseLanguage(inputLanguage) ? '我在，先生。' : 'At your service, sir.');
+        if (!wakeCommand) {
+          void submitMessage(text);
+          return;
+        }
+
+        speakWithParticleOutput('At your service, sir.');
         return;
       }
 
@@ -376,8 +461,9 @@ export default function App() {
   );
 
   const voice = useVoiceControl(handleVoiceCommand, recognitionLanguage);
-  voiceControlRef.current = { pause: voice.pause, resume: voice.resume };
+  voiceControlRef.current = { pause: voice.pause, resume: voice.resume, stop: voice.stop };
   const micLevel = useMicLevel();
+  micLevelRef.current = { stop: micLevel.stop };
 
   useEffect(() => {
     primeSpeechOutput();
@@ -419,15 +505,61 @@ export default function App() {
     voice.start();
   }, [micLevel, voice]);
 
+  const toggleManualVoiceSession = useCallback(() => {
+    if (!voice.supported) {
+      return;
+    }
+
+    primeSpeechOutput();
+
+    if (manualVoiceSession || voiceAwake) {
+      speechSessionRef.current += 1;
+      clearSpeechEndTimer();
+      speechOutputActiveRef.current = false;
+      window.speechSynthesis?.cancel();
+      setManualVoiceSession(false);
+      setVoiceAwake(false);
+      setLastAction(null);
+      setLastHeard('');
+      setCurrentSpeechText('');
+      setSpeechError('');
+      voice.stop();
+      micLevel.stop();
+      setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+      return;
+    }
+
+    setManualVoiceSession(true);
+    setVoiceAwake(true);
+    setLastAction(null);
+    setLastHeard('');
+    setSettings((current) => ({ ...current, energy: 0.82, mode: 'listening', pulseSeed: current.pulseSeed + 1 }));
+    void micLevel.start();
+    voice.start();
+
+    speakWithParticleOutput(
+      demoGraphEnabled
+        ? 'Graph preview online, sir. Voice link is live.'
+        : 'At your service, sir. Voice mode is online.',
+    );
+  }, [clearSpeechEndTimer, demoGraphEnabled, manualVoiceSession, micLevel, speakWithParticleOutput, voice, voiceAwake]);
+
   const latestAiMessage = [...messages].reverse().find((message) => message.speaker === 'ai' && message.text !== 'Processing...');
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
+  const graphFocusKey =
+    lastAction?.type === 'focus_graph_path'
+      ? `${lastAction.label}:${lastAction.route.join('/')}:${latestAiMessage?.id ?? 0}`
+      : '';
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
         ? '思考中...'
         : 'Thinking...'
-      : latestAiMessage?.text ?? (isChineseLanguage(interfaceLanguage) ? '晚上好，先生。系统已上线。' : 'Good evening, sir. Systems are online.');
+      : settings.mode === 'speaking'
+        ? currentSpeechText
+        : '';
   const captionText =
+    speechError ||
     voice.error ||
     micLevel.error ||
     (lastAction?.type === 'focus_graph_path'
@@ -452,7 +584,7 @@ export default function App() {
 
   return (
     <main className="app-shell" onPointerDown={armVoiceSession}>
-      <ParticleField audioLevel={micLevel.level} graphRoute={graphRoute} settings={settings} />
+      <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
       <div className="scene-vignette" />
 
       <section className="dialogue-stage" aria-label="AI particle dialogue">
@@ -471,23 +603,35 @@ export default function App() {
           <span>{captionText}</span>
         </div>
 
-        <div className="core-label" aria-hidden="true">
+        <div className="core-label" aria-hidden="true" data-graph-active={graphRoute.length > 0}>
           <span>JARVIS</span>
         </div>
 
-        {graphRoute.length > 0 ? (
-          <div className="graph-label-cloud" aria-label="Selected graph path">
-            {graphRoute.map((label, index) => (
-              <span key={`${label}-${index}`}>{label}</span>
-            ))}
+        {readoutText ? (
+          <div className="voice-readout" aria-live="polite">
+            <span>{readoutText}</span>
           </div>
         ) : null}
 
-        <div className="voice-readout" aria-live="polite">
-          <span>{readoutText}</span>
+        <div className="voice-control-row">
+          <div className="voice-presence" aria-hidden="true" data-active={voice.listening} data-awake={voiceAwake} />
+          <button
+            aria-label={voiceAwake ? 'Stand down voice mode' : 'Wake voice mode'}
+            aria-pressed={voiceAwake}
+            className="voice-toggle"
+            data-active={voiceAwake}
+            disabled={!voice.supported}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleManualVoiceSession();
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            title={voiceAwake ? 'Stand down' : 'Wake voice'}
+            type="button"
+          >
+            {voiceAwake ? <MicOff size={17} /> : <Mic size={17} />}
+          </button>
         </div>
-
-        <div className="voice-presence" aria-hidden="true" data-active={voice.listening} data-awake={voiceAwake} />
       </section>
     </main>
   );

@@ -4,6 +4,7 @@ import type { DialogueMode, ParticleSettings } from '../types';
 
 type ParticleFieldProps = {
   audioLevel: number;
+  graphFocusKey?: string;
   graphRoute?: string[];
   settings: ParticleSettings;
 };
@@ -75,8 +76,9 @@ function createParticleTexture() {
   return texture;
 }
 
-export default function ParticleField({ audioLevel, graphRoute = [], settings }: ParticleFieldProps) {
+export default function ParticleField({ audioLevel, graphFocusKey = '', graphRoute = [], settings }: ParticleFieldProps) {
   const audioLevelRef = useRef(audioLevel);
+  const graphFocusKeyRef = useRef(graphFocusKey);
   const graphRouteRef = useRef(graphRoute);
   const hostRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef(settings);
@@ -88,6 +90,10 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    graphFocusKeyRef.current = graphFocusKey;
+  }, [graphFocusKey]);
 
   useEffect(() => {
     graphRouteRef.current = graphRoute;
@@ -119,10 +125,12 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
 
     const width = host.clientWidth || window.innerWidth;
     const particleCount = width < 720 ? 15000 : 25200;
+    const defaultGraphFocus = new THREE.Vector3(width < 720 ? 0.22 : 0.36, width < 720 ? 0.3 : 0.22, 0.16);
+    const graphFocus = defaultGraphFocus.clone();
+    const graphFocusTarget = defaultGraphFocus.clone();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
     const seeds = new Float32Array(particleCount * SEED_STRIDE);
-    const graphTarget = new THREE.Vector3();
     const target = new THREE.Vector3();
 
     for (let index = 0; index < particleCount; index += 1) {
@@ -154,6 +162,15 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const maxLockPoints = 6;
+    const maxLockEdges = 8;
+    const lockCandidatePoolSize = 36;
+    const lockLinePositions = new Float32Array(maxLockEdges * 6);
+    const lockLineGeometry = new THREE.BufferGeometry();
+    lockLineGeometry.setAttribute('position', new THREE.BufferAttribute(lockLinePositions, 3));
+    const lockPointPositions = new Float32Array(maxLockPoints * 3);
+    const lockPointGeometry = new THREE.BufferGeometry();
+    lockPointGeometry.setAttribute('position', new THREE.BufferAttribute(lockPointPositions, 3));
 
     const material = new THREE.PointsMaterial({
       blending: THREE.AdditiveBlending,
@@ -171,6 +188,33 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
     points.scale.setScalar(width < 720 ? 1.22 : 1.56);
     scene.add(points);
 
+    const lockLineMaterial = new THREE.LineBasicMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0x8bdcff,
+      depthTest: false,
+      depthWrite: false,
+      opacity: 0,
+      transparent: true,
+    });
+    const lockLines = new THREE.LineSegments(lockLineGeometry, lockLineMaterial);
+    lockLines.scale.copy(points.scale);
+    scene.add(lockLines);
+
+    const lockPointMaterial = new THREE.PointsMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0xdaf8ff,
+      depthTest: false,
+      depthWrite: false,
+      map: material.map,
+      opacity: 0,
+      size: width < 720 ? 0.11 : 0.096,
+      sizeAttenuation: true,
+      transparent: true,
+    });
+    const lockPoints = new THREE.Points(lockPointGeometry, lockPointMaterial);
+    lockPoints.scale.copy(points.scale);
+    scene.add(lockPoints);
+
     const pointer = new THREE.Vector2(0, 0);
     const pointerTarget = new THREE.Vector2(0, 0);
     const startTime = performance.now();
@@ -182,7 +226,189 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
     let voiceEnvelope = 0;
     let voiceBeatEnvelope = 0;
     let graphProgress = 0;
+    let lastGraphFocusKey = '';
+    let pendingGraphFocusKey = '';
     let lastPulseSeed = settingsRef.current.pulseSeed;
+    let lockedGraphNodes: { phase: number; x: number; y: number; z: number }[] = [];
+    let lockedGraphEdges: [number, number][] = [];
+    const defaultGraphDisplayCenter = new THREE.Vector3(0, width < 720 ? 0.03 : 0.06, 0.34);
+    const graphDisplayCenter = defaultGraphDisplayCenter.clone();
+    const graphDisplayCenterTarget = defaultGraphDisplayCenter.clone();
+
+    const chooseGraphFocus = () => {
+      const desiredAngle = Math.random() * TAU;
+      const desiredRadius = width < 720 ? 0.62 + Math.random() * 1.1 : 0.86 + Math.random() * 1.62;
+      const desiredX = Math.cos(desiredAngle) * desiredRadius;
+      const desiredY = Math.sin(desiredAngle) * desiredRadius * 0.74 + (Math.random() - 0.5) * (width < 720 ? 0.32 : 0.54);
+      const desiredZ = -0.38 + Math.random() * 1.05;
+      let chosenIndex = Math.floor((0.05 + Math.random() * 0.94) * particleCount);
+      let bestFocusScore = Infinity;
+
+      for (let attempt = 0; attempt < 520; attempt += 1) {
+        const candidateIndex = Math.floor((0.05 + Math.random() * 0.94) * particleCount);
+        const candidateRole = seeds[candidateIndex * SEED_STRIDE + S_ROLE];
+        const candidateOffset = candidateIndex * 3;
+        const candidateX = positions[candidateOffset];
+        const candidateY = positions[candidateOffset + 1];
+        const candidateZ = positions[candidateOffset + 2];
+        const radialDistance = Math.hypot(candidateX, candidateY);
+        const comfortablyVisible =
+          Math.abs(candidateX) < 2.28 &&
+          Math.abs(candidateY) < 1.72 &&
+          candidateZ > -0.92 &&
+          candidateZ < 0.96 &&
+          radialDistance > 0.34;
+        const canBecomeFocus = candidateRole === ROLE_SHELL || candidateRole === ROLE_RIBBON || candidateRole === ROLE_HALO;
+
+        if (canBecomeFocus && comfortablyVisible) {
+          const desiredDx = candidateX - desiredX;
+          const desiredDy = candidateY - desiredY;
+          const desiredDz = candidateZ - desiredZ;
+          const focusScore =
+            Math.sqrt(desiredDx * desiredDx + desiredDy * desiredDy * 1.2 + desiredDz * desiredDz * 0.46) +
+            seeds[candidateIndex * SEED_STRIDE + S_A] * 0.04;
+
+          if (focusScore < bestFocusScore) {
+            bestFocusScore = focusScore;
+            chosenIndex = candidateIndex;
+          }
+        }
+      }
+
+      const offset = chosenIndex * 3;
+      graphFocusTarget.set(positions[offset], positions[offset + 1], positions[offset + 2]);
+
+      if (!Number.isFinite(graphFocusTarget.x) || graphFocusTarget.lengthSq() < 0.08) {
+        graphFocusTarget.copy(defaultGraphFocus);
+      }
+
+      const focusAngle = desiredAngle + (Math.random() - 0.5) * 0.34;
+      const normalizedFocusReach = clamp(desiredRadius * 0.34, 0.24, 0.88);
+      const focusReach =
+        width < 720
+          ? clamp(normalizedFocusReach * 0.5 + Math.random() * 0.08, 0.16, 0.3)
+          : clamp(normalizedFocusReach + Math.random() * 0.18, 0.34, 0.78);
+      graphDisplayCenterTarget.set(
+        Math.cos(focusAngle) * focusReach,
+        (width < 720 ? 0.02 : 0.05) + Math.sin(focusAngle) * focusReach * 0.48 + (Math.random() - 0.5) * (width < 720 ? 0.05 : 0.11),
+        0.34 + Math.random() * 0.08,
+      );
+
+      const candidatePool: { angle: number; index: number; score: number; x: number; y: number; z: number }[] = [];
+
+      for (let index = 0; index < particleCount; index += 1) {
+        const seedOffset = index * SEED_STRIDE;
+        const offset = index * 3;
+        const x = positions[offset];
+        const y = positions[offset + 1];
+        const z = positions[offset + 2];
+        const dx = x - graphFocusTarget.x;
+        const dy = y - graphFocusTarget.y;
+        const dz = z - graphFocusTarget.z;
+        const distance = Math.sqrt(dx * dx * 1.06 + dy * dy * 1.42 + dz * dz * 0.72);
+
+        if (distance < 0.74) {
+          candidatePool.push({
+            angle: Math.atan2(dy, dx),
+            index,
+            score: distance + seeds[seedOffset + S_A] * 0.006,
+            x,
+            y,
+            z,
+          });
+        }
+      }
+
+      const nearbyCandidates = candidatePool
+        .sort((left, right) => left.score - right.score)
+        .slice(0, lockCandidatePoolSize)
+        .sort((left, right) => left.angle - right.angle);
+      const selectedCandidates: { angle: number; index: number; score: number; x: number; y: number; z: number }[] = [];
+
+      for (let sector = 0; sector < maxLockPoints; sector += 1) {
+        const sectorCenter = -Math.PI + ((sector + 0.5) / maxLockPoints) * TAU;
+        const sectorCandidate = nearbyCandidates
+          .map((candidate) => {
+            const angleDelta = Math.abs(Math.atan2(Math.sin(candidate.angle - sectorCenter), Math.cos(candidate.angle - sectorCenter)));
+
+            return { candidate, sectorScore: candidate.score + angleDelta * 0.055 };
+          })
+          .filter(({ candidate }) => !selectedCandidates.includes(candidate))
+          .sort((left, right) => left.sectorScore - right.sectorScore)[0]?.candidate;
+
+        if (sectorCandidate) {
+          selectedCandidates.push(sectorCandidate);
+        }
+      }
+
+      if (selectedCandidates.length < Math.min(maxLockPoints, nearbyCandidates.length)) {
+        nearbyCandidates.some((candidate) => {
+          if (!selectedCandidates.includes(candidate)) {
+            selectedCandidates.push(candidate);
+          }
+
+          return selectedCandidates.length >= maxLockPoints;
+        });
+      }
+
+      selectedCandidates.sort((left, right) => left.angle - right.angle);
+
+      const localGraphMagnify = width < 720 ? 8.4 : 9.8;
+      lockedGraphNodes = selectedCandidates.map((candidate) => {
+        const dx = candidate.x - graphFocusTarget.x;
+        const dy = candidate.y - graphFocusTarget.y;
+        const dz = candidate.z - graphFocusTarget.z;
+        const distance = Math.max(0.001, Math.hypot(dx, dy, dz));
+        const readableRadius = clamp(distance * localGraphMagnify, 0.2, width < 720 ? 0.48 : 0.54);
+        const depthOffset = clamp(dz * localGraphMagnify * 0.38, -0.12, 0.18);
+
+        return {
+          phase: seeds[candidate.index * SEED_STRIDE + S_E] * TAU,
+          x: Math.cos(candidate.angle) * readableRadius,
+          y: Math.sin(candidate.angle) * readableRadius * 0.76,
+          z: depthOffset,
+        };
+      });
+
+      const nextEdges: [number, number, number][] = [];
+      const addStableEdge = (fromIndex: number, toIndex: number, edgeLength: number) => {
+        if (fromIndex === toIndex) {
+          return;
+        }
+
+        const normalizedFrom = Math.min(fromIndex, toIndex);
+        const normalizedTo = Math.max(fromIndex, toIndex);
+        const exists = nextEdges.some(([left, right]) => left === normalizedFrom && right === normalizedTo);
+
+        if (!exists) {
+          nextEdges.push([normalizedFrom, normalizedTo, edgeLength]);
+        }
+      };
+
+      for (let pointIndex = 0; pointIndex < lockedGraphNodes.length; pointIndex += 1) {
+        const nextIndex = (pointIndex + 1) % lockedGraphNodes.length;
+        const from = lockedGraphNodes[pointIndex];
+        const to = lockedGraphNodes[nextIndex];
+        addStableEdge(pointIndex, nextIndex, Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z));
+      }
+
+      for (let fromIndex = 0; fromIndex < lockedGraphNodes.length; fromIndex += 1) {
+        for (let toIndex = fromIndex + 1; toIndex < lockedGraphNodes.length; toIndex += 1) {
+          const from = lockedGraphNodes[fromIndex];
+          const to = lockedGraphNodes[toIndex];
+          const edgeLength = Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z);
+
+          if (edgeLength < (width < 720 ? 0.52 : 0.62)) {
+            addStableEdge(fromIndex, toIndex, edgeLength);
+          }
+        }
+      }
+
+      lockedGraphEdges = nextEdges
+        .sort((left, right) => left[2] - right[2])
+        .slice(0, maxLockEdges)
+        .map(([fromIndex, toIndex]) => [fromIndex, toIndex]);
+    };
 
     const resize = () => {
       const nextWidth = Math.max(1, host.clientWidth || window.innerWidth);
@@ -505,75 +731,6 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
       return 0.18 + facetDepth * 0.42 + apexLight + innerRidge + facetPulse * 0.44 + voiceEnergy * 0.07 + voiceBeat * 0.13;
     };
 
-    const writeGraphTarget = (index: number, time: number, routeLength: number, voiceEnergy: number, voiceBeat: number) => {
-      const seedOffset = index * SEED_STRIDE;
-      const allocation = seeds[seedOffset + S_A];
-      const nodeCount = clamp(routeLength || 4, 3, 6);
-      const phase = seeds[seedOffset + S_E] * TAU;
-
-      if (allocation < 0.34) {
-        graphTarget.copy(target);
-        graphTarget.multiplyScalar(0.36 + seeds[seedOffset + S_SHADE] * 0.04);
-        graphTarget.x -= 2.34;
-        graphTarget.y += 0.72;
-        graphTarget.z -= 0.18;
-        return 0.12 + voiceEnergy * 0.1;
-      }
-
-      if (allocation < 0.62) {
-        const nodeIndex = Math.min(nodeCount - 1, Math.floor(seeds[seedOffset + S_B] * nodeCount));
-        const nodeT = nodeCount <= 1 ? 0 : nodeIndex / (nodeCount - 1);
-        const theta = seeds[seedOffset + S_C] * TAU + time * (0.22 + nodeIndex * 0.018);
-        const latitude = Math.asin(clamp(seeds[seedOffset + S_D] * 2 - 1, -0.86, 0.86));
-        const nodePulse =
-          Math.pow(Math.max(0, Math.sin(time * (1.1 + voiceBeat) + nodeIndex * 1.7 + phase)), 4.4) *
-          (0.04 + voiceEnergy * 0.08);
-        const radius = 0.12 + seeds[seedOffset + S_WIDTH] * 0.16 + nodePulse;
-        const centerX = -0.08 + nodeT * 2.92;
-        const centerY = 0.82 - nodeT * 1.5 + Math.sin(nodeIndex * 1.62) * 0.22;
-        const centerZ = -0.08 + Math.cos(nodeIndex * 1.37) * 0.22;
-
-        sphericalToPoint(theta, latitude, radius, graphTarget);
-        graphTarget.x += centerX;
-        graphTarget.y += centerY;
-        graphTarget.z += centerZ;
-        return 0.22 + nodePulse * 2.6 + voiceBeat * 0.12;
-      }
-
-      if (allocation < 0.86) {
-        const edgeCount = Math.max(1, nodeCount - 1);
-        const edgeIndex = Math.min(edgeCount - 1, Math.floor(seeds[seedOffset + S_B] * edgeCount));
-        const edgeT = edgeCount <= 1 ? 0 : edgeIndex / edgeCount;
-        const nextT = edgeCount <= 1 ? 1 : (edgeIndex + 1) / edgeCount;
-        const flow = (seeds[seedOffset + S_C] + time * (0.09 + seeds[seedOffset + S_FLOW] * 0.035 + voiceBeat * 0.06)) % 1;
-        const ax = -0.08 + edgeT * 2.92;
-        const ay = 0.82 - edgeT * 1.5 + Math.sin(edgeIndex * 1.62) * 0.22;
-        const az = -0.08 + Math.cos(edgeIndex * 1.37) * 0.22;
-        const bx = -0.08 + nextT * 2.92;
-        const by = 0.82 - nextT * 1.5 + Math.sin((edgeIndex + 1) * 1.62) * 0.22;
-        const bz = -0.08 + Math.cos((edgeIndex + 1) * 1.37) * 0.22;
-        const curve = Math.sin(flow * Math.PI);
-        const streamPulse = Math.pow(Math.max(0, Math.sin(flow * TAU * 2.6 - time * 2.8 + phase)), 5.2);
-
-        graphTarget.set(
-          ax + (bx - ax) * flow + seeds[seedOffset + S_WIDTH] * 0.18,
-          ay + (by - ay) * flow + curve * (0.18 + edgeIndex * 0.015),
-          az + (bz - az) * flow + Math.sin(flow * Math.PI + phase) * 0.08 + streamPulse * 0.08,
-        );
-        return 0.1 + streamPulse * 1.25 + voiceBeat * 0.16;
-      }
-
-      const column = Math.floor(seeds[seedOffset + S_B] * 18);
-      const row = Math.floor(seeds[seedOffset + S_C] * 9);
-      const flicker = Math.pow(Math.max(0, Math.sin(time * 1.3 + column * 0.7 + row * 0.9 + phase)), 6);
-      graphTarget.set(
-        0.2 + column * 0.16 + seeds[seedOffset + S_WIDTH] * 0.18,
-        1.12 - row * 0.24 + seeds[seedOffset + S_E] * 0.04,
-        -0.72 + flicker * 0.12,
-      );
-      return 0.025 + flicker * 0.26 + voiceEnergy * 0.04;
-    };
-
     const animate = () => {
       const currentSettings = settingsRef.current;
       const frameNow = performance.now();
@@ -601,11 +758,40 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
       pointerCharge += (pointerTargetEnergy - pointerCharge) * 0.08;
       pointer.x += (pointerTarget.x - pointer.x) * 0.1;
       pointer.y += (pointerTarget.y - pointer.y) * 0.1;
-      const graphRouteLength = graphRouteRef.current.length;
-      const graphTargetProgress = graphRouteLength > 0 ? 1 : 0;
-      graphProgress += (graphTargetProgress - graphProgress) * (graphTargetProgress > graphProgress ? 0.025 : 0.04);
+      const graphTargetProgress = graphRouteRef.current.length > 0 ? 1 : 0;
+      graphProgress += (graphTargetProgress - graphProgress) * (graphTargetProgress > graphProgress ? 0.036 : 0.045);
       const graphBlend = smoothstep(0, 1, graphProgress);
+      const galaxyTravel = smoothstep(0.02, 0.58, graphProgress);
+      const solarReveal = smoothstep(0.38, 0.78, graphProgress);
+      const earthLock = smoothstep(0.72, 0.96, graphProgress);
+      const deepCollapse = smoothstep(0.84, 0.995, graphProgress);
+      const activeGraphFocusKey =
+        graphTargetProgress > 0 ? graphFocusKeyRef.current || graphRouteRef.current.join(' / ') : '';
       lastFrameTime = frameNow;
+
+      if (activeGraphFocusKey && activeGraphFocusKey !== lastGraphFocusKey) {
+        lastGraphFocusKey = activeGraphFocusKey;
+        pendingGraphFocusKey = activeGraphFocusKey;
+        lockedGraphNodes = [];
+        lockedGraphEdges = [];
+      }
+
+      if (!activeGraphFocusKey) {
+        lastGraphFocusKey = '';
+        pendingGraphFocusKey = '';
+        graphFocusTarget.copy(defaultGraphFocus);
+        graphDisplayCenterTarget.copy(defaultGraphDisplayCenter);
+        lockedGraphNodes = [];
+        lockedGraphEdges = [];
+      }
+
+      if (pendingGraphFocusKey && graphProgress > 0.34) {
+        chooseGraphFocus();
+        pendingGraphFocusKey = '';
+      }
+
+      graphFocus.lerp(graphTargetProgress > 0 ? graphFocusTarget : defaultGraphFocus, graphTargetProgress > 0 ? 0.055 : 0.035);
+      graphDisplayCenter.lerp(graphTargetProgress > 0 ? graphDisplayCenterTarget : defaultGraphDisplayCenter, 0.055);
 
       if (lastPulseSeed !== currentSettings.pulseSeed) {
         lastPulseSeed = currentSettings.pulseSeed;
@@ -623,11 +809,22 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
           target.set(0, 0, 0);
         }
 
-        if (graphBlend > 0.001) {
-          const graphLight = writeGraphTarget(index, elapsed, graphRouteLength, voiceEnergy, voiceBeat);
-          target.lerp(graphTarget, graphBlend);
-          shapeLight = shapeLight * (1 - graphBlend * 0.58) + graphLight * graphBlend;
-        }
+        const focusDx = target.x - graphFocus.x;
+        const focusDy = target.y - graphFocus.y;
+        const focusDz = target.z - graphFocus.z;
+        const focusDistance = Math.sqrt(focusDx * focusDx * 1.06 + focusDy * focusDy * 1.42 + focusDz * focusDz * 0.72);
+        const focusWeight = Math.exp(-focusDistance * focusDistance);
+        const focusCore = Math.exp(-focusDistance * focusDistance * 4.8);
+        const focusNeedle = Math.exp(-focusDistance * focusDistance * 12);
+        const solarBand = Math.pow(Math.max(0, Math.cos(focusDistance * 8.2 - elapsed * 0.42 + seeds[seedOffset + S_E] * TAU)), 5.4);
+        const travelSpark = Math.pow(Math.max(0, Math.sin(focusDistance * 9.5 - elapsed * 2.2 + seeds[seedOffset + S_A] * TAU)), 6);
+        const localLock = earthLock * smoothstep(0.18, 0.82, focusCore);
+        shapeLight +=
+          focusWeight * galaxyTravel * (0.46 + voiceEnergy * 0.16) +
+          solarBand * solarReveal * focusCore * 0.82 +
+          travelSpark * galaxyTravel * smoothstep(1.6, 0.22, focusDistance) * 0.32 +
+          focusNeedle * earthLock * (1.2 + voiceEnergy * 0.12) +
+          localLock * (1.1 + voiceBeat * 0.22);
 
         const speechExpansion =
           currentSettings.mode === 'speaking'
@@ -732,11 +929,55 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
           specular;
         const baseGlow = role === ROLE_CORE ? 0.08 : role === ROLE_HALO ? 0.044 : 0.026;
 
-        colors[offset] = color.r * (shimmer + baseGlow);
-        colors[offset + 1] = color.g * (shimmer + baseGlow);
-        colors[offset + 2] = color.b * (shimmer + baseGlow);
+        const finalVisibility =
+          (1 - earthLock * 0.66) * (1 - deepCollapse * 0.72) +
+          earthLock * focusWeight * 0.16 * (1 - deepCollapse) +
+          deepCollapse * (focusNeedle * 0.24 + localLock * 0.42) +
+          solarBand * solarReveal * focusCore * 0.16;
+        const finalGlow = (shimmer + baseGlow) * clamp(finalVisibility, 0.012 + 0.04 * (1 - deepCollapse), 3.8);
+        colors[offset] = color.r * finalGlow;
+        colors[offset + 1] = color.g * finalGlow;
+        colors[offset + 2] = color.b * finalGlow;
       }
 
+      lockLinePositions.fill(0);
+      lockPointPositions.fill(0);
+      const lockedCount = lockedGraphNodes.length;
+      const localGraphReveal = smoothstep(0.68, 0.95, graphProgress);
+      const lineAlpha = localGraphReveal * smoothstep(2, maxLockPoints, lockedCount);
+      const projectedLockPoints = lockedGraphNodes.map((node) => ({
+        x: graphDisplayCenter.x + node.x,
+        y: graphDisplayCenter.y + node.y,
+        z: graphDisplayCenter.z + deepCollapse * 0.12 + node.z,
+      }));
+
+      projectedLockPoints.forEach((candidate, pointIndex) => {
+        const pointOffset = pointIndex * 3;
+        lockPointPositions[pointOffset] = candidate.x;
+        lockPointPositions[pointOffset + 1] = candidate.y;
+        lockPointPositions[pointOffset + 2] = candidate.z;
+      });
+
+      lockedGraphEdges.forEach(([fromIndex, toIndex], edgeIndex) => {
+        if (edgeIndex >= maxLockEdges || fromIndex >= lockedCount || toIndex >= lockedCount) {
+          return;
+        }
+
+          const from = projectedLockPoints[fromIndex];
+          const to = projectedLockPoints[toIndex];
+          const lineOffset = edgeIndex * 6;
+          lockLinePositions[lineOffset] = from.x;
+          lockLinePositions[lineOffset + 1] = from.y;
+          lockLinePositions[lineOffset + 2] = from.z;
+          lockLinePositions[lineOffset + 3] = to.x;
+          lockLinePositions[lineOffset + 4] = to.y;
+          lockLinePositions[lineOffset + 5] = to.z;
+      });
+
+      lockLineGeometry.attributes.position.needsUpdate = true;
+      lockPointGeometry.attributes.position.needsUpdate = true;
+      lockLineMaterial.opacity += (lineAlpha * 0.78 - lockLineMaterial.opacity) * 0.08;
+      lockPointMaterial.opacity += (lineAlpha * 1 - lockPointMaterial.opacity) * 0.1;
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.color.needsUpdate = true;
 
@@ -747,15 +988,21 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
       pulsePower = Math.max(0, pulsePower - delta * 1.35);
 
       const coreScale = width < 720 ? 1.22 : 1.56;
-      const graphScale = width < 720 ? 1.1 : 1.28;
+      const graphScale = width < 720 ? 2.35 : 2.92;
       const baseScale = coreScale + (graphScale - coreScale) * graphBlend;
       const outputScale =
         currentSettings.mode === 'speaking'
           ? 0.03 + voiceEnergy * 0.075 + voiceBeat * 0.04
           : voiceEnergy * 0.018;
       points.scale.setScalar(baseScale * (1 + outputScale + pulsePower * 0.018));
-      const sceneLift = (width < 720 ? 0.62 : 0.42) + graphBlend * (width < 720 ? -0.02 : 0.08);
+      const focusLayerScale = width < 720 ? 1.38 : 1.54;
+      lockLines.scale.setScalar(focusLayerScale);
+      lockPoints.scale.setScalar(focusLayerScale);
+      const sceneLift = (width < 720 ? 0.62 : 0.42) + graphBlend * (width < 720 ? 0.08 : 0.12);
       points.position.y += (sceneLift - points.position.y) * 0.08;
+      const graphLayerY = width < 720 ? 0.02 : 0.03;
+      lockLines.position.y += (graphLayerY - lockLines.position.y) * 0.12;
+      lockPoints.position.y = lockLines.position.y;
 
       const targetSize =
         (width < 720 ? 0.032 : 0.028) +
@@ -763,17 +1010,24 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
         (currentSettings.mode === 'speaking' ? voiceBeat * 0.012 : 0) +
         pulsePower * 0.004;
       material.size += (targetSize - material.size) * 0.1;
-      const cameraX = pointer.x * 0.36 + graphBlend * (width < 720 ? 0.28 : 0.68);
-      const cameraY = 0.08 + pointer.y * 0.18 + graphBlend * 0.04;
-      const cameraZ = 6.72 + graphBlend * (width < 720 ? -0.28 : -0.6);
+      const lockPointTargetSize = (width < 720 ? 0.11 : 0.096) + localGraphReveal * (width < 720 ? 0.07 : 0.058);
+      lockPointMaterial.size += (lockPointTargetSize - lockPointMaterial.size) * 0.12;
+      const cameraGraphDrift = graphBlend * (1 - localGraphReveal * 0.94);
+      const cameraX = pointer.x * 0.28 + cameraGraphDrift * graphFocus.x * 0.16;
+      const cameraY = 0.08 + pointer.y * 0.14 + cameraGraphDrift * graphFocus.y * 0.18;
+      const cameraZ =
+        6.72 + cameraGraphDrift * (width < 720 ? -1.36 : -1.72) + deepCollapse * (1 - localGraphReveal) * (width < 720 ? -0.22 : -0.28);
+      const lookAtX = graphFocus.x * cameraGraphDrift * 0.16;
+      const lookAtY = graphFocus.y * cameraGraphDrift * 0.18;
+      const lookAtZ = graphFocus.z * cameraGraphDrift * 0.12;
 
-      camera.fov += ((48 - graphBlend * 5) - camera.fov) * 0.04;
+      camera.fov += ((48 - cameraGraphDrift * 10 - deepCollapse * (1 - localGraphReveal) * 3) - camera.fov) * 0.04;
       camera.updateProjectionMatrix();
 
       camera.position.x += (cameraX - camera.position.x) * 0.04;
       camera.position.y += (cameraY - camera.position.y) * 0.04;
       camera.position.z += (cameraZ - camera.position.z) * 0.04;
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(lookAtX, lookAtY, lookAtZ);
       renderer.render(scene, camera);
       animationId = requestAnimationFrame(animate);
     };
@@ -793,8 +1047,12 @@ export default function ParticleField({ audioLevel, graphRoute = [], settings }:
       host.removeEventListener('pointerdown', triggerPulse);
       host.removeEventListener('pointerleave', clearPointer);
       geometry.dispose();
+      lockLineGeometry.dispose();
+      lockPointGeometry.dispose();
       material.map?.dispose();
       material.dispose();
+      lockLineMaterial.dispose();
+      lockPointMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

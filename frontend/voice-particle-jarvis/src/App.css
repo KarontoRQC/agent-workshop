@@ -119,6 +119,10 @@ h1 {
     0 0 8px rgba(255, 255, 255, 0.78),
     0 0 30px rgba(92, 160, 255, 0.9);
   transform: translate(-50%, -50%);
+  transition:
+    opacity 420ms ease,
+    transform 520ms ease,
+    filter 520ms ease;
 }
 
 .core-label span {
@@ -126,6 +130,12 @@ h1 {
   font-size: clamp(24px, 4.6vw, 42px);
   font-weight: 790;
   line-height: 1;
+}
+
+.core-label[data-graph-active='true'] {
+  opacity: 0.16;
+  transform: translate(-50%, -50%) scale(0.86);
+  filter: blur(0.6px);
 }
 
 .graph-label-cloud {
@@ -206,8 +216,16 @@ h1 {
   line-height: 1.42;
 }
 
-.voice-presence {
+.voice-control-row {
   align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.voice-presence {
   width: 82px;
   height: 3px;
   border-radius: 999px;
@@ -235,6 +253,58 @@ h1 {
     0 0 56px rgba(120, 239, 255, 0.22);
   opacity: 0.92;
   transform: scaleX(1.28);
+}
+
+.voice-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(183, 220, 255, 0.18);
+  border-radius: 8px;
+  color: rgba(231, 246, 255, 0.82);
+  background: rgba(5, 13, 36, 0.2);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.22),
+    inset 0 0 18px rgba(120, 239, 255, 0.035);
+  backdrop-filter: blur(16px);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.voice-toggle:hover,
+.voice-toggle:focus-visible {
+  border-color: rgba(183, 220, 255, 0.38);
+  color: #ffffff;
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.26),
+    0 0 28px rgba(80, 168, 255, 0.2),
+    inset 0 0 18px rgba(120, 239, 255, 0.06);
+}
+
+.voice-toggle:active {
+  transform: scale(0.96);
+}
+
+.voice-toggle[data-active="true"] {
+  border-color: rgba(255, 255, 255, 0.46);
+  color: #ffffff;
+  background: rgba(15, 46, 98, 0.38);
+  box-shadow:
+    0 0 28px rgba(80, 168, 255, 0.34),
+    0 0 56px rgba(120, 239, 255, 0.16),
+    inset 0 0 20px rgba(120, 239, 255, 0.08);
+}
+
+.voice-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.34;
 }
 
 @media (prefers-reduced-motion: reduce) {

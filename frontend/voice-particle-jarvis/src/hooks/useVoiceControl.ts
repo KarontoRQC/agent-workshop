@@ -61,6 +61,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const languageRef = useRef(language);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const restartTimerRef = useRef(0);
+  const sessionRef = useRef(0);
   const onCommandRef = useRef(onCommand);
   const Recognition = useMemo(getSpeechRecognition, []);
   const supported = Boolean(Recognition);
@@ -81,6 +82,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   }, []);
 
   const pause = useCallback(() => {
+    sessionRef.current += 1;
     clearRestartTimer();
 
     const recognition = recognitionRef.current;
@@ -99,6 +101,8 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const stop = useCallback(() => {
     keepAliveRef.current = false;
     pause();
+    setError('');
+    setTranscript('');
     setListening(false);
   }, [pause]);
 
@@ -115,8 +119,11 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
       return;
     }
 
+    const sessionId = sessionRef.current + 1;
+    sessionRef.current = sessionId;
+
     const beginRecognition = () => {
-      if (!keepAliveRef.current || recognitionRef.current) {
+      if (sessionId !== sessionRef.current || !keepAliveRef.current || recognitionRef.current) {
         return;
       }
 
@@ -127,11 +134,19 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        if (sessionId !== sessionRef.current || recognitionRef.current !== recognition) {
+          return;
+        }
+
         setError('');
         setListening(true);
       };
 
       recognition.onend = () => {
+        if (sessionId !== sessionRef.current || recognitionRef.current !== recognition) {
+          return;
+        }
+
         recognitionRef.current = null;
         setListening(false);
 
@@ -141,6 +156,10 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
       };
 
       recognition.onerror = (event) => {
+        if (sessionId !== sessionRef.current || recognitionRef.current !== recognition) {
+          return;
+        }
+
         if (event.error !== 'no-speech') {
           setError(event.error);
         }
@@ -148,6 +167,10 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
       };
 
       recognition.onresult = (event) => {
+        if (sessionId !== sessionRef.current || recognitionRef.current !== recognition) {
+          return;
+        }
+
         let finalText = '';
         let interimText = '';
 
@@ -177,6 +200,10 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
         recognitionRef.current = recognition;
         recognition.start();
       } catch (startError) {
+        if (sessionId !== sessionRef.current) {
+          return;
+        }
+
         recognitionRef.current = null;
         const message = startError instanceof Error ? startError.message : 'Speech start failed';
         setError(message);

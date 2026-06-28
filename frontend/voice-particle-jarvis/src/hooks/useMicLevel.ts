@@ -7,10 +7,13 @@ export function useMicLevel() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+  const sessionRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef(0);
 
   const stop = useCallback(() => {
+    sessionRef.current += 1;
+
     if (frameRef.current) {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = 0;
@@ -24,6 +27,7 @@ export function useMicLevel() {
     analyserRef.current = null;
     dataRef.current = null;
     setActive(false);
+    setError('');
     setLevel(0);
   }, []);
 
@@ -34,6 +38,8 @@ export function useMicLevel() {
     }
 
     stop();
+    const sessionId = sessionRef.current + 1;
+    sessionRef.current = sessionId;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -42,6 +48,12 @@ export function useMicLevel() {
           noiseSuppression: true,
         },
       });
+
+      if (sessionId !== sessionRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       const AudioContextCtor = window.AudioContext;
       const audioContext = new AudioContextCtor();
       const analyser = audioContext.createAnalyser();
@@ -59,6 +71,10 @@ export function useMicLevel() {
       setActive(true);
 
       const tick = () => {
+        if (sessionId !== sessionRef.current) {
+          return;
+        }
+
         const currentAnalyser = analyserRef.current;
         const data = dataRef.current;
 
@@ -82,6 +98,10 @@ export function useMicLevel() {
 
       tick();
     } catch {
+      if (sessionId !== sessionRef.current) {
+        return;
+      }
+
       setError('Microphone permission needed');
       setActive(false);
       setLevel(0);
