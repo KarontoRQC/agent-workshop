@@ -11,13 +11,14 @@ const DRAW_SLOT_COUNT = 3;
 type AgentDrawOverlayProps = {
   active: boolean;
   agents: RecommendedAgent[];
+  onSettled?: () => void;
   pulseKey: number;
   replyText: string;
 };
 
 type DrawPhase = 'hidden' | 'active' | 'settled' | 'closing';
 
-export default function AgentDrawOverlay({ active, agents, pulseKey, replyText }: AgentDrawOverlayProps) {
+export default function AgentDrawOverlay({ active, agents, onSettled, pulseKey, replyText }: AgentDrawOverlayProps) {
   const [phase, setPhase] = useState<DrawPhase>('hidden');
   const [visibleAgents, setVisibleAgents] = useState<RecommendedAgent[]>([]);
   const shownAtRef = useRef(0);
@@ -46,7 +47,7 @@ export default function AgentDrawOverlay({ active, agents, pulseKey, replyText }
   }, [cards, phase]);
   const launchTargets = useMemo(() => getAgentLaunchTargets(enrichedAgents), [enrichedAgents]);
   const resultCount = enrichedAgents.length;
-  const hasVisibleResult = resultCount > 0;
+  const hasVisibleResult = resultCount > 0 || cards.length > 0;
   const canOpenLaunchTargets = phase === 'settled' && launchTargets.length > 0;
   const compactReplyText = compactText(replyText);
   const showReplyText = phase === 'settled' && compactReplyText;
@@ -93,6 +94,7 @@ export default function AgentDrawOverlay({ active, agents, pulseKey, replyText }
     closeTimerRef.current = window.setTimeout(() => {
       if (hasVisibleResult) {
         setPhase('settled');
+        onSettled?.();
 
         return;
       }
@@ -104,11 +106,12 @@ export default function AgentDrawOverlay({ active, agents, pulseKey, replyText }
         setPhase('hidden');
       }, EXIT_MS);
     }, settleDelay);
-  }, [active, hasVisibleResult, phase]);
+  }, [active, hasVisibleResult, onSettled, phase]);
 
   function handleClose() {
     clearTimer(closeTimerRef);
     clearTimer(hideTimerRef);
+    onSettled?.();
     setPhase('closing');
     hideTimerRef.current = window.setTimeout(() => {
       shownAtRef.current = 0;

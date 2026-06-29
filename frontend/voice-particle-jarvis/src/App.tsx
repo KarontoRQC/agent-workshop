@@ -4,7 +4,7 @@ import AgentDrawOverlay from './components/AgentDrawOverlay';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
-import { streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
+import { API_BASE_URL, streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
 import { enrichDrawAgent, getAgentLaunchTargets, type AgentLaunchTarget } from './lib/agentLaunchCatalog';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
@@ -73,6 +73,7 @@ const matureMaleVoiceHints = [
 ];
 
 const avoidedVoiceHints = ['zira', 'hazel', 'susan', 'zira desktop', 'female', 'aria', 'jenny', 'emma', 'samantha'];
+const TTS_SPEECH_URL = `${API_BASE_URL}/tts/speech`;
 const preferredChineseVoiceHints = [
   'microsoft yunyang',
   'microsoft yunjian',
@@ -85,6 +86,18 @@ const preferredChineseVoiceHints = [
   'chinese',
 ];
 const wakeWords = ['jarvis', '贾维斯', '贾贾维斯', '加维斯', '甲维斯', '嘉维斯'];
+const knowledgeGraphTextTypes = ['THINKING_PROCESS', 'ACK', 'DIRECT_REPLY', 'KG_PATH', 'EXPLANATION'] as const;
+const agentRecommendationTextTypes = ['THINKING_PROCESS', 'ACK', 'SUMMARY'] as const;
+const PATH_MATCH_ANIMATION_MS = 3600;
+const CARD_DRAW_ACTIVE_MS = 3200;
+const SPEECH_SEGMENT_WAIT_MS = 45000;
+
+type SpeechSegmentKey = 'knowledgeAck' | 'knowledgeExplanation' | 'recommendationAck' | 'recommendationSummary';
+
+type PreloadedSpeechAsset = {
+  audioPromise: Promise<Blob>;
+  text: string;
+};
 
 type SpeechCallbacks = {
   onEnd?: () => void;
@@ -94,7 +107,10 @@ type SpeechCallbacks = {
 };
 
 type SpeechOutputOptions = {
+  audioBlob?: Blob;
   displayText?: string;
+  minimumVisualDurationMs?: number;
+  onSettled?: () => void;
   resumeListening?: boolean;
 };
 
@@ -197,6 +213,111 @@ function primeSpeechOutput() {
   window.speechSynthesis.resume();
 }
 
+let activeSpeechAudio: HTMLAudioElement | null = null;
+let activeSpeechObjectUrl = '';
+
+function cancelSpeechPlayback() {
+  if (activeSpeechAudio) {
+    activeSpeechAudio.pause();
+    activeSpeechAudio.removeAttribute('src');
+    activeSpeechAudio.load();
+    activeSpeechAudio = null;
+  }
+
+  if (activeSpeechObjectUrl) {
+    URL.revokeObjectURL(activeSpeechObjectUrl);
+    activeSpeechObjectUrl = '';
+  }
+}
+
+async function requestTtsAudio(text: string) {
+  const response = await fetch(TTS_SPEECH_URL, {
+    body: JSON.stringify({ mood: 'neutral', text }),
+    headers: {
+      'content-type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(await formatTtsResponseError(response));
+  }
+
+  const audio = await response.blob();
+
+  if (!audio.size) {
+    throw new Error('TTS interface returned empty audio.');
+  }
+
+  return audio;
+}
+
+async function formatTtsResponseError(response: Response) {
+  const payload = await response.json().catch(() => null);
+
+  if (typeof payload?.detail === 'string') {
+    return payload.detail;
+  }
+
+  if (typeof payload?.error === 'string') {
+    return payload.error;
+  }
+
+  return `TTS interface failed: ${response.status}`;
+}
+
+async function playTtsSpeech(text: string, callbacks: SpeechCallbacks, preparedAudio?: Blob) {
+  cancelSpeechPlayback();
+
+  let pulseTimer: number | null = null;
+  let started = false;
+  const clearPulseTimer = () => {
+    if (pulseTimer !== null) {
+      window.clearInterval(pulseTimer);
+      pulseTimer = null;
+    }
+  };
+  const finish = () => {
+    clearPulseTimer();
+    cancelSpeechPlayback();
+    callbacks.onEnd?.();
+  };
+
+  try {
+    const audioBlob = preparedAudio || (await requestTtsAudio(text));
+    const objectUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(objectUrl);
+
+    activeSpeechAudio = audio;
+    activeSpeechObjectUrl = objectUrl;
+    audio.preload = 'auto';
+    audio.onplaying = () => {
+      if (started) {
+        return;
+      }
+
+      started = true;
+      callbacks.onStart?.();
+      callbacks.onPulse?.();
+      pulseTimer = window.setInterval(() => callbacks.onPulse?.(), 360);
+    };
+    audio.onended = finish;
+    audio.onerror = () => {
+      clearPulseTimer();
+      cancelSpeechPlayback();
+      callbacks.onError?.('TTS audio playback failed.');
+      callbacks.onEnd?.();
+    };
+
+    await audio.play();
+  } catch (error) {
+    clearPulseTimer();
+    cancelSpeechPlayback();
+    callbacks.onError?.(error instanceof Error ? error.message : 'TTS interface failed.');
+    callbacks.onEnd?.();
+  }
+}
+
 function speakNow(text: string, callbacks: SpeechCallbacks) {
   const language = detectConversationLanguage(text);
   const voice = selectVoiceForLanguage(language);
@@ -248,7 +369,12 @@ function speakNow(text: string, callbacks: SpeechCallbacks) {
   window.setTimeout(stopResumeTimer, 12000);
 }
 
-function speak(text: string, callbacks: SpeechCallbacks = {}) {
+function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Blob) {
+  if (import.meta.env.VITE_TTS_BROWSER_FALLBACK !== '1') {
+    void playTtsSpeech(polishSpokenLine(text), callbacks, preparedAudio);
+    return true;
+  }
+
   if (!('speechSynthesis' in window)) {
     callbacks.onError?.('Speech synthesis is not available in this browser.');
     return false;
@@ -311,12 +437,12 @@ function createAgentTurn(id: string, user: string): AgentTurn {
 function getWorkflowSection(event: AgentStreamEvent): keyof AgentWorkflow | null {
   if (
     event.stage === 'knowledge_graph' &&
-    ['THINKING_PROCESS', 'ACK', 'DIRECT_REPLY', 'KG_PATH', 'EXPLANATION'].includes(event.type || '')
+    (knowledgeGraphTextTypes as readonly string[]).includes(event.type || '')
   ) {
     return 'knowledgeGraph';
   }
 
-  if (event.stage === 'agent_recommendation' && ['THINKING_PROCESS', 'ACK', 'SUMMARY'].includes(event.type || '')) {
+  if (event.stage === 'agent_recommendation' && (agentRecommendationTextTypes as readonly string[]).includes(event.type || '')) {
     return 'agentRecommendation';
   }
 
@@ -329,7 +455,7 @@ function appendWorkflowContent(workflow: AgentWorkflow, section: keyof AgentWork
   }
 
   if (section === 'knowledgeGraph') {
-    if (!['THINKING_PROCESS', 'ACK', 'DIRECT_REPLY', 'KG_PATH', 'EXPLANATION'].includes(type)) {
+    if (!(knowledgeGraphTextTypes as readonly string[]).includes(type)) {
       return workflow;
     }
 
@@ -342,7 +468,7 @@ function appendWorkflowContent(workflow: AgentWorkflow, section: keyof AgentWork
     };
   }
 
-  if (!['THINKING_PROCESS', 'ACK', 'SUMMARY'].includes(type)) {
+  if (!(agentRecommendationTextTypes as readonly string[]).includes(type)) {
     return workflow;
   }
 
@@ -493,6 +619,74 @@ function buildAgentReplyText(workflow: AgentWorkflow, fallbackText = '') {
   ).trim();
 }
 
+function getCompletedSpeechSegment(event: AgentStreamEvent): SpeechSegmentKey | null {
+  if (event.event !== 'content.completed') {
+    return null;
+  }
+
+  if (event.stage === 'knowledge_graph' && event.type === 'ACK') {
+    return 'knowledgeAck';
+  }
+
+  if (event.stage === 'knowledge_graph' && event.type === 'EXPLANATION') {
+    return 'knowledgeExplanation';
+  }
+
+  if (event.stage === 'agent_recommendation' && event.type === 'ACK') {
+    return 'recommendationAck';
+  }
+
+  if (event.stage === 'agent_recommendation' && event.type === 'SUMMARY') {
+    return 'recommendationSummary';
+  }
+
+  return null;
+}
+
+function getSpeechTextForSegment(workflow: AgentWorkflow, segment: SpeechSegmentKey) {
+  if (segment === 'knowledgeAck') {
+    return cleanSpeechText(workflow.knowledgeGraph.ACK);
+  }
+
+  if (segment === 'knowledgeExplanation') {
+    return cleanSpeechText(workflow.knowledgeGraph.EXPLANATION);
+  }
+
+  if (segment === 'recommendationAck') {
+    return cleanSpeechText(workflow.agentRecommendation.ACK);
+  }
+
+  return cleanSpeechText(workflow.agentRecommendation.SUMMARY);
+}
+
+function extractAckSpeechText(text: string) {
+  const matches = String(text || '').matchAll(/<ACK\b[^>]*>([\s\S]*?)<\/ACK>/gi);
+
+  return Array.from(matches)
+    .map((match) => cleanSpeechText(match[1] || ''))
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function cleanSpeechText(text: string) {
+  return String(text || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wait(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+
+function stripSpeechTagSyntax(text: string) {
+  return String(text || '')
+    .replace(/<\/?ACK\b[^>]*>/gi, '')
+    .trim();
+}
+
 function hasAgentOutput(turn: AgentTurn | null) {
   if (!turn) {
     return false;
@@ -546,6 +740,7 @@ export default function App() {
   const speechSessionRef = useRef(0);
   const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
   const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
+  const cardAnimationSettledResolversRef = useRef<Array<() => void>>([]);
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
@@ -553,6 +748,7 @@ export default function App() {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
   const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
+  const [recommendationAnimationReady, setRecommendationAnimationReady] = useState(false);
   const [draft, setDraft] = useState('');
   const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [interfaceLanguage, setInterfaceLanguage] = useState<ConversationLanguage>('zh-CN');
@@ -624,6 +820,8 @@ export default function App() {
             voiceControlRef.current?.resume();
           }, 260);
         }
+
+        options.onSettled?.();
       };
       const finishAfterMinimum = () => {
         if (speechSessionId !== speechSessionRef.current) {
@@ -631,34 +829,56 @@ export default function App() {
         }
 
         const elapsed = performance.now() - startedAt;
-        const minimumVisualDuration = Math.min(estimatedDuration, 5200);
+        const minimumVisualDuration = options.minimumVisualDurationMs ?? Math.min(estimatedDuration, 5200);
         const remaining = Math.max(0, minimumVisualDuration - elapsed);
 
         clearSpeechEndTimer();
         speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, remaining);
       };
-      const queued = speak(text, {
-        onEnd: finishAfterMinimum,
-        onError: (reason) => {
-          if (speechSessionId === speechSessionRef.current) {
-            setSpeechError(reason);
-          }
+      const queued = speak(
+        text,
+        {
+          onEnd: finishAfterMinimum,
+          onError: (reason) => {
+            if (speechSessionId === speechSessionRef.current) {
+              setSpeechError(reason);
+            }
+          },
+          onPulse: () => {
+            if (speechSessionId === speechSessionRef.current) {
+              pulseSpeechOutput();
+            }
+          },
+          onStart: () => {
+            if (speechSessionId === speechSessionRef.current) {
+              beginSpeechOutput();
+            }
+          },
         },
-        onPulse: () => {
-          if (speechSessionId === speechSessionRef.current) {
-            pulseSpeechOutput();
-          }
-        },
-        onStart: () => {
-          if (speechSessionId === speechSessionRef.current) {
-            beginSpeechOutput();
-          }
-        },
-      });
+        options.audioBlob,
+      );
 
-      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration : 5200);
+      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration + 30000 : 5200);
     },
     [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
+  );
+
+  const finishReplyWithoutSpeech = useCallback(
+    (shouldResumeListening: boolean) => {
+      clearSpeechEndTimer();
+      speechOutputActiveRef.current = false;
+      setCurrentSpeechText('');
+      setSpeechError('');
+      setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
+
+      if (shouldResumeListening) {
+        window.setTimeout(() => {
+          void micLevelRef.current?.start();
+          voiceControlRef.current?.resume();
+        }, 260);
+      }
+    },
+    [clearSpeechEndTimer],
   );
 
   const submitMessage = useCallback(
@@ -688,6 +908,7 @@ export default function App() {
       setAgentStatus('streaming');
       setLastAction(null);
       setLastHeard('');
+      setRecommendationAnimationReady(false);
       setAgentTurns((current) => [...current.slice(-3), createAgentTurn(turnId, text)]);
       setMessages((current) => [
         ...current.slice(-3),
@@ -697,9 +918,17 @@ export default function App() {
       setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
 
       let accumulatedWorkflow = createEmptyAgentWorkflow();
-      let committedRouteKey = '';
+      let cardsCompleted = false;
+      let routeActionReady = false;
+      let committedRouteAction: AgentAction | null = null;
+      let routeKey = '';
       let hasSeenKnowledgePath = false;
       let streamError = '';
+      let speechSegmentsClosed = false;
+      const cardReadyWaiters: Array<(ready: boolean) => void> = [];
+      const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
+      const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
+      const speechWaiters = new Map<SpeechSegmentKey, Array<(asset: PreloadedSpeechAsset | null) => void>>();
       const commitWorkflow = (workflow: AgentWorkflow) => {
         accumulatedWorkflow = workflow;
         setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, workflow })));
@@ -711,17 +940,19 @@ export default function App() {
           return;
         }
 
-        const routeKey = routeAction.route.join('/');
+        const nextRouteKey = routeAction.route.join('/');
 
-        if (routeKey === committedRouteKey) {
+        if (nextRouteKey === routeKey) {
           return;
         }
 
-        committedRouteKey = routeKey;
-        setLastAction(routeAction);
+        routeKey = nextRouteKey;
+        routeActionReady = true;
+        committedRouteAction = routeAction;
+        routeActionWaiters.splice(0).forEach((resolve) => resolve(routeAction));
       };
       const commitKnowledgePathIfReady = () => {
-        if (!hasSeenKnowledgePath || committedRouteKey) {
+        if (!hasSeenKnowledgePath || routeActionReady) {
           return;
         }
 
@@ -732,10 +963,169 @@ export default function App() {
         setAgentStatus('error');
         setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, error, status: 'error' })));
       };
+      const preloadSpeechSegment = (segment: SpeechSegmentKey) => {
+        const segmentText = getSpeechTextForSegment(accumulatedWorkflow, segment);
+
+        if (!segmentText) {
+          return;
+        }
+
+        const existing = speechAssets.get(segment);
+        if (existing?.text === segmentText) {
+          return;
+        }
+
+        const asset: PreloadedSpeechAsset = {
+          audioPromise: requestTtsAudio(segmentText),
+          text: segmentText,
+        };
+        speechAssets.set(segment, asset);
+        speechWaiters.get(segment)?.splice(0).forEach((resolve) => resolve(asset));
+      };
+      const waitForSpeechSegment = (segment: SpeechSegmentKey) => {
+        const existing = speechAssets.get(segment);
+
+        if (existing) {
+          return Promise.resolve(existing);
+        }
+
+        if (speechSegmentsClosed) {
+          return Promise.resolve(null);
+        }
+
+        return new Promise<PreloadedSpeechAsset | null>((resolve) => {
+          const timer = window.setTimeout(() => resolve(null), SPEECH_SEGMENT_WAIT_MS);
+          const resolveOnce = (asset: PreloadedSpeechAsset | null) => {
+            window.clearTimeout(timer);
+            resolve(asset);
+          };
+          const waiters = speechWaiters.get(segment) || [];
+          waiters.push(resolveOnce);
+          speechWaiters.set(segment, waiters);
+        });
+      };
+      const closeSpeechSegments = () => {
+        speechSegmentsClosed = true;
+        speechWaiters.forEach((waiters) => waiters.splice(0).forEach((resolve) => resolve(null)));
+      };
+      const playSpeechSegment = async (segment: SpeechSegmentKey) => {
+        const asset = await waitForSpeechSegment(segment);
+
+        if (!asset) {
+          return;
+        }
+
+        const audioBlob = await asset.audioPromise.catch((error) => {
+          setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
+          return null;
+        });
+
+        if (!audioBlob) {
+          return;
+        }
+
+        await new Promise<void>((resolve) => {
+          speakWithParticleOutput(asset.text, {
+            audioBlob,
+            displayText: asset.text,
+            minimumVisualDurationMs: 0,
+            onSettled: resolve,
+            resumeListening: false,
+          });
+        });
+      };
+      const waitForRouteAction = () => {
+        if (committedRouteAction) {
+          return Promise.resolve(committedRouteAction);
+        }
+
+        return new Promise<AgentAction | null>((resolve) => {
+          routeActionWaiters.push(resolve);
+        });
+      };
+      const closeRouteAction = () => {
+        if (routeActionWaiters.length === 0) {
+          return;
+        }
+
+        routeActionWaiters.splice(0).forEach((resolve) => resolve(getActionFromRoute(accumulatedWorkflow.knowledgeGraph.KG_PATH)));
+      };
+      const markCardsReady = () => {
+        cardsCompleted = true;
+        cardReadyWaiters.splice(0).forEach((resolve) => resolve(true));
+      };
+      const closeCardsReady = () => {
+        const hasCards = accumulatedWorkflow.agentRecommendation.agents.length > 0;
+
+        if (hasCards) {
+          cardsCompleted = true;
+        }
+
+        cardReadyWaiters.splice(0).forEach((resolve) => resolve(hasCards));
+      };
+      const waitForCardsReady = () => {
+        if (cardsCompleted || accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          return Promise.resolve(true);
+        }
+
+        return new Promise<boolean>((resolve) => {
+          const timer = window.setTimeout(() => resolve(false), SPEECH_SEGMENT_WAIT_MS);
+          cardReadyWaiters.push((ready) => {
+            window.clearTimeout(timer);
+            resolve(ready);
+          });
+        });
+      };
+      const waitForCardAnimationSettled = () =>
+        new Promise<void>((resolve) => {
+          cardAnimationSettledResolversRef.current.push(resolve);
+        });
+      const runPathAnimation = async () => {
+        const routeAction = await waitForRouteAction();
+
+        if (!routeAction || routeAction.type !== 'focus_graph_path') {
+          return;
+        }
+
+        setLastAction(routeAction);
+        await wait(PATH_MATCH_ANIMATION_MS);
+      };
+      const runCardAnimation = async () => {
+        const hasCards = await waitForCardsReady();
+
+        if (!hasCards) {
+          return;
+        }
+
+        const settled = waitForCardAnimationSettled();
+        setRecommendationAnimationReady(true);
+        setDrawOverlayPulse((pulse) => pulse + 1);
+        window.setTimeout(() => setRecommendationAnimationReady(false), CARD_DRAW_ACTIVE_MS);
+        await settled;
+      };
+      const orchestrationPromise = (async () => {
+        await playSpeechSegment('knowledgeAck');
+        await runPathAnimation();
+        await playSpeechSegment('knowledgeExplanation');
+        await playSpeechSegment('recommendationAck');
+        await runCardAnimation();
+        await playSpeechSegment('recommendationSummary');
+      })();
 
       try {
         await streamAgentChat(text, {
           signal: controller.signal,
+          onEvent(event) {
+            const speechSegment = getCompletedSpeechSegment(event);
+
+            if (speechSegment) {
+              preloadSpeechSegment(speechSegment);
+              return;
+            }
+          },
+          onCompleted() {
+            commitKnowledgePathIfReady();
+          },
           onContentDelta(event) {
             const section = getWorkflowSection(event);
 
@@ -799,10 +1189,8 @@ export default function App() {
           onRecommendedAgentsCompleted(agents) {
             commitKnowledgePathIfReady();
             commitWorkflow(replaceRecommendedAgents(accumulatedWorkflow, agents));
+            markCardsReady();
             setDrawOverlayPulse((pulse) => pulse + 1);
-          },
-          onCompleted() {
-            commitKnowledgePathIfReady();
           },
           onWorkflowError(event) {
             commitKnowledgePathIfReady();
@@ -810,23 +1198,39 @@ export default function App() {
           },
         });
 
-        if (!committedRouteKey) {
+        if (!routeActionReady) {
           commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
         }
+        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          markCardsReady();
+        } else {
+          closeCardsReady();
+        }
+        closeSpeechSegments();
+        closeRouteAction();
 
         const finalText = buildAgentReplyText(accumulatedWorkflow, streamError || 'Agent 已完成，但没有返回可展示内容。');
         const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
-        setAgentStatus(finalStatus);
-        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
         setMessages((current) => {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: finalText }];
         });
-        speakWithParticleOutput(finalText, { displayText: finalText, resumeListening: shouldResumeListening });
+        void orchestrationPromise.finally(() => {
+          setAgentStatus(finalStatus);
+          setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
+          finishReplyWithoutSpeech(shouldResumeListening);
+        });
       } catch (error) {
         if (controller.signal.aborted) {
+          closeSpeechSegments();
+          closeRouteAction();
+          closeCardsReady();
           return;
         }
+
+        closeSpeechSegments();
+        closeRouteAction();
+        closeCardsReady();
 
         try {
           const response = await requestAIReply(text, history);
@@ -845,10 +1249,15 @@ export default function App() {
             const withoutThinking = current.filter((message) => message.text !== 'Processing...');
             return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
           });
-          speakWithParticleOutput(response.spokenText ?? response.text, {
-            displayText: response.text,
-            resumeListening: shouldResumeListening,
-          });
+          const speechText = extractAckSpeechText(response.spokenText ?? response.text);
+          if (speechText) {
+            speakWithParticleOutput(speechText, {
+              displayText: speechText,
+              resumeListening: shouldResumeListening,
+            });
+          } else {
+            finishReplyWithoutSpeech(shouldResumeListening);
+          }
         } catch {
           const fallback =
             error instanceof Error && error.message
@@ -871,7 +1280,12 @@ export default function App() {
             const withoutThinking = current.filter((message) => message.text !== 'Processing...');
             return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: fallback }];
           });
-          speakWithParticleOutput(fallback, { resumeListening: shouldResumeListening });
+          const speechText = extractAckSpeechText(fallback);
+          if (speechText) {
+            speakWithParticleOutput(speechText, { displayText: speechText, resumeListening: shouldResumeListening });
+          } else {
+            finishReplyWithoutSpeech(shouldResumeListening);
+          }
         }
       } finally {
         if (agentRequestRef.current === controller) {
@@ -879,7 +1293,7 @@ export default function App() {
         }
       }
     },
-    [agentStatus, inputMode, manualVoiceSession, messages, speakWithParticleOutput, voiceAwake],
+    [agentStatus, finishReplyWithoutSpeech, inputMode, manualVoiceSession, messages, speakWithParticleOutput, voiceAwake],
   );
 
   const handleVoiceCommand = useCallback(
@@ -947,6 +1361,7 @@ export default function App() {
     return () => {
       agentRequestRef.current?.abort();
       clearSpeechEndTimer();
+      cancelSpeechPlayback();
     };
   }, [clearSpeechEndTimer]);
 
@@ -962,6 +1377,7 @@ export default function App() {
       speechSessionRef.current += 1;
       clearSpeechEndTimer();
       speechOutputActiveRef.current = false;
+      cancelSpeechPlayback();
       window.speechSynthesis?.cancel();
       setManualVoiceSession(false);
       setVoiceAwake(false);
@@ -997,6 +1413,7 @@ export default function App() {
       speechSessionRef.current += 1;
       clearSpeechEndTimer();
       speechOutputActiveRef.current = false;
+      cancelSpeechPlayback();
       window.speechSynthesis?.cancel();
       setManualVoiceSession(false);
       setVoiceAwake(false);
@@ -1030,18 +1447,24 @@ export default function App() {
     [draft, submitMessage],
   );
 
+  const handleDrawOverlaySettled = useCallback(() => {
+    cardAnimationSettledResolversRef.current.splice(0).forEach((resolve) => resolve());
+  }, []);
+
   const latestAgentTurn = agentTurns.at(-1) ?? null;
   const latestRecommendation = latestAgentTurn?.workflow.agentRecommendation;
   const recommendedAgents = latestRecommendation?.agents ?? [];
   const drawOverlayReplyText = latestRecommendation?.SUMMARY.trim() || latestAgentTurn?.fallbackText.trim() || '';
   const drawOverlayActive = Boolean(
-    agentStatus === 'streaming' &&
+    recommendationAnimationReady &&
+      agentStatus === 'streaming' &&
       latestRecommendation &&
       (latestRecommendation.THINKING_PROCESS ||
         latestRecommendation.ACK ||
         latestRecommendation.SUMMARY ||
         latestRecommendation.agents.length),
   );
+  const drawOverlayPulseKey = recommendationAnimationReady ? drawOverlayPulse : 0;
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
   const graphFocusKey =
     lastAction?.type === 'focus_graph_path'
@@ -1117,7 +1540,13 @@ export default function App() {
         voiceTranscript={voice.transcript}
         voiceSupported={voice.supported}
       />
-      <AgentDrawOverlay active={drawOverlayActive} agents={recommendedAgents} pulseKey={drawOverlayPulse} replyText={drawOverlayReplyText} />
+      <AgentDrawOverlay
+        active={drawOverlayActive}
+        agents={recommendedAgents}
+        onSettled={handleDrawOverlaySettled}
+        pulseKey={drawOverlayPulseKey}
+        replyText={drawOverlayReplyText}
+      />
     </main>
   );
 }
@@ -1315,7 +1744,7 @@ function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
 
   return (
     <article className="agent-response">
-      {knowledgeGraph.DIRECT_REPLY && <p className="agent-answer-text">{knowledgeGraph.DIRECT_REPLY}</p>}
+      {renderAgentAnswerText(knowledgeGraph.DIRECT_REPLY)}
       {knowledgeGraph.THINKING_PROCESS && (
         <section className="agent-section agent-thinking-section" data-collapsed={collapseKnowledgeThinking} aria-expanded={!collapseKnowledgeThinking}>
           <div className="agent-section-title">
@@ -1325,9 +1754,9 @@ function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
           {!collapseKnowledgeThinking && <p>{knowledgeGraph.THINKING_PROCESS}</p>}
         </section>
       )}
-      {knowledgeGraph.ACK && <p className="agent-answer-text">{knowledgeGraph.ACK}</p>}
+      {renderAgentAnswerText(knowledgeGraph.ACK)}
       {routeSegments.length > 0 && <RouteResult routeSegments={routeSegments} active={active && !knowledgeGraph.EXPLANATION} />}
-      {knowledgeGraph.EXPLANATION && <p className="agent-answer-text">{knowledgeGraph.EXPLANATION}</p>}
+      {renderAgentAnswerText(knowledgeGraph.EXPLANATION)}
       {recommendation.THINKING_PROCESS && (
         <section className="agent-section agent-thinking-section" data-collapsed={collapseRecommendationThinking} aria-expanded={!collapseRecommendationThinking}>
           <div className="agent-section-title">
@@ -1337,7 +1766,7 @@ function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
           {!collapseRecommendationThinking && <p>{recommendation.THINKING_PROCESS}</p>}
         </section>
       )}
-      {recommendation.ACK && <p className="agent-answer-text">{recommendation.ACK}</p>}
+      {renderAgentAnswerText(recommendation.ACK)}
       {recommendation.agents.length > 0 && (
         <section className="agent-section recommended-agent-section">
           <div className="agent-section-title">
@@ -1353,12 +1782,18 @@ function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
           <RecommendedAgentLaunchBar agents={recommendation.agents} />
         </section>
       )}
-      {recommendation.SUMMARY && <p className="agent-answer-text">{recommendation.SUMMARY}</p>}
-      {turn.fallbackText && <p className="agent-answer-text">{turn.fallbackText}</p>}
+      {renderAgentAnswerText(recommendation.SUMMARY)}
+      {renderAgentAnswerText(turn.fallbackText)}
       {turn.error && <p className="agent-error-text">{turn.error}</p>}
       {active && <TypingLine />}
     </article>
   );
+}
+
+function renderAgentAnswerText(text: string) {
+  const visibleText = stripSpeechTagSyntax(text);
+
+  return visibleText ? <p className="agent-answer-text">{visibleText}</p> : null;
 }
 
 function RouteResult({ active, routeSegments }: { active: boolean; routeSegments: string[] }) {
