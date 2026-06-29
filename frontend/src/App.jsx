@@ -21,6 +21,7 @@ import { streamCozeChat } from "./cozeChatClient.js";
 import baiLogo from "./assets/bailogo.png";
 
 const GRAPH_PATH_STEP_MS = 980;
+const SPOKEN_ACK_TYPES = new Set(["knowledge_graph:ACK", "agent_recommendation:ACK"]);
 
 function createEmptyAgentWorkflow() {
   return {
@@ -93,6 +94,8 @@ export function App() {
   const [agentTurns, setAgentTurns] = useState([]);
   const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
   const agentRequestRef = useRef(null);
+  const ackSpeechBuffersRef = useRef(new Map());
+  const spokenAckKeysRef = useRef(new Set());
   const drawOverlaySignalRef = useRef({
     signalActive: false,
     agentCount: 0,
@@ -117,6 +120,7 @@ export function App() {
   useEffect(() => {
     return () => {
       agentRequestRef.current?.abort();
+      stopAgentSpeech();
       clearGraphPathAnimation({ releaseHold: false });
     };
   }, []);
@@ -318,6 +322,9 @@ export function App() {
     const agentNames = getAgentPackage(targetFocusId).map((agent) => agent.name);
 
     agentRequestRef.current?.abort();
+    stopAgentSpeech();
+    ackSpeechBuffersRef.current.clear();
+    spokenAckKeysRef.current.clear();
     clearGraphPathAnimation();
     graphPathAnimationRef.current.activeTurnId = turnId;
     agentRequestRef.current = controller;
@@ -347,6 +354,11 @@ export function App() {
       await streamCozeChat(text, {
         signal: controller.signal,
         agentNames,
+        onEvent(event) {
+          if (event.event === "content.completed") {
+            speakCompletedAck(event, turnId, ackSpeechBuffersRef.current, spokenAckKeysRef.current);
+          }
+        },
         onContentDelta(event) {
           const section = getWorkflowSection(event);
           if (!section) return;
@@ -356,6 +368,7 @@ export function App() {
           }
 
           const content = event.content || "";
+          appendAckSpeechBuffer(event, turnId, ackSpeechBuffersRef.current, content);
           setAgentStream((current) => ({
             ...current,
             workflow: appendWorkflowContent(current.workflow, section, event.type, content),
@@ -566,6 +579,86 @@ function hasRecommendationDrawSignal(agentRecommendation) {
       agentRecommendation.ACK ||
       agentRecommendation.SUMMARY ||
       (agentRecommendation.agents || []).length,
+  );
+}
+
+function appendAckSpeechBuffer(event, turnId, buffers, content) {
+  if (!content || !isSpokenAckEvent(event)) return;
+
+  const key = getAckSpeechKey(event, turnId);
+  buffers.set(key, `${buffers.get(key) || ""}${content}`);
+}
+
+function speakCompletedAck(event, turnId, buffers, spokenKeys) {
+  if (!isSpokenAckEvent(event)) return;
+
+  const key = getAckSpeechKey(event, turnId);
+  if (spokenKeys.has(key)) return;
+
+  const text = cleanSpeechText(buffers.get(key));
+  buffers.delete(key);
+
+  if (!text) return;
+
+  spokenKeys.add(key);
+  speakAgentAck(text);
+}
+
+function isSpokenAckEvent(event) {
+  return SPOKEN_ACK_TYPES.has(`${event.stage}:${event.type}`);
+}
+
+function getAckSpeechKey(event, turnId) {
+  return `${turnId}:${event.stage}:${event.type}`;
+}
+
+function cleanSpeechText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/[<>]/g, "")
+    .trim();
+}
+
+function speakAgentAck(text) {
+  if (!text || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = selectChineseVoice();
+
+  utterance.lang = voice?.lang || "zh-CN";
+  utterance.rate = 0.96;
+  utterance.pitch = 1.02;
+  utterance.volume = 1;
+
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.resume();
+  window.speechSynthesis.speak(utterance);
+  window.setTimeout(() => window.speechSynthesis.resume(), 120);
+}
+
+function stopAgentSpeech() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function selectChineseVoice() {
+  if (!("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  return (
+    voices.find((voice) => /zh[-_]?CN/i.test(voice.lang) && /xiaoxiao|xiaoyi|xiaobei|huihui|yaoyao/i.test(voice.name)) ||
+    voices.find((voice) => /zh[-_]?CN/i.test(voice.lang)) ||
+    voices.find((voice) => /^zh/i.test(voice.lang)) ||
+    null
   );
 }
 
