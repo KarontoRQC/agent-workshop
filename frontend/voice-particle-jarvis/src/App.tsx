@@ -145,6 +145,48 @@ type SubmitMessageOptions = {
   resumeListening?: boolean;
 };
 
+type AgentConversationIds = Record<string, string>;
+
+function createClientConversationIds(): AgentConversationIds {
+  const newId = (key: string) => {
+    const randomId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+    return `web-${key}-${randomId}`;
+  };
+
+  return {
+    agent_recommendation: newId('agent-recommendation'),
+    route_planner: newId('route-planner'),
+  };
+}
+
+function ensureClientConversationIds(conversationIds: AgentConversationIds): AgentConversationIds {
+  if (conversationIds.route_planner && conversationIds.agent_recommendation) {
+    return conversationIds;
+  }
+
+  const generatedConversationIds = createClientConversationIds();
+
+  return {
+    ...conversationIds,
+    agent_recommendation: conversationIds.agent_recommendation || generatedConversationIds.agent_recommendation,
+    route_planner: conversationIds.route_planner || generatedConversationIds.route_planner,
+  };
+}
+
+class TtsRequestError extends Error {
+  fallbackToBrowser: boolean;
+
+  constructor(message: string, fallbackToBrowser = false) {
+    super(message);
+    this.name = 'TtsRequestError';
+    this.fallbackToBrowser = fallbackToBrowser;
+  }
+}
+
 function extractWakeCommand(raw: string) {
   const text = raw.trim();
   const lowered = text.toLowerCase();
@@ -241,6 +283,30 @@ function primeSpeechOutput() {
 let activeSpeechAudio: HTMLAudioElement | null = null;
 let activeSpeechObjectUrl = '';
 
+function getTtsMode() {
+  const rawMode = String(import.meta.env.VITE_TTS_BROWSER_FALLBACK ?? 'auto')
+    .trim()
+    .toLowerCase();
+
+  if (['1', 'true', 'browser'].includes(rawMode)) {
+    return 'browser';
+  }
+
+  if (['0', 'false', 'server'].includes(rawMode)) {
+    return 'server';
+  }
+
+  return 'auto';
+}
+
+function isFallbackableTtsError(error: unknown) {
+  if (error instanceof TtsRequestError) {
+    return error.fallbackToBrowser;
+  }
+
+  return getTtsMode() === 'auto' && error instanceof TypeError;
+}
+
 function cancelSpeechPlayback() {
   if (activeSpeechAudio) {
     activeSpeechAudio.pause();
@@ -265,7 +331,7 @@ async function requestTtsAudio(text: string) {
   });
 
   if (!response.ok) {
-    throw new Error(await formatTtsResponseError(response));
+    throw await formatTtsResponseError(response);
   }
 
   const audio = await response.blob();
@@ -279,16 +345,23 @@ async function requestTtsAudio(text: string) {
 
 async function formatTtsResponseError(response: Response) {
   const payload = await response.json().catch(() => null);
+  let message = `TTS interface failed: ${response.status}`;
 
   if (typeof payload?.detail === 'string') {
-    return payload.detail;
+    message = payload.detail;
+  } else if (typeof payload?.error === 'string') {
+    message = payload.error;
   }
 
-  if (typeof payload?.error === 'string') {
-    return payload.error;
-  }
+  const normalizedMessage = message.toLowerCase();
+  const fallbackToBrowser =
+    getTtsMode() === 'auto' &&
+    (response.status >= 500 ||
+      normalizedMessage.includes('tts is not configured') ||
+      normalizedMessage.includes('local tts is not configured') ||
+      normalizedMessage.includes('tts_provider'));
 
-  return `TTS interface failed: ${response.status}`;
+  return new TtsRequestError(message, fallbackToBrowser);
 }
 
 async function playTtsSpeech(text: string, callbacks: SpeechCallbacks, preparedAudio?: Blob) {
@@ -338,6 +411,12 @@ async function playTtsSpeech(text: string, callbacks: SpeechCallbacks, preparedA
   } catch (error) {
     clearPulseTimer();
     cancelSpeechPlayback();
+
+    if (isFallbackableTtsError(error)) {
+      playBrowserSpeech(text, callbacks);
+      return;
+    }
+
     callbacks.onError?.(error instanceof Error ? error.message : 'TTS interface failed.');
     callbacks.onEnd?.();
   }
@@ -394,12 +473,7 @@ function speakNow(text: string, callbacks: SpeechCallbacks) {
   window.setTimeout(stopResumeTimer, 12000);
 }
 
-function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Blob) {
-  if (import.meta.env.VITE_TTS_BROWSER_FALLBACK !== '1') {
-    void playTtsSpeech(polishSpokenLine(text), callbacks, preparedAudio);
-    return true;
-  }
-
+function playBrowserSpeech(text: string, callbacks: SpeechCallbacks = {}) {
   if (!('speechSynthesis' in window)) {
     callbacks.onError?.('Speech synthesis is not available in this browser.');
     return false;
@@ -425,6 +499,17 @@ function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Bl
 
   window.speechSynthesis.addEventListener('voiceschanged', speakAfterVoicesLoad);
   window.setTimeout(speakAfterVoicesLoad, 700);
+  return true;
+}
+
+function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Blob) {
+  const ttsMode = getTtsMode();
+
+  if (ttsMode === 'browser') {
+    return playBrowserSpeech(text, callbacks);
+  }
+
+  void playTtsSpeech(polishSpokenLine(text), callbacks, preparedAudio);
   return true;
 }
 
@@ -781,7 +866,7 @@ function wait(durationMs: number) {
 
 function stripSpeechTagSyntax(text: string) {
   return String(text || '')
-    .replace(/<\/?(?:ACK|EXPLANATION|SUMMARY)\b[^>]*>/gi, '')
+    .replace(/<\/?(?:ACK|EXPLANATION|EXPLATION|SUMMARY)\b[^>]*>/gi, '')
     .trim();
 }
 
@@ -835,6 +920,36 @@ function updateTurnById(turnId: string, update: (turn: AgentTurn) => AgentTurn) 
   return (current: AgentTurn[]) => current.map((turn) => (turn.id === turnId ? update(turn) : turn));
 }
 
+function mergeConversationIdsFromEvent(current: AgentConversationIds, event: AgentStreamEvent) {
+  const next = { ...current };
+  let changed = false;
+
+  const setConversationId = (key: string, value: unknown) => {
+    const conversationId = String(value ?? '').trim();
+
+    if (!key || !conversationId || next[key] === conversationId) {
+      return;
+    }
+
+    next[key] = conversationId;
+    changed = true;
+  };
+
+  if (event.conversation_ids && typeof event.conversation_ids === 'object') {
+    for (const [key, value] of Object.entries(event.conversation_ids)) {
+      setConversationId(key, value);
+    }
+  }
+
+  setConversationId('route_planner', event.master_conversation_id);
+
+  if (typeof event.conversation_key === 'string') {
+    setConversationId(event.conversation_key, event.conversation_id);
+  }
+
+  return changed ? next : current;
+}
+
 export default function App() {
   const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
   const speechCaptionTimerRef = useRef<number | null>(null);
@@ -845,8 +960,10 @@ export default function App() {
   const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
+  const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
+  const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
@@ -865,6 +982,17 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
+
+  const rememberConversationIds = useCallback((event: AgentStreamEvent) => {
+    const nextConversationIds = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
+
+    if (nextConversationIds === agentConversationIdsRef.current) {
+      return;
+    }
+
+    agentConversationIdsRef.current = nextConversationIds;
+    setConversationIdsVersion((version) => version + 1);
+  }, []);
 
   const clearSpeechEndTimer = useCallback(() => {
     if (speechEndTimerRef.current !== null) {
@@ -1045,6 +1173,8 @@ export default function App() {
       const turnId = `turn-${now}`;
       const controller = new AbortController();
       const history = [...messages, nextUserMessage];
+      agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
+      const conversationIdsForRequest = { ...agentConversationIdsRef.current };
 
       agentRequestRef.current = controller;
       voiceControlRef.current?.pause();
@@ -1057,9 +1187,9 @@ export default function App() {
       setRouteDockVisible(false);
       setRecommendationDockVisible(false);
       setWorkflowHighlight('none');
-      setAgentTurns((current) => [...current.slice(-3), createAgentTurn(turnId, text)]);
+      setAgentTurns((current) => [...current.slice(-9), createAgentTurn(turnId, text)]);
       setMessages((current) => [
-        ...current.slice(-3),
+        ...current.slice(-18),
         nextUserMessage,
         { id: now + 1, speaker: 'ai', text: 'Processing...' },
       ]);
@@ -1232,7 +1362,9 @@ export default function App() {
 
         const audioBlob = asset
           ? await asset.audioPromise.catch((error) => {
-              setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
+              if (!isFallbackableTtsError(error)) {
+                setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
+              }
               return null;
             })
           : undefined;
@@ -1356,8 +1488,13 @@ export default function App() {
 
       try {
         await streamAgentChat(text, {
+          autoSaveHistory: true,
+          conversationId: conversationIdsForRequest.route_planner,
+          conversationIds: conversationIdsForRequest,
           signal: controller.signal,
           onEvent(event) {
+            rememberConversationIds(event);
+
             const speechSegment = getCompletedSpeechSegment(event);
 
             if (speechSegment) {
@@ -1365,7 +1502,8 @@ export default function App() {
               return;
             }
           },
-          onCompleted() {
+          onCompleted(event) {
+            rememberConversationIds(event);
             commitKnowledgePathIfReady();
           },
           onContentDelta(event) {
@@ -1450,7 +1588,7 @@ export default function App() {
         const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
         setMessages((current) => {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-          return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: finalText }];
+          return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: finalText }];
         });
         setAgentStatus(finalStatus);
         setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
@@ -1486,7 +1624,7 @@ export default function App() {
           );
           setMessages((current) => {
             const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-            return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
+            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: response.text }];
           });
           const speechText = extractAckSpeechText(response.spokenText ?? response.text);
           if (speechText) {
@@ -1517,7 +1655,7 @@ export default function App() {
           );
           setMessages((current) => {
             const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-            return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: fallback }];
+            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: fallback }];
           });
           const speechText = extractAckSpeechText(fallback);
           if (speechText) {
@@ -1532,7 +1670,16 @@ export default function App() {
         }
       }
     },
-    [agentStatus, finishReplyWithoutSpeech, inputMode, manualVoiceSession, messages, speakWithParticleOutput, voiceAwake],
+    [
+      agentStatus,
+      finishReplyWithoutSpeech,
+      inputMode,
+      manualVoiceSession,
+      messages,
+      rememberConversationIds,
+      speakWithParticleOutput,
+      voiceAwake,
+    ],
   );
 
   const handleVoiceCommand = useCallback(
@@ -1667,8 +1814,7 @@ export default function App() {
   );
 
   const sendDraftMessage = useCallback(
-    (event?: FormEvent<HTMLFormElement>) => {
-      event?.preventDefault();
+    () => {
       void submitMessage(draft, { resumeListening: false });
     },
     [draft, submitMessage],
@@ -1762,7 +1908,7 @@ export default function App() {
         setDraft={setDraft}
         speakingText={currentSpeechText}
         status={agentStatus}
-        turn={latestAgentTurn}
+        turns={agentTurns}
         voiceHeardText={lastHeard}
         voiceAwake={voiceAwake}
         voiceListening={voice.listening}
@@ -1825,12 +1971,12 @@ type AgentConsoleProps = {
   inputMode: InputMode;
   onDraftKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onModeChange: (mode: InputMode) => void;
-  onSend: (event?: FormEvent<HTMLFormElement>) => void;
+  onSend: () => void;
   onToggleVoice: () => void;
   setDraft: (value: string) => void;
   speakingText: string;
   status: AgentStatus;
-  turn: AgentTurn | null;
+  turns: AgentTurn[];
   voiceAwake: boolean;
   voiceHeardText: string;
   voiceListening: boolean;
@@ -1848,7 +1994,7 @@ function AgentConsole({
   setDraft,
   speakingText,
   status,
-  turn,
+  turns,
   voiceAwake,
   voiceHeardText,
   voiceListening,
@@ -1859,8 +2005,10 @@ function AgentConsole({
   const shouldStickToBottomRef = useRef(true);
   const isStreaming = status === 'streaming';
   const visibleVoiceText = voiceHeardText || voiceTranscript;
-  const pendingVoiceText = inputMode === 'voice' && !turn ? visibleVoiceText : '';
-  const turnId = turn?.id ?? '';
+  const latestTurn = turns.at(-1) ?? null;
+  const latestTurnId = latestTurn?.id ?? '';
+  const hasTurns = turns.length > 0;
+  const pendingVoiceText = inputMode === 'voice' && !hasTurns ? visibleVoiceText : '';
 
   const scrollThreadToBottom = useCallback(() => {
     const thread = threadRef.current;
@@ -1886,34 +2034,50 @@ function AgentConsole({
   useEffect(() => {
     shouldStickToBottomRef.current = true;
     scrollThreadToBottom();
-  }, [scrollThreadToBottom, turnId]);
+  }, [latestTurnId, scrollThreadToBottom]);
 
   useLayoutEffect(() => {
     if (shouldStickToBottomRef.current) {
       scrollThreadToBottom();
     }
-  }, [pendingVoiceText, scrollThreadToBottom, status, turn]);
+  }, [pendingVoiceText, scrollThreadToBottom, status, turns]);
+
+  const handleComposerSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      onSend();
+    },
+    [onSend],
+  );
 
   return (
     <aside
       className="agent-console"
-      data-has-turn={Boolean(turn)}
+      data-has-turn={hasTurns}
       data-input-mode={inputMode}
       data-status={status}
       aria-label="Agent response panel"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      {turn || pendingVoiceText ? (
+      {hasTurns || pendingVoiceText ? (
         <div className="agent-console-thread" aria-live="polite" onScroll={handleThreadScroll} ref={threadRef}>
-          {turn ? (
+          {hasTurns ? (
             <>
-              <article className="agent-user-line">
-                <span aria-hidden="true">
-                  <UserRound size={14} />
-                </span>
-                <p>{turn.user}</p>
-              </article>
-              <AgentResponse turn={turn} active={isStreaming} speakingText={speakingText} />
+              {turns.map((turn) => (
+                <section className="agent-turn" key={turn.id}>
+                  <article className="agent-user-line">
+                    <span aria-hidden="true">
+                      <UserRound size={14} />
+                    </span>
+                    <p>{turn.user}</p>
+                  </article>
+                  <AgentResponse
+                    active={turn.status === 'streaming'}
+                    speakingText={turn.id === latestTurnId ? speakingText : ''}
+                    turn={turn}
+                  />
+                </section>
+              ))}
             </>
           ) : (
             <article className="agent-user-line">
@@ -1968,7 +2132,7 @@ function AgentConsole({
             <em>{voiceSupported ? (voiceAwake ? '语音已激活' : '语音待命') : '语音不可用'}</em>
           </div>
         ) : (
-          <form className="agent-composer" onSubmit={onSend}>
+          <form className="agent-composer" onSubmit={handleComposerSubmit}>
             <textarea
               value={draft}
               disabled={isStreaming}

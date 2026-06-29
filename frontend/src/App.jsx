@@ -79,6 +79,33 @@ function TopBar({ mode, setMode }) {
   );
 }
 
+function mergeConversationIdsFromEvent(current, event) {
+  const next = { ...current };
+  let changed = false;
+  const setConversationId = (key, value) => {
+    const conversationId = String(value || "").trim();
+
+    if (!key || !conversationId || next[key] === conversationId) {
+      return;
+    }
+
+    next[key] = conversationId;
+    changed = true;
+  };
+
+  if (event?.conversation_ids && typeof event.conversation_ids === "object") {
+    Object.entries(event.conversation_ids).forEach(([key, value]) => setConversationId(key, value));
+  }
+
+  setConversationId("route_planner", event?.master_conversation_id);
+
+  if (typeof event?.conversation_key === "string") {
+    setConversationId(event.conversation_key, event.conversation_id);
+  }
+
+  return changed ? next : current;
+}
+
 export function App() {
   const [focusId, setFocusId] = useState(ROOT_ID);
   const [selectedId, setSelectedId] = useState(ROOT_ID);
@@ -94,6 +121,7 @@ export function App() {
   const [agentTurns, setAgentTurns] = useState([]);
   const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
   const agentRequestRef = useRef(null);
+  const agentConversationIdsRef = useRef({});
   const ackSpeechBuffersRef = useRef(new Map());
   const spokenAckKeysRef = useRef(new Set());
   const drawOverlaySignalRef = useRef({
@@ -320,6 +348,7 @@ export function App() {
     const turnId = `turn-${Date.now()}`;
     const targetFocusId = response.focusId || focusId;
     const agentNames = getAgentPackage(targetFocusId).map((agent) => agent.name);
+    const conversationIdsForRequest = { ...agentConversationIdsRef.current };
 
     agentRequestRef.current?.abort();
     stopAgentSpeech();
@@ -354,7 +383,11 @@ export function App() {
       await streamCozeChat(text, {
         signal: controller.signal,
         agentNames,
+        conversationId: conversationIdsForRequest.route_planner,
+        conversationIds: conversationIdsForRequest,
         onEvent(event) {
+          agentConversationIdsRef.current = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
+
           if (event.event === "content.completed") {
             speakCompletedAck(event, turnId, ackSpeechBuffersRef.current, spokenAckKeysRef.current);
           }

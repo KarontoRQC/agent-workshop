@@ -29,16 +29,18 @@ def stream_chat():
             parameters=_get_parameters(data),
             user_id=data.get("user_id"),
             agent_names=data.get("agent_names"),
+            conversation_ids=_get_conversation_ids(data),
+            auto_save_history=_get_auto_save_history(data),
         )
     except CozeConfigurationError as exc:
         return jsonify({"error": str(exc)}), 500
     except CozeConnectionError as exc:
-        return jsonify({"error": "Failed to connect to Coze", "detail": str(exc)}), 502
+        return jsonify({"error": "Failed to connect to chat provider", "detail": str(exc)}), 502
     except CozeUpstreamError as exc:
         return (
             jsonify(
                 {
-                    "error": "Coze request failed",
+                    "error": "Chat provider request failed",
                     "status_code": exc.status_code,
                     "detail": exc.detail,
                 }
@@ -59,6 +61,63 @@ def stream_chat():
 def _get_parameters(data):
     parameters = data.get("parameters")
     return parameters if isinstance(parameters, dict) else {}
+
+
+def _get_conversation_ids(data):
+    raw_conversation_ids = data.get("conversation_ids")
+    conversation_ids = raw_conversation_ids if isinstance(raw_conversation_ids, dict) else {}
+    route_conversation_id = _first_string(
+        data.get("route_conversation_id"),
+        data.get("control_conversation_id"),
+        conversation_ids.get("route_planner"),
+        conversation_ids.get("control"),
+        conversation_ids.get("master"),
+        conversation_ids.get("knowledge_graph"),
+        data.get("conversation_id"),
+    )
+    recommender_conversation_id = _first_string(
+        data.get("recommender_conversation_id"),
+        data.get("recommendation_conversation_id"),
+        conversation_ids.get("agent_recommendation"),
+        conversation_ids.get("recommender"),
+    )
+    normalized = {}
+
+    if route_conversation_id:
+        normalized["route_planner"] = route_conversation_id
+
+    if recommender_conversation_id:
+        normalized["agent_recommendation"] = recommender_conversation_id
+
+    return normalized
+
+
+def _get_auto_save_history(data):
+    value = data.get("auto_save_history")
+
+    if value is None:
+        return True
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+
+    return bool(value)
+
+
+def _first_string(*values):
+    for value in values:
+        if value is None:
+            continue
+
+        text = str(value).strip()
+
+        if text:
+            return text
+
+    return ""
 
 
 def _guard_stream_errors(stream):

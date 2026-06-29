@@ -6,10 +6,15 @@ export type AgentStreamEvent = {
   agent?: RecommendedAgent;
   agent_index?: number;
   agents?: RecommendedAgent[];
+  chat_ids?: Record<string, string>;
   content?: string;
+  conversation_id?: string;
+  conversation_ids?: Record<string, string>;
+  conversation_key?: string;
   detail?: unknown;
   error?: string;
   event: string;
+  master_conversation_id?: string;
   node?: unknown;
   route?: string;
   stage?: string;
@@ -19,8 +24,12 @@ export type AgentStreamEvent = {
 
 type StreamAgentHandlers = {
   agentNames?: string[];
+  autoSaveHistory?: boolean;
+  conversationId?: string;
+  conversationIds?: Record<string, string>;
   onCompleted?: (event: AgentStreamEvent) => void;
   onContentDelta?: (event: AgentStreamEvent) => void;
+  onConversationUpdated?: (event: AgentStreamEvent) => void;
   onEvent?: (event: AgentStreamEvent) => void;
   onGraphNode?: (node: unknown, event: AgentStreamEvent) => void;
   onGraphPathResolved?: (event: AgentStreamEvent) => void;
@@ -52,13 +61,32 @@ export const API_BASE_URL = resolveApiBaseUrl();
 export const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
 
 export async function streamAgentChat(message: string, handlers: StreamAgentHandlers = {}) {
-  const body: { agent_names?: string[]; message: string; parameters: Record<string, never> } = {
+  const body: {
+    agent_names?: string[];
+    auto_save_history?: boolean;
+    conversation_id?: string;
+    conversation_ids?: Record<string, string>;
+    message: string;
+    parameters: Record<string, never>;
+  } = {
     message,
     parameters: {},
   };
 
   if (Array.isArray(handlers.agentNames) && handlers.agentNames.length > 0) {
     body.agent_names = handlers.agentNames;
+  }
+
+  if (handlers.conversationId) {
+    body.conversation_id = handlers.conversationId;
+  }
+
+  if (handlers.conversationIds && Object.keys(handlers.conversationIds).length > 0) {
+    body.conversation_ids = handlers.conversationIds;
+  }
+
+  if (typeof handlers.autoSaveHistory === 'boolean') {
+    body.auto_save_history = handlers.autoSaveHistory;
   }
 
   const response = await fetch(COZE_CHAT_STREAM_URL, {
@@ -133,6 +161,10 @@ function emitSseFrame(frame: string, handlers: StreamAgentHandlers) {
 
   if (event.event === 'content.delta') {
     handlers.onContentDelta?.(event);
+  }
+
+  if (event.event === 'conversation.updated') {
+    handlers.onConversationUpdated?.(event);
   }
 
   if (event.event === 'recommended_agent.started') {

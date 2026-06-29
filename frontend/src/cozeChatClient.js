@@ -10,6 +10,14 @@ export async function streamCozeChat(message, handlers = {}) {
     body.agent_names = handlers.agentNames;
   }
 
+  if (handlers.conversationId) {
+    body.conversation_id = handlers.conversationId;
+  }
+
+  if (handlers.conversationIds && Object.keys(handlers.conversationIds).length > 0) {
+    body.conversation_ids = handlers.conversationIds;
+  }
+
   const response = await fetch(COZE_CHAT_STREAM_URL, {
     method: "POST",
     headers: {
@@ -65,6 +73,10 @@ function emitSseFrame(frame, handlers) {
 
   if (event.event === "content.delta") {
     handlers.onContentDelta?.(event);
+  }
+
+  if (event.event === "conversation.updated") {
+    handlers.onConversationUpdated?.(event);
   }
 
   if (event.event === "recommended_agents.delta") {

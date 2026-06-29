@@ -19,11 +19,11 @@ def synthesize_speech(text, mood="neutral"):
     settings = get_tts_settings()
     provider = settings.provider
 
-    if provider == "edge":
+    if provider in {"auto", "browser", "edge"}:
         return synthesize_with_edge_tts(text, mood, settings), "audio/mpeg"
 
     if provider != "piper":
-        raise TtsConfigurationError("Local TTS is not configured. Set TTS_PROVIDER=piper to enable it.")
+        raise TtsConfigurationError("Unsupported TTS_PROVIDER. Use edge, piper, auto, or browser.")
 
     return synthesize_with_piper(text, mood, settings), "audio/wav"
 
@@ -79,6 +79,9 @@ def synthesize_with_edge_tts(text, mood, settings):
 
 
 def get_edge_command(edge_exe):
+    if not edge_exe or edge_exe == "edge-tts":
+        return [sys.executable, "-m", "edge_tts"]
+
     if os.path.sep in edge_exe or (os.path.altsep and os.path.altsep in edge_exe):
         if not os.path.exists(edge_exe):
             raise TtsConfigurationError(f"edge-tts executable was not found: {edge_exe}")

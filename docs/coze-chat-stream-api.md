@@ -6,12 +6,14 @@
 - 本地后端地址：`http://127.0.0.1:5000/api/coze/chat/stream`
 - 前端 Vite 代理调用：`/api/coze/chat/stream`
 - 响应类型：`text/event-stream; charset=utf-8`
-- 对话模式：单轮输入，两阶段内部编排。
+- 对话模式：支持多轮输入，两阶段内部编排；路径规划智能体是主控智能体。
 
 接口内部会按顺序调用两个 Coze 智能体：
 
-1. 知识图谱路径规划智能体：根据用户需求返回 `ACK`、`KG_PATH`、`EXPLANATION`。
-2. 智能体推荐智能体：根据上一步选出的路线、候选智能体合集、用户原始需求，返回 `ACK`、`RECOMMENDED_AGENTS`、`SUMMARY`。
+1. 知识图谱路径规划智能体：根据用户需求自由生成本次对话的路线，返回 `ACK`、`KG_PATH`、`EXPLANATION`。
+2. 智能体推荐智能体：根据用户原始需求、上一步路线参考和候选智能体合集，返回 `ACK`、`RECOMMENDED_AGENTS`、`SUMMARY`。
+
+两阶段没有固定图谱约束。第一阶段路线只用于视觉表达和理解参考；第二阶段推荐从 60 个智能体候选集中独立选择组合。
 
 前端不会收到 `<ACK>`、`<KG_PATH>`、`<AGENT>` 这类原始标签。后端会把这些标签转换成结构化 SSE JSON。
 
@@ -31,16 +33,8 @@ Content-Type: application/json
 {
   "message": "我想优化白酒行业销售转化",
   "user_id": "123456789",
-  "parameters": {},
-  "agent_names": [
-    "帝王竞技场",
-    "第一性原理挖掘",
-    "①战略专家",
-    "②用户画像大师",
-    "用户分析-卖点专家",
-    "行业尽调",
-    "销售智能体"
-  ]
+  "conversation_id": "7483480124491380000",
+  "parameters": {}
 }
 ```
 
@@ -51,13 +45,38 @@ Content-Type: application/json
 | `message` | string | 是 | 用户本次输入，也是第二阶段里的“业务需求、学习目标或任务描述”。 |
 | `content` | string | 否 | `message` 的兼容别名；优先使用 `message`。 |
 | `user_id` | string | 否 | Coze 用户 ID；不传则使用后端默认值。 |
+| `conversation_id` | string | 否 | 主控会话 ID，等价于路径规划智能体会话 ID；第二轮开始传上一轮返回的 `master_conversation_id`。 |
+| `route_conversation_id` | string | 否 | `conversation_id` 的显式别名，用于路径规划主控智能体。 |
+| `conversation_ids` | object | 否 | 多智能体会话 ID。支持 `route_planner` / `master` / `knowledge_graph` 和 `agent_recommendation` / `recommender`。 |
 | `parameters` | object | 否 | 透传给两个 Coze 智能体的参数；不传默认为 `{}`。 |
-| `agent_names` | string[] | 否 | 第二阶段候选智能体合集；不传则使用后端默认列表。 |
+| `agent_names` | string[] | 否 | 第二阶段候选智能体合集覆盖值；不传则使用 `data/source_agents_full.json` 中的 60 个智能体。 |
+| `auto_save_history` | boolean | 否 | 是否让 Coze 保存本轮上下文，默认 `true`。多轮对话建议保持默认值。 |
+
+### 多轮对话
+
+第一轮可以不传 `conversation_id`，Coze 会创建新的主控会话。后端会在 SSE 中返回：
+
+```text
+event: conversation.updated
+data: {"event":"conversation.updated","stage":"knowledge_graph","conversation_key":"route_planner","conversation_id":"7483480124491380000","conversation_ids":{"route_planner":"7483480124491380000"},"master_conversation_id":"7483480124491380000"}
+```
+
+也会在 `workflow.completed` 里返回同一组 ID。下一轮把 `master_conversation_id` 或 `conversation_ids.route_planner` 作为 `conversation_id` 传回即可：
+
+```json
+{
+  "message": "继续刚才那条路径，帮我更聚焦成交转化",
+  "conversation_id": "7483480124491380000"
+}
+```
+
+推荐智能体默认每轮可独立生成；如果前端也希望推荐智能体保留自己的上下文，可以保存并回传 `conversation_ids.agent_recommendation`。
 
 第二阶段后端实际发送给推荐智能体的内容格式：
 
 ```text
 已选择的路线：{第一阶段 KG_PATH}
+可用智能体合集：[{60 个候选智能体名称}]
 可能包含业务需求、学习目标或任务描述：{message}
 ```
 
@@ -92,6 +111,7 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"KG_PATH","conte
 | `workflow.started` | `workflow.started` | 整个接口流程开始。 |
 | `workflow.stage.started` | `workflow.stage.started` | 某个阶段开始。 |
 | `workflow.stage.completed` | `workflow.stage.completed` | 某个阶段结束。 |
+| `conversation.updated` | `conversation.updated` | 某个阶段获得或更新了 Coze 会话 ID；`route_planner` 是主控会话。 |
 | `content.started` | `content.started` | 某个标签内容段开始。 |
 | `content.delta` | `content.delta` | 文本内容增量。 |
 | `content.completed` | `content.completed` | 某个标签内容段结束。 |
@@ -135,7 +155,7 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"EXPLANATION","c
 
 ### 图谱节点返回
 
-当前端已经默认渲染初始节点 `行业智能体作战图谱` 时，后端不会在 `nodes` 里重复返回根节点，只返回路线对应的业务节点。
+当前端已经默认渲染动态根节点 `dynamic-route-root` 时，后端不会在 `nodes` 里重复返回根节点，只返回本次路线拆出来的临时节点。
 
 例如 `KG_PATH` 为：
 
@@ -147,20 +167,20 @@ data: {"event":"content.delta","stage":"knowledge_graph","type":"EXPLANATION","c
 
 ```text
 event: graph.node.delta
-data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"industry-baijiu","label":"白酒行业招商获客","type":"industry","summary":"围绕招商获客、渠道承接、内容触达、销售跟进和数据复盘建立行业作战图谱。","parent":"root-brief","children":["baijiu-target","baijiu-leads","baijiu-content","baijiu-follow","baijiu-private","baijiu-review"],"agents":["agent-030","agent-001","agent-003","agent-004","agent-005","agent-008","agent-032"],"count":6}}
+data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"route-node-1","label":"白酒行业招商获客","type":"entry","summary":"当前动态路线节点：白酒行业招商获客","insight":"该节点来自路径规划智能体的实时输出，不依赖固定图谱包。","parent":"dynamic-route-root","children":["route-node-2"],"agents":[],"count":1}}
 
 event: graph.node.delta
-data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"baijiu-follow","label":"销售跟进","type":"capability","summary":"围绕客户阶段生成话术、节奏、异议处理和下一步动作。","parent":"industry-baijiu","children":["follow-script","follow-strategy","follow-objection","follow-deal"],"agents":["agent-005","agent-008","agent-009","agent-012","agent-007","agent-030","agent-035"],"count":4}}
+data: {"event":"graph.node.delta","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","node":{"id":"route-node-2","label":"销售跟进","type":"focus","summary":"当前动态路线节点：销售跟进","insight":"该节点来自路径规划智能体的实时输出，不依赖固定图谱包。","parent":"route-node-1","children":[],"agents":[],"count":0}}
 ```
 
 然后返回完整路径：
 
 ```text
 event: graph.path.resolved
-data: {"event":"graph.path.resolved","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","root_id":"root-brief","nodes":[{"id":"industry-baijiu","label":"白酒行业招商获客","type":"industry"},{"id":"baijiu-follow","label":"销售跟进","type":"capability"}],"edges":[{"id":"root-brief->industry-baijiu","source":"root-brief","target":"industry-baijiu","relationType":"starts_from_industry","relationLabel":"行业场景","sortOrder":1},{"id":"industry-baijiu->baijiu-follow","source":"industry-baijiu","target":"baijiu-follow","relationType":"maps_to_capability","relationLabel":"能力映射","sortOrder":4}]}
+data: {"event":"graph.path.resolved","stage":"knowledge_graph","route":"白酒行业招商获客-销售跟进","root_id":"dynamic-route-root","nodes":[{"id":"route-node-1","label":"白酒行业招商获客","type":"entry"},{"id":"route-node-2","label":"销售跟进","type":"focus"}],"edges":[{"id":"route-node-1->route-node-2","source":"route-node-1","target":"route-node-2","relationType":"dynamic_route","relationLabel":"动态路径","sortOrder":0}]}
 ```
 
-前端推荐使用 `graph.path.resolved.nodes` 的最后一个节点作为当前焦点。上面的例子里，最终焦点应为 `baijiu-follow`。
+前端推荐使用 `graph.path.resolved.nodes` 的最后一个节点作为当前焦点。上面的例子里，最终焦点应为 `route-node-2`。
 
 ## 第二阶段内容
 

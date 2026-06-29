@@ -1,4 +1,4 @@
-import graphPackRaw from '../../../../data/agent_graph_pack.json?raw';
+import sourceAgentsRaw from '../../../../data/source_agents_full.json?raw';
 import type { RecommendedAgent } from '../types';
 
 type CatalogAgent = {
@@ -14,8 +14,13 @@ type CatalogAgent = {
   [key: string]: unknown;
 };
 
-type GraphPack = {
-  agents?: CatalogAgent[];
+type SourceAgent = {
+  '功能'?: string;
+  '智能体介绍'?: string | null;
+  '智能体名称'?: string;
+  '智能体链接'?: string | null;
+  '知识库'?: string | null;
+  '类型'?: string;
 };
 
 export type AgentLaunchTarget = {
@@ -47,8 +52,7 @@ const avatarModules = import.meta.glob('../../../src/assets/agent-avatars/*.{png
 const GPT_ID_PATTERN = /g-[a-z0-9]+/i;
 const IMAGE_SOURCE_PATTERN = /^(?:data:image\/|https?:\/\/|\/).+\.(?:png|webp|jpe?g|gif|svg)(?:[?#].*)?$/i;
 
-const graphPack = parseGraphPack(graphPackRaw);
-const catalogAgents = graphPack.agents ?? [];
+const catalogAgents = parseSourceAgents(sourceAgentsRaw);
 const avatarByGptId = new Map(
   Object.entries(avatarModules)
     .map(([path, source]) => {
@@ -144,14 +148,40 @@ export function getAgentLaunchTargets(agents: EnrichedDrawAgent[]): AgentLaunchT
     });
 }
 
-function parseGraphPack(source: string): GraphPack {
+function parseSourceAgents(source: string): CatalogAgent[] {
   try {
-    return JSON.parse(source) as GraphPack;
-  } catch (error) {
-    console.warn('Failed to parse agent graph pack.', error);
+    const rows = JSON.parse(source) as SourceAgent[];
 
-    return {};
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    return rows.map((row, index) => {
+      const id = `agent-${String(index + 1).padStart(3, '0')}`;
+
+      return {
+        agentKey: id,
+        endpoint: firstString(row['智能体链接']),
+        functionLabel: firstString(row['功能']),
+        id,
+        knowledge: splitKnowledge(row['知识库']),
+        name: firstString(row['智能体名称']),
+        role: firstString(row['智能体介绍'], `${firstString(row['智能体名称'])} 是当前智能体库中的可调用能力。`),
+        typeLabel: firstString(row['类型']),
+      };
+    });
+  } catch (error) {
+    console.warn('Failed to parse source agent catalog.', error);
+
+    return [];
   }
+}
+
+function splitKnowledge(value: unknown) {
+  return firstString(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function getAgentAvatar(agent: Record<string, unknown>) {

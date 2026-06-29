@@ -1,172 +1,131 @@
-import graphPack from "../../data/agent_graph_pack.json";
+import sourceAgents from "../../data/source_agents_full.json";
 import { AGENT_GATEWAY_URL } from "./apiConfig.js";
 
-export const ROOT_ID = graphPack.rootId;
-export const libraryStats = graphPack.stats;
+export const ROOT_ID = "dynamic-route-root";
+export const libraryStats = {
+  agentCount: sourceAgents.length,
+  edgeCount: 0,
+  nodeCount: 1,
+};
 
-export const graphModel = Object.fromEntries(
-  graphPack.nodes.map((node) => [
-    node.id,
-    {
-      ...node,
-      children: node.children || [],
-      agents: node.agents || [],
-    },
-  ]),
-);
+export const graphModel = {
+  [ROOT_ID]: {
+    agents: sourceAgents.map((_, index) => agentIdFromIndex(index)),
+    children: [],
+    count: 0,
+    id: ROOT_ID,
+    insight: "路径由知识图谱智能体实时规划；前端只负责把路径可视化，不保存固定图谱。",
+    label: "动态路径",
+    parent: null,
+    summary: "等待路径规划智能体生成本次对话的动态路线。",
+    type: "dynamic-root",
+  },
+};
 
 export const agentCatalog = Object.fromEntries(
-  graphPack.agents.map((agent) => [
-    agent.id,
-    {
-      ...agent,
-      agentKey: agent.agentKey || agent.id,
-      provider: agent.provider || "local",
-      endpoint: agent.endpoint || AGENT_GATEWAY_URL,
-    },
-  ]),
+  sourceAgents.map((row, index) => {
+    const id = agentIdFromIndex(index);
+
+    return [
+      id,
+      {
+        agentKey: id,
+        endpoint: row["智能体链接"] || AGENT_GATEWAY_URL,
+        functionLabel: row["功能"] || "",
+        id,
+        knowledge: splitKnowledge(row["知识库"]),
+        name: row["智能体名称"] || id,
+        provider: row["智能体链接"] ? "chatgpt-gpt" : "local",
+        role: row["智能体介绍"] || `${row["智能体名称"] || id} 是当前智能体库中的可调用能力。`,
+        typeLabel: row["类型"] || "",
+      },
+    ];
+  }),
 );
 
-export const defaultBrief =
-  "我想从行业场景出发，沿着痛点、能力和动作生成一条适合业务演示的智能体作战路径。";
+export const defaultBrief = "请描述你的业务问题，路径规划智能体会生成本次动态路径，推荐智能体会独立匹配工具组合。";
 
 export const initialAgentMessages = [
   {
+    focusId: ROOT_ID,
     id: "m-0",
     role: "assistant",
-    text: "我会先从行业节点进入，再沿着痛点、能力和动作逐层点亮路径。60 个智能体会作为推荐调用资源挂在语义节点后面，不会替代行业图谱本身。",
-    focusId: ROOT_ID,
+    text: "我不会从固定图谱里选节点。你说出需求后，路径规划智能体会自由生成路线；推荐智能体会从 60 个智能体里独立挑组合。",
   },
 ];
 
-const NODE_KEYWORD_ALIASES = {
-  "industry-education": ["教培", "培训", "辅导", "老师", "学员", "课程", "家长", "续费", "试听"],
-  "industry-beauty": ["美业", "美容", "美发", "门店项目", "顾问成交", "到店"],
-  "industry-catering": ["餐饮", "外卖", "菜单", "翻台", "加盟店"],
-  "industry-baijiu": ["白酒", "酒商", "代理商", "招商会"],
-  "industry-local-life": ["本地生活", "团购", "核销", "探店"],
-  "industry-enterprise": ["企服", "企业服务", "销售线索", "方案生成"],
-};
-
 export function getNode(id) {
-  if (graphModel[id]) return graphModel[id];
-  return {
-    id,
-    label: id,
-    type: "node",
-    summary: `${id} 是一个待补充的图谱节点。`,
-    insight: "这个节点暂时不参与主展示链路。",
-    children: [],
-    agents: [],
-  };
+  return (
+    graphModel[id] || {
+      agents: [],
+      children: [],
+      id,
+      insight: "这是一次对话中生成的动态路径节点，不属于固定图谱。",
+      label: id,
+      parent: ROOT_ID,
+      summary: `${id} 来自路径规划智能体的实时输出。`,
+      type: "dynamic-route",
+    }
+  );
 }
 
-export function getChildren(id) {
-  return (getNode(id).children || []).map((childId) => getNode(childId));
+export function getChildren() {
+  return [];
 }
 
-export function hasChildren(id) {
-  return getChildren(id).length > 0;
+export function hasChildren() {
+  return false;
 }
 
 export function getFocusPath(focusId) {
-  const path = [];
-  const seen = new Set();
-  let cursor = getNode(focusId);
-
-  while (cursor && !seen.has(cursor.id)) {
-    path.unshift(cursor);
-    seen.add(cursor.id);
-    cursor = cursor.parent ? getNode(cursor.parent) : null;
-  }
-
-  if (!path.some((node) => node.id === ROOT_ID)) path.unshift(getNode(ROOT_ID));
-  return path;
+  return focusId && focusId !== ROOT_ID ? [getNode(ROOT_ID), getNode(focusId)] : [getNode(ROOT_ID)];
 }
 
-function collectDescendantAgentIds(startId, cap = 9) {
-  const out = [];
-  const seen = new Set([startId]);
-  const queue = [...(getNode(startId).children || [])];
-
-  while (queue.length && out.length < cap) {
-    const id = queue.shift();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    const node = getNode(id);
-    out.push(...(node.agents || []));
-    if (node.type === "agent") out.push(id);
-    queue.push(...(node.children || []));
-  }
-
-  return [...new Set(out)].slice(0, cap);
+export function getAgentPackage() {
+  return Object.values(agentCatalog).slice(0, 7);
 }
 
-export function getAgentPackage(focusId) {
+export function buildJumpPayload(focusId = ROOT_ID, source = "dynamic-route") {
   const focus = getNode(focusId);
-  const parent = focus.parent ? getNode(focus.parent) : null;
-  const grandParent = parent?.parent ? getNode(parent.parent) : null;
-
-  const ids = [
-    ...(focus.type === "agent" ? [focus.id] : []),
-    ...(focus.agents || []),
-    ...collectDescendantAgentIds(focus.id, 9),
-    ...(parent?.agents || []),
-    ...(grandParent?.agents || []),
-    ...graphModel[ROOT_ID].agents,
-  ];
-
-  return [...new Set(ids)]
-    .map((id) => agentCatalog[id])
-    .filter(Boolean)
-    .slice(0, 7);
-}
-
-export function buildJumpPayload(focusId, source = "graph") {
-  const focus = getNode(focusId);
-  const path = getFocusPath(focusId).map((node) => ({ id: node.id, label: node.label, type: node.type }));
-  const packageAgents = getAgentPackage(focusId);
 
   return {
-    source,
     focusId,
     focusLabel: focus.label,
     focusType: focus.type,
-    path,
-    providerStrategy: "backend-gateway",
     gatewayEndpoint: AGENT_GATEWAY_URL,
+    path: getFocusPath(focusId).map((node) => ({ id: node.id, label: node.label, type: node.type })),
+    providerStrategy: "backend-gateway",
+    recommendedAgents: [],
+    source,
     targetProvider: "coze-or-chatgpt-gpt",
-    recommendedAgents: packageAgents.map((agent) => ({
-      name: agent.name,
-      agentKey: agent.agentKey,
-      provider: agent.provider,
-      endpoint: agent.endpoint,
-    })),
   };
 }
 
 export function invokeAgentJump(agent, focusId = ROOT_ID) {
   return {
-    ok: true,
-    provider: agent.provider || "local",
     endpoint: agent.endpoint,
+    message: `${agent.name} 已进入调用草案：推荐结果来自推荐智能体，不来自固定图谱节点。`,
+    ok: true,
     payload: buildJumpPayload(focusId, "recommendation-rail"),
-    message: `${agent.name} 已进入调用草案：前端只传 agentKey 和图谱上下文，后端再决定走 Coze、GPTs 链接或本地代理。`,
+    provider: agent.provider || "local",
   };
 }
 
 export function buildCozeGatewayDraft({ agent, focusId, userMessage, conversationId }) {
   const focus = getNode(focusId);
+
   return {
-    endpoint: AGENT_GATEWAY_URL,
-    method: "POST",
-    provider: agent.provider || "coze",
     agentKey: agent.agentKey,
     conversationId: conversationId || null,
-    stream: true,
+    endpoint: AGENT_GATEWAY_URL,
+    graphContext: {
+      focusId,
+      focusLabel: focus.label,
+      focusType: focus.type,
+      path: getFocusPath(focusId).map((node) => node.label),
+      recommendedAgents: [],
+    },
     message: {
-      role: "user",
-      type: "question",
       content: userMessage,
       content_type: "text",
       meta_data: {
@@ -174,64 +133,35 @@ export function buildCozeGatewayDraft({ agent, focusId, userMessage, conversatio
         focusLabel: focus.label,
         focusType: focus.type,
       },
+      role: "user",
+      type: "question",
     },
-    graphContext: {
-      focusId,
-      focusLabel: focus.label,
-      focusType: focus.type,
-      path: getFocusPath(focusId).map((node) => node.label),
-      recommendedAgents: getAgentPackage(focusId).map((item) => item.name),
-    },
+    method: "POST",
+    provider: agent.provider || "coze",
+    stream: true,
   };
 }
 
-export function askRoutingAgent(message, currentFocusId = ROOT_ID) {
+export function askRoutingAgent(message) {
   const text = String(message || "").trim();
-  const lower = text.toLowerCase();
-  const candidates = graphPack.nodes
-    .filter((node) => node.id !== ROOT_ID)
-    .filter((node) => matchesRoutingText(node, text, lower))
-    .sort((a, b) => {
-      const order = {
-        industry: 1,
-        problem: 2,
-        capability: 2,
-        action: 3,
-        asset: 3,
-        variable: 3,
-        agent: 4,
-      };
-      return (order[a.type] || 9) - (order[b.type] || 9);
-    });
-
-  const target = candidates[0] || getNode(currentFocusId);
-  const focusId = target.id || currentFocusId || ROOT_ID;
-  const focus = getNode(focusId);
-  const action = hasChildren(focusId) ? "展开" : "选中并点亮路径";
-  const visibleParentId = hasChildren(focusId) ? focusId : focus.parent || ROOT_ID;
+  const routeLabel = text ? text.slice(0, 24) : "动态路径";
 
   return {
+    entities: [],
+    focusId: ROOT_ID,
     id: `m-${Date.now()}`,
     role: "assistant",
-    text: candidates[0]
-      ? `我识别到「${focus.label}」，已${action}这个图谱节点。`
-      : `我会保留当前焦点「${focus.label}」，先把你的补充写进语义简报，再等待下一步路径选择。`,
-    focusId,
-    entities: getChildren(visibleParentId)
-      .slice(0, 5)
-      .map((node) => node.label),
+    text: `我会把「${routeLabel}」交给路径规划智能体自由规划，不再匹配固定图谱节点。`,
   };
 }
 
-function matchesRoutingText(node, text, lower) {
-  const label = String(node.label || "");
-  const displayLabel = String(node.displayLabel || "");
-  const aliases = NODE_KEYWORD_ALIASES[node.id] || [];
+function agentIdFromIndex(index) {
+  return `agent-${String(index + 1).padStart(3, "0")}`;
+}
 
-  return (
-    (label && text.includes(label)) ||
-    (displayLabel && text.includes(displayLabel)) ||
-    lower.includes(label.toLowerCase()) ||
-    aliases.some((alias) => text.includes(alias) || lower.includes(alias.toLowerCase()))
-  );
+function splitKnowledge(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

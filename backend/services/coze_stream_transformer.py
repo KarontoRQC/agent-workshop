@@ -6,6 +6,16 @@ ROUTE_PLANNER_TAGS = {
     "ACK": ("<ACK>", "</ACK>"),
     "KG_PATH": ("<KG_PATH>", "</KG_PATH>"),
     "EXPLANATION": ("<EXPLANATION>", "</EXPLANATION>"),
+    "EXPLANATION_MISSPELLED": ("<EXPLATION>", "</EXPLATION>"),
+}
+
+TAG_TYPE_ALIASES = {
+    "EXPLANATION_MISSPELLED": "EXPLANATION",
+}
+
+TAG_CLOSE_ALIASES = {
+    "EXPLANATION": ("</EXPLANATION>", "</EXPLATION>"),
+    "EXPLANATION_MISSPELLED": ("</EXPLATION>", "</EXPLANATION>"),
 }
 
 RECOMMENDER_TAGS = {
@@ -56,17 +66,18 @@ class TaggedContentParser:
 
                 self.buffer = self.buffer[tag_index + len(open_tag) :]
                 self.current_type = section_type
-                self.current_buffer = "" if section_type in self.section_emitters else None
-                stream_emitter = self.section_stream_emitters.get(section_type)
+                canonical_type = self._canonical_type(section_type)
+                self.current_buffer = "" if canonical_type in self.section_emitters else None
+                stream_emitter = self.section_stream_emitters.get(canonical_type)
                 self.current_stream_emitter = stream_emitter() if stream_emitter else None
                 self.at_section_start = True
-                yield content_event("content.started", {"type": section_type})
+                yield content_event("content.started", {"type": canonical_type})
                 continue
 
-            close_tag = self.section_tags[self.current_type][1]
-            close_index = self.buffer.find(close_tag)
+            close_tag_match = self._find_next_close_tag()
 
-            if close_index >= 0:
+            if close_tag_match is not None:
+                close_index, close_tag = close_tag_match
                 content = self.buffer[:close_index].rstrip()
                 yield from self._content_delta(content)
                 yield from self._finish_current_section()
@@ -79,7 +90,7 @@ class TaggedContentParser:
                 self.buffer = ""
                 return
 
-            keep_length = _longest_suffix_that_starts_tag(self.buffer, [close_tag])
+            keep_length = _longest_suffix_that_starts_tag(self.buffer, self._current_close_tags())
             content = self.buffer[:-keep_length] if keep_length else self.buffer
             yield from self._content_delta(content)
             self.buffer = self.buffer[-keep_length:] if keep_length else ""
@@ -154,7 +165,7 @@ class TaggedContentParser:
         yield content_event(
             "content.delta",
             {
-                "type": self.current_type,
+                "type": self._canonical_type(self.current_type),
                 "content_type": "text",
                 "content": content,
             },
@@ -162,7 +173,7 @@ class TaggedContentParser:
 
     def _finish_current_section(self):
         if self.current_buffer is not None:
-            emitter = self.section_emitters.get(self.current_type)
+            emitter = self.section_emitters.get(self._canonical_type(self.current_type))
 
             if emitter:
                 yield from emitter(self.current_buffer.strip())
@@ -170,11 +181,31 @@ class TaggedContentParser:
         if self.current_stream_emitter is not None:
             yield from self.current_stream_emitter.flush()
 
-        yield content_event("content.completed", {"type": self.current_type})
+        yield content_event("content.completed", {"type": self._canonical_type(self.current_type)})
         self.current_type = None
         self.current_buffer = None
         self.current_stream_emitter = None
         self.at_section_start = False
+
+    def _canonical_type(self, section_type):
+        return TAG_TYPE_ALIASES.get(section_type, section_type)
+
+    def _current_close_tags(self):
+        if self.current_type is None:
+            return ()
+
+        return TAG_CLOSE_ALIASES.get(self.current_type, (self.section_tags[self.current_type][1],))
+
+    def _find_next_close_tag(self):
+        matches = []
+
+        for close_tag in self._current_close_tags():
+            close_index = self.buffer.find(close_tag)
+
+            if close_index >= 0:
+                matches.append((close_index, close_tag))
+
+        return min(matches, default=None, key=lambda match: match[0])
 
 
 def iter_tagged_events(

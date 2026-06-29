@@ -623,7 +623,7 @@
 }
 
 .agent-console-thread {
-  max-height: 25vh;
+  max-height: clamp(220px, 34vh, 430px);
   min-height: 0;
   overflow-y: auto;
   padding: 13px;
@@ -632,6 +632,21 @@
 
 .agent-console-thread::-webkit-scrollbar {
   display: none;
+}
+
+.agent-turn {
+  display: grid;
+  gap: 0;
+  padding-bottom: 18px;
+}
+
+.agent-turn + .agent-turn {
+  padding-top: 16px;
+  border-top: 1px solid rgba(137, 226, 205, 0.08);
+}
+
+.agent-turn:last-child {
+  padding-bottom: 0;
 }
 
 .agent-empty-state {
