@@ -683,7 +683,7 @@ function wait(durationMs: number) {
 
 function stripSpeechTagSyntax(text: string) {
   return String(text || '')
-    .replace(/<\/?ACK\b[^>]*>/gi, '')
+    .replace(/<\/?(?:ACK|EXPLANATION|SUMMARY)\b[^>]*>/gi, '')
     .trim();
 }
 
@@ -748,6 +748,8 @@ export default function App() {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
   const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
+  const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
+  const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
   const [recommendationAnimationReady, setRecommendationAnimationReady] = useState(false);
   const [draft, setDraft] = useState('');
   const [inputMode, setInputMode] = useState<InputMode>('voice');
@@ -908,6 +910,8 @@ export default function App() {
       setAgentStatus('streaming');
       setLastAction(null);
       setLastHeard('');
+      setRouteDockVisible(false);
+      setRecommendationDockVisible(false);
       setRecommendationAnimationReady(false);
       setAgentTurns((current) => [...current.slice(-3), createAgentTurn(turnId, text)]);
       setMessages((current) => [
@@ -1088,6 +1092,7 @@ export default function App() {
         }
 
         setLastAction(routeAction);
+        setRouteDockVisible(true);
         await wait(PATH_MATCH_ANIMATION_MS);
       };
       const runCardAnimation = async () => {
@@ -1098,6 +1103,7 @@ export default function App() {
         }
 
         const settled = waitForCardAnimationSettled();
+        setRecommendationDockVisible(true);
         setRecommendationAnimationReady(true);
         setDrawOverlayPulse((pulse) => pulse + 1);
         window.setTimeout(() => setRecommendationAnimationReady(false), CARD_DRAW_ACTIVE_MS);
@@ -1454,7 +1460,6 @@ export default function App() {
   const latestAgentTurn = agentTurns.at(-1) ?? null;
   const latestRecommendation = latestAgentTurn?.workflow.agentRecommendation;
   const recommendedAgents = latestRecommendation?.agents ?? [];
-  const drawOverlayReplyText = latestRecommendation?.SUMMARY.trim() || latestAgentTurn?.fallbackText.trim() || '';
   const drawOverlayActive = Boolean(
     recommendationAnimationReady &&
       agentStatus === 'streaming' &&
@@ -1466,6 +1471,8 @@ export default function App() {
   );
   const drawOverlayPulseKey = recommendationAnimationReady ? drawOverlayPulse : 0;
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
+  const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
+  const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
   const graphFocusKey =
     lastAction?.type === 'focus_graph_path'
       ? `${lastAction.label}:${lastAction.route.join('/')}`
@@ -1481,32 +1488,29 @@ export default function App() {
   const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
   const captionText =
     voiceCaptionError ||
-    (lastAction?.type === 'focus_graph_path'
-      ? isChineseLanguage(interfaceLanguage)
-        ? `本地图谱动作：${lastAction.route.join(' / ')}`
-        : `Local graph action: ${lastAction.route.join(' / ')}`
-      : inputMode === 'text'
-        ? ''
-        : voice.listening
-          ? voiceAwake
-            ? lastHeard
+    (inputMode === 'text'
+      ? ''
+      : voice.listening
+        ? voiceAwake
+          ? lastHeard
             ? isChineseLanguage(interfaceLanguage)
               ? `语音模式已激活。听到：${lastHeard}`
               : `Voice mode active. Heard: ${lastHeard}`
             : isChineseLanguage(interfaceLanguage)
               ? '语音模式已激活，可以直接说。'
               : 'Voice mode active. Speak naturally.'
-          : isChineseLanguage(interfaceLanguage)
-            ? '说“贾维斯”唤醒语音模式。'
-            : 'Say "Jarvis" to wake voice mode.'
         : isChineseLanguage(interfaceLanguage)
-          ? '语音待命。'
-          : 'Voice standby.');
+          ? '说“贾维斯”唤醒语音模式。'
+          : 'Say "Jarvis" to wake voice mode.'
+      : isChineseLanguage(interfaceLanguage)
+        ? '语音待命。'
+        : 'Voice standby.');
 
   return (
     <main className="app-shell">
       <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
       <div className="scene-vignette" />
+      <WorkflowDock active={agentStatus === 'streaming'} agents={dockRecommendedAgents} routeSegments={dockRouteSegments} />
 
       <section className="dialogue-stage" aria-label="AI particle dialogue">
         {captionText ? (
@@ -1532,6 +1536,7 @@ export default function App() {
         onSend={sendDraftMessage}
         onToggleVoice={toggleManualVoiceSession}
         setDraft={setDraft}
+        speakingText={currentSpeechText}
         status={agentStatus}
         turn={latestAgentTurn}
         voiceHeardText={lastHeard}
@@ -1545,9 +1550,41 @@ export default function App() {
         agents={recommendedAgents}
         onSettled={handleDrawOverlaySettled}
         pulseKey={drawOverlayPulseKey}
-        replyText={drawOverlayReplyText}
+        replyText=""
       />
     </main>
+  );
+}
+
+function WorkflowDock({ active, agents, routeSegments }: { active: boolean; agents: RecommendedAgent[]; routeSegments: string[] }) {
+  const hasRoute = routeSegments.length > 0;
+  const hasAgents = agents.length > 0;
+  const visibleAgents = agents.slice(0, 4);
+
+  if (!hasRoute && !hasAgents) {
+    return null;
+  }
+
+  return (
+    <aside className="workflow-dock" data-active={active} aria-label="Agent workflow context">
+      {hasRoute ? <RouteResult active={active} routeSegments={routeSegments} /> : null}
+      {hasAgents ? (
+        <section className="workflow-dock-section workflow-agent-panel">
+          <div className="workflow-dock-title">
+            <Sparkles size={14} />
+            <strong>推荐智能体</strong>
+            <span>{agents.length}</span>
+          </div>
+          <div className="workflow-agent-list">
+            {visibleAgents.map((agent, index) => (
+              <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
+            ))}
+          </div>
+          {agents.length > visibleAgents.length ? <em className="workflow-agent-more">+{agents.length - visibleAgents.length} 个待查看</em> : null}
+          <RecommendedAgentLaunchBar agents={agents} />
+        </section>
+      ) : null}
+    </aside>
   );
 }
 
@@ -1559,6 +1596,7 @@ type AgentConsoleProps = {
   onSend: (event?: FormEvent<HTMLFormElement>) => void;
   onToggleVoice: () => void;
   setDraft: (value: string) => void;
+  speakingText: string;
   status: AgentStatus;
   turn: AgentTurn | null;
   voiceAwake: boolean;
@@ -1576,6 +1614,7 @@ function AgentConsole({
   onSend,
   onToggleVoice,
   setDraft,
+  speakingText,
   status,
   turn,
   voiceAwake,
@@ -1642,7 +1681,7 @@ function AgentConsole({
                 </span>
                 <p>{turn.user}</p>
               </article>
-              <AgentResponse turn={turn} active={isStreaming} />
+              <AgentResponse turn={turn} active={isStreaming} speakingText={speakingText} />
             </>
           ) : (
             <article className="agent-user-line">
@@ -1716,27 +1755,11 @@ function AgentConsole({
   );
 }
 
-function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
+function AgentResponse({ active, speakingText, turn }: { active: boolean; speakingText: string; turn: AgentTurn }) {
   const workflow = turn.workflow;
   const knowledgeGraph = workflow.knowledgeGraph;
   const recommendation = workflow.agentRecommendation;
-  const routeSegments = splitRouteText(knowledgeGraph.KG_PATH);
   const showOutput = hasAgentOutput(turn);
-  const collapseKnowledgeThinking =
-    !active ||
-    Boolean(
-      knowledgeGraph.ACK ||
-        routeSegments.length ||
-        knowledgeGraph.EXPLANATION ||
-        recommendation.THINKING_PROCESS ||
-        recommendation.ACK ||
-        recommendation.agents.length ||
-        recommendation.SUMMARY ||
-        turn.fallbackText ||
-        turn.error,
-    );
-  const collapseRecommendationThinking =
-    !active || Boolean(recommendation.ACK || recommendation.agents.length || recommendation.SUMMARY || turn.fallbackText || turn.error);
 
   if (!showOutput && active) {
     return <TypingLine />;
@@ -1744,68 +1767,56 @@ function AgentResponse({ active, turn }: { active: boolean; turn: AgentTurn }) {
 
   return (
     <article className="agent-response">
-      {renderAgentAnswerText(knowledgeGraph.DIRECT_REPLY)}
-      {knowledgeGraph.THINKING_PROCESS && (
-        <section className="agent-section agent-thinking-section" data-collapsed={collapseKnowledgeThinking} aria-expanded={!collapseKnowledgeThinking}>
-          <div className="agent-section-title">
-            <BrainCircuit size={14} />
-            <strong>深度思考</strong>
-          </div>
-          {!collapseKnowledgeThinking && <p>{knowledgeGraph.THINKING_PROCESS}</p>}
-        </section>
-      )}
-      {renderAgentAnswerText(knowledgeGraph.ACK)}
-      {routeSegments.length > 0 && <RouteResult routeSegments={routeSegments} active={active && !knowledgeGraph.EXPLANATION} />}
-      {renderAgentAnswerText(knowledgeGraph.EXPLANATION)}
-      {recommendation.THINKING_PROCESS && (
-        <section className="agent-section agent-thinking-section" data-collapsed={collapseRecommendationThinking} aria-expanded={!collapseRecommendationThinking}>
-          <div className="agent-section-title">
-            <BrainCircuit size={14} />
-            <strong>推荐推理</strong>
-          </div>
-          {!collapseRecommendationThinking && <p>{recommendation.THINKING_PROCESS}</p>}
-        </section>
-      )}
-      {renderAgentAnswerText(recommendation.ACK)}
-      {recommendation.agents.length > 0 && (
-        <section className="agent-section recommended-agent-section">
-          <div className="agent-section-title">
-            <Sparkles size={14} />
-            <strong>推荐智能体</strong>
-            <small className="recommended-agent-section-subtitle">点击卡片跳转对应智能体</small>
-          </div>
-          <div className="recommended-agent-list">
-            {recommendation.agents.map((agent, index) => (
-              <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
-            ))}
-          </div>
-          <RecommendedAgentLaunchBar agents={recommendation.agents} />
-        </section>
-      )}
-      {renderAgentAnswerText(recommendation.SUMMARY)}
-      {renderAgentAnswerText(turn.fallbackText)}
+      {renderThinkingText('思考过程', knowledgeGraph.THINKING_PROCESS, active && !knowledgeGraph.ACK)}
+      {renderAgentSubtitle(speakingText)}
+      {renderThinkingText('推荐思考', recommendation.THINKING_PROCESS, active && !recommendation.ACK)}
       {turn.error && <p className="agent-error-text">{turn.error}</p>}
       {active && <TypingLine />}
     </article>
   );
 }
 
-function renderAgentAnswerText(text: string) {
+function renderThinkingText(label: string, text: string, active: boolean) {
   const visibleText = stripSpeechTagSyntax(text);
 
-  return visibleText ? <p className="agent-answer-text">{visibleText}</p> : null;
+  if (!visibleText) {
+    return null;
+  }
+
+  return (
+    <section className="agent-thinking-stream" data-active={active}>
+      <div>
+        <BrainCircuit size={13} />
+        <strong>{label}</strong>
+      </div>
+      <p>{visibleText}</p>
+    </section>
+  );
+}
+
+function renderAgentSubtitle(text: string) {
+  const visibleText = stripSpeechTagSyntax(text);
+
+  return visibleText ? (
+    <section className="agent-subtitle-line">
+      <p>{visibleText}</p>
+    </section>
+  ) : null;
 }
 
 function RouteResult({ active, routeSegments }: { active: boolean; routeSegments: string[] }) {
   return (
-    <section className={`agent-route-result ${active ? 'is-running' : ''}`}>
-      <div className="agent-section-title">
+    <section className={`workflow-dock-section workflow-route-panel ${active ? 'is-running' : ''}`}>
+      <div className="workflow-dock-title">
         <GitBranch size={14} />
         <strong>知识路径</strong>
+        <span>{routeSegments.length}</span>
       </div>
-      <div className="route-segment-row">
-        {routeSegments.map((segment) => (
-          <span key={segment}>{segment}</span>
+      <div className="workflow-route-chain">
+        {routeSegments.map((segment, index) => (
+          <span data-current={index === routeSegments.length - 1} key={`${index}-${segment}`}>
+            {segment}
+          </span>
         ))}
       </div>
     </section>
