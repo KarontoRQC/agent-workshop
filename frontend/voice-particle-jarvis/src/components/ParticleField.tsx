@@ -51,6 +51,17 @@ function smoothstep(edge0: number, edge1: number, value: number) {
   return nextValue * nextValue * (3 - 2 * nextValue);
 }
 
+function seededUnit(seed: number) {
+  let value = seed >>> 0;
+  value = Math.imul(value ^ (value >>> 15), 0x2c1b3c6d);
+  value = Math.imul(value ^ (value >>> 12), 0x297a2d39);
+  return ((value ^ (value >>> 15)) >>> 0) / 4294967295;
+}
+
+function seededSigned(seed: number) {
+  return seededUnit(seed) * 2 - 1;
+}
+
 function sphericalToPoint(theta: number, latitude: number, radius: number, target: THREE.Vector3) {
   const horizontal = Math.cos(latitude);
 
@@ -356,7 +367,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         if (canBecomeRouteNode && comfortablyVisible) {
           candidatePool.push({
             index,
-            score: Math.random() + seeds[seedOffset + S_A] * 0.22 + seeds[seedOffset + S_E] * 0.08,
+            score: seededUnit(routeHash + index * 2654435761) + seeds[seedOffset + S_A] * 0.22 + seeds[seedOffset + S_E] * 0.08,
             x,
             y,
             z,
@@ -403,20 +414,34 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         0.34 + ((routeHash % 17) / 17) * 0.035,
       );
 
-      const pathWidth = routeCount <= 2 ? (width < 720 ? 0.46 : 0.62) : width < 720 ? 0.78 : 1.08;
-      const pathHeight = width < 720 ? 0.16 : 0.22;
-      const depthSpread = width < 720 ? 0.06 : 0.1;
+      const isCompact = width < 720;
+      const pathWidth = routeCount <= 2 ? (isCompact ? 0.68 : 0.96) : isCompact ? 1.08 : 1.56;
+      const pathHeight = isCompact ? 0.32 : 0.46;
+      const depthSpread = isCompact ? 0.12 : 0.2;
+      const routeTilt = seededSigned(routeHash + 53) * (isCompact ? 0.11 : 0.18);
+      const routeWaveCount = 1.35 + seededUnit(routeHash + 71) * 1.2;
+      const horizontalJitter = isCompact ? 0.08 : 0.13;
+      const verticalJitter = isCompact ? 0.09 : 0.15;
       const routePhase = routeHash * 0.0007;
 
       lockedGraphNodes = selectedCandidates.map((candidate, routeIndex) => {
         const progress = routeCount === 1 ? 0.5 : routeIndex / (routeCount - 1);
         const centeredProgress = progress - 0.5;
         const pathBend = Math.sin(progress * Math.PI);
-        const nodeX = centeredProgress * pathWidth;
+        const nodeSeed = routeHash + routeIndex * 19349663;
+        const edgeDamping = routeIndex === 0 || routeIndex === routeCount - 1 ? 0.42 : 1;
+        const nodeX =
+          centeredProgress * pathWidth +
+          seededSigned(nodeSeed + 17) * horizontalJitter * edgeDamping +
+          pathBend * routeTilt;
         const nodeY =
-          Math.sin((progress - 0.5) * Math.PI) * pathHeight +
-          (routeIndex % 2 === 0 ? -0.035 : 0.045) * (1 - pathBend * 0.16);
-        const nodeZ = Math.cos(progress * Math.PI * 1.25 + routePhase) * depthSpread;
+          Math.sin((progress - 0.5) * Math.PI) * pathHeight * 0.62 +
+          Math.sin(progress * Math.PI * routeWaveCount + routePhase) * pathHeight * 0.42 +
+          (routeIndex % 2 === 0 ? -1 : 1) * (0.07 + seededUnit(nodeSeed + 29) * 0.06) * (0.76 + pathBend * 0.24) +
+          seededSigned(nodeSeed + 37) * verticalJitter;
+        const nodeZ =
+          Math.cos(progress * Math.PI * (1.05 + seededUnit(routeHash + 97) * 0.75) + routePhase) * depthSpread +
+          seededSigned(nodeSeed + 43) * depthSpread * 0.58;
 
         return {
           particleIndex: candidate.index,
@@ -429,10 +454,33 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         };
       });
 
+      const minNodeDistance = isCompact ? 0.24 : 0.32;
+      lockedGraphNodes.forEach((node, nodeIndex) => {
+        for (let previousIndex = 0; previousIndex < nodeIndex; previousIndex += 1) {
+          const previousNode = lockedGraphNodes[previousIndex];
+          const dx = node.x - previousNode.x;
+          const dy = node.y - previousNode.y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance >= minNodeDistance) {
+            continue;
+          }
+
+          const push = minNodeDistance - distance;
+          const pushAngle = routePhase + nodeIndex * 1.37 + previousIndex * 0.61;
+          node.x += Math.cos(pushAngle) * push * 0.72;
+          node.y += Math.sin(pushAngle) * push * 0.9 + (nodeIndex % 2 === 0 ? -push : push) * 0.36;
+        }
+
+        node.x = clamp(node.x, -pathWidth * 0.68, pathWidth * 0.68);
+        node.y = clamp(node.y, -pathHeight * 1.08, pathHeight * 1.08);
+        node.z = clamp(node.z, -depthSpread * 1.42, depthSpread * 1.42);
+      });
+
       lockedGraphEdges = lockedGraphNodes.slice(1).map((_, index) => [index, index + 1]);
       lockedParticleTargets = new Map();
       syncGraphLabels(lockedGraphNodes.map((node) => node.label));
-      const particlePathScale = width < 720 ? 0.42 : 0.5;
+      const particlePathScale = isCompact ? 0.46 : 0.56;
 
       lockedGraphNodes.forEach((node) => {
         lockedParticleTargets.set(node.particleIndex, {
