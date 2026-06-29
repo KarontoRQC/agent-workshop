@@ -1846,8 +1846,6 @@ export default function App() {
     lastAction?.type === 'focus_graph_path'
       ? `${lastAction.label}:${lastAction.route.join('/')}`
       : '';
-  const graphRouteForParticles = workflowHighlight === 'route' ? graphRoute : [];
-  const graphFocusKeyForParticles = workflowHighlight === 'route' ? graphFocusKey : '';
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
@@ -1881,8 +1879,8 @@ export default function App() {
     <main className="app-shell">
       <ParticleField
         audioLevel={micLevel.level}
-        graphFocusKey={graphFocusKeyForParticles}
-        graphRoute={graphRouteForParticles}
+        graphFocusKey={graphFocusKey}
+        graphRoute={graphRoute}
         settings={settings}
       />
       <div className="scene-vignette" />
