@@ -13,6 +13,7 @@ import {
   ROOT_ID,
 } from "./agentAdapter.js";
 import { AgentDock } from "./components/AgentDock.jsx";
+import { AgentDrawOverlay } from "./components/AgentDrawOverlay.jsx";
 import { ControlDock } from "./components/ControlDock.jsx";
 import { KnowledgeGraph } from "./components/KnowledgeGraph.jsx";
 import { RecommendationRail } from "./components/RecommendationRail.jsx";
@@ -90,7 +91,12 @@ export function App() {
     error: "",
   });
   const [agentTurns, setAgentTurns] = useState([]);
+  const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
   const agentRequestRef = useRef(null);
+  const drawOverlaySignalRef = useRef({
+    signalActive: false,
+    agentCount: 0,
+  });
   const graphPathAnimationRef = useRef({
     queue: [],
     seen: new Set(),
@@ -101,7 +107,12 @@ export function App() {
     holdingReply: false,
     graphStarted: false,
   });
-  const hasRecommendedAgents = agentStream.workflow.agentRecommendation.agents.length > 0;
+  const agentRecommendation = agentStream.workflow.agentRecommendation;
+  const recommendedAgents = agentRecommendation.agents || [];
+  const hasRecommendedAgents = recommendedAgents.length > 0;
+  const recommendationDrawSignal = hasRecommendationDrawSignal(agentRecommendation);
+  const isDrawOverlayActive =
+    agentStream.status === "streaming" && recommendationDrawSignal;
 
   useEffect(() => {
     return () => {
@@ -109,6 +120,24 @@ export function App() {
       clearGraphPathAnimation({ releaseHold: false });
     };
   }, []);
+
+  useEffect(() => {
+    const signal = agentStream.status === "streaming" && recommendationDrawSignal;
+    const currentAgentCount = recommendedAgents.length;
+    const previous = drawOverlaySignalRef.current;
+    const shouldPulse = (signal && !previous.signalActive) || currentAgentCount > previous.agentCount;
+
+    if (shouldPulse) {
+      setDrawOverlayPulse((pulse) => pulse + 1);
+    }
+
+    previous.signalActive = signal;
+    previous.agentCount = currentAgentCount;
+
+    if (agentStream.status !== "streaming" && currentAgentCount === 0) {
+      previous.signalActive = false;
+    }
+  }, [agentStream.status, recommendationDrawSignal, recommendedAgents.length]);
 
   function focusNode(id) {
     setSelectedId(id);
@@ -516,7 +545,7 @@ export function App() {
       <RecommendationRail
         focusId={focusId}
         selectedId={selectedId}
-        recommendedAgents={agentStream.workflow.agentRecommendation.agents}
+        recommendedAgents={recommendedAgents}
         status={agentStream.status}
       />
       <ControlDock
@@ -526,7 +555,17 @@ export function App() {
         setDepth={setDepth}
         onReset={resetGraph}
       />
+      <AgentDrawOverlay agents={recommendedAgents} active={isDrawOverlayActive} pulseKey={drawOverlayPulse} />
     </main>
+  );
+}
+
+function hasRecommendationDrawSignal(agentRecommendation) {
+  return Boolean(
+    agentRecommendation.THINKING_PROCESS ||
+      agentRecommendation.ACK ||
+      agentRecommendation.SUMMARY ||
+      (agentRecommendation.agents || []).length,
   );
 }
 
