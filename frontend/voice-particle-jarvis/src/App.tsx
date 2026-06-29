@@ -17,7 +17,7 @@ import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
 import { API_BASE_URL, streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
-import { enrichDrawAgent, getAgentLaunchTargets, type AgentLaunchTarget } from './lib/agentLaunchCatalog';
+import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from './lib/agentLaunchCatalog';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
 import type {
   AgentAction,
@@ -1426,19 +1426,18 @@ export default function App() {
           });
         });
       };
-      const runPathAnimation = async () => {
+      const activatePathAnimation = async () => {
         const routeAction = await waitForRouteAction();
 
         if (!routeAction || routeAction.type !== 'focus_graph_path') {
-          return;
+          return false;
         }
 
         revealWorkflow({ knowledgePath: true });
         setLastAction(routeAction);
         setRouteDockVisible(true);
         setWorkflowHighlight('route');
-        await wait(PATH_MATCH_ANIMATION_MS);
-        setWorkflowHighlight('none');
+        return true;
       };
       const runCardAnimation = async () => {
         const hasCards = await waitForCardsReady();
@@ -1478,8 +1477,13 @@ export default function App() {
       };
       const orchestrationPromise = (async () => {
         await playSpeechSegment('knowledgeAck');
-        await runPathAnimation();
-        await playSpeechSegment('knowledgeExplanation');
+        const pathAnimationActive = await activatePathAnimation();
+        if (pathAnimationActive) {
+          await Promise.all([playSpeechSegment('knowledgeExplanation'), wait(PATH_MATCH_ANIMATION_MS)]);
+        } else {
+          await playSpeechSegment('knowledgeExplanation');
+        }
+        setWorkflowHighlight('none');
         await playSpeechSegment('recommendationAck');
         await Promise.all([playSpeechSegment('recommendationSummary'), runCardAnimation()]);
         setWorkflowHighlight('none');
@@ -1842,6 +1846,8 @@ export default function App() {
     lastAction?.type === 'focus_graph_path'
       ? `${lastAction.label}:${lastAction.route.join('/')}`
       : '';
+  const graphRouteForParticles = workflowHighlight === 'route' ? graphRoute : [];
+  const graphFocusKeyForParticles = workflowHighlight === 'route' ? graphFocusKey : '';
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
@@ -1873,7 +1879,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
+      <ParticleField
+        audioLevel={micLevel.level}
+        graphFocusKey={graphFocusKeyForParticles}
+        graphRoute={graphRouteForParticles}
+        settings={settings}
+      />
       <div className="scene-vignette" />
       <WorkflowDock
         active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
@@ -2338,24 +2349,6 @@ function RecommendedAgentLaunchBar({ agents }: { agents: RecommendedAgent[] }) {
       </button>
     </div>
   );
-}
-
-function openAgentLaunchTargets(launchTargets: AgentLaunchTarget[]) {
-  const openedTabs = launchTargets.map((target) => ({
-    target,
-    tab: window.open('about:blank', '_blank'),
-  }));
-
-  openedTabs.forEach(({ target, tab }) => {
-    if (tab) {
-      tab.opener = null;
-      tab.location.replace(target.href);
-
-      return;
-    }
-
-    window.open(target.href, '_blank', 'noopener,noreferrer');
-  });
 }
 
 function TypingLine() {

@@ -148,6 +148,36 @@ export function getAgentLaunchTargets(agents: EnrichedDrawAgent[]): AgentLaunchT
     });
 }
 
+export function openAgentLaunchTargets(launchTargets: AgentLaunchTarget[]) {
+  const targets = normalizeLaunchTargets(launchTargets);
+
+  if (targets.length === 0) {
+    return;
+  }
+
+  const openedTabs = targets.map((target) => ({
+    target,
+    tab: window.open('about:blank', '_blank'),
+  }));
+  const openedEntries = openedTabs.filter((entry): entry is { target: AgentLaunchTarget; tab: Window } => Boolean(entry.tab));
+
+  if (openedEntries.length === targets.length) {
+    openedEntries.forEach(({ target, tab }) => navigateOpenedTab(tab, target.href));
+    return;
+  }
+
+  const hubEntry = openedEntries.shift();
+  const hubTab = hubEntry?.tab || window.open('about:blank', '_blank');
+
+  if (hubTab) {
+    writeLaunchHub(hubTab, targets);
+  } else {
+    window.location.href = targets[0].href;
+  }
+
+  openedEntries.forEach(({ target, tab }) => navigateOpenedTab(tab, target.href));
+}
+
 function parseSourceAgents(source: string): CatalogAgent[] {
   try {
     const rows = JSON.parse(source) as SourceAgent[];
@@ -305,6 +335,134 @@ function getAgentLaunchTarget(endpoint: unknown) {
     href,
     isChatGpt: /^https:\/\/chatgpt\.com\/g\//i.test(href),
   };
+}
+
+function normalizeLaunchTargets(launchTargets: AgentLaunchTarget[]) {
+  const seen = new Set<string>();
+
+  return launchTargets
+    .map((target) => ({
+      href: firstString(target.href),
+      name: firstString(target.name, target.href),
+    }))
+    .filter((target) => {
+      if (!target.href || seen.has(target.href)) {
+        return false;
+      }
+
+      seen.add(target.href);
+      return true;
+    });
+}
+
+function navigateOpenedTab(tab: Window, href: string) {
+  try {
+    tab.opener = null;
+    tab.location.replace(href);
+  } catch {
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function writeLaunchHub(tab: Window, targets: AgentLaunchTarget[]) {
+  const targetJson = JSON.stringify(targets).replace(/</g, '\\u003c');
+  const links = targets
+    .map(
+      (target, index) => `
+        <a class="agent-link" href="${escapeHtml(target.href)}" target="_blank" rel="noopener noreferrer">
+          <span>${String(index + 1).padStart(2, '0')}</span>
+          <strong>${escapeHtml(target.name)}</strong>
+          <em>${escapeHtml(target.href)}</em>
+        </a>`,
+    )
+    .join('');
+
+  tab.document.open();
+  tab.document.write(`<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>智能体组合入口</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", system-ui, sans-serif; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: clamp(24px, 5vw, 56px);
+        color: rgba(245, 252, 255, 0.94);
+        background:
+          radial-gradient(circle at 20% 12%, rgba(85, 223, 255, 0.2), transparent 32%),
+          radial-gradient(circle at 82% 20%, rgba(255, 215, 118, 0.16), transparent 30%),
+          linear-gradient(135deg, #030817, #07162e 52%, #03131f);
+      }
+      main { width: min(880px, 100%); margin: 0 auto; display: grid; gap: 18px; }
+      h1 { margin: 0; font-size: clamp(24px, 4vw, 42px); letter-spacing: 0; }
+      p { margin: 0; color: rgba(214, 236, 255, 0.72); line-height: 1.6; }
+      button {
+        justify-self: start;
+        height: 44px;
+        padding: 0 18px;
+        border: 1px solid rgba(137, 226, 205, 0.36);
+        border-radius: 8px;
+        color: rgba(248, 255, 252, 0.98);
+        background: rgba(18, 78, 83, 0.72);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 800;
+      }
+      .agent-list { display: grid; gap: 10px; margin-top: 4px; }
+      .agent-link {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 8px 12px;
+        align-items: center;
+        padding: 14px;
+        border: 1px solid rgba(91, 204, 255, 0.22);
+        border-radius: 8px;
+        color: inherit;
+        background: rgba(5, 18, 39, 0.72);
+        text-decoration: none;
+      }
+      .agent-link:hover { border-color: rgba(255, 226, 152, 0.46); background: rgba(8, 30, 55, 0.84); }
+      .agent-link span { color: rgba(255, 226, 152, 0.9); font-weight: 900; }
+      .agent-link strong, .agent-link em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .agent-link em { grid-column: 2; color: rgba(172, 209, 232, 0.58); font-size: 12px; font-style: normal; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>智能体组合入口</h1>
+      <p>浏览器如果拦截了多个新窗口，可以在这里一次性打开本次推荐的全部智能体。</p>
+      <button id="open-all" type="button">打开全部智能体</button>
+      <section class="agent-list">${links}</section>
+    </main>
+    <script>
+      const targets = ${targetJson};
+      function openAllTargets() {
+        targets.forEach((target) => window.open(target.href, '_blank', 'noopener,noreferrer'));
+      }
+      document.getElementById('open-all').addEventListener('click', openAllTargets);
+      window.setTimeout(openAllTargets, 80);
+    </script>
+  </body>
+</html>`);
+  tab.document.close();
+
+  try {
+    tab.opener = null;
+  } catch {
+    // Some browsers disallow changing opener after document writes.
+  }
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function getDirectImageSource(value: unknown) {

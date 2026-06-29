@@ -1,6 +1,6 @@
 import { CircleCheck, Cpu, ExternalLink, Orbit, PackageOpen, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
-import { enrichDrawAgent, getAgentLaunchTargets, type EnrichedDrawAgent } from '../lib/agentLaunchCatalog';
+import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets, type EnrichedDrawAgent } from '../lib/agentLaunchCatalog';
 import type { RecommendedAgent } from '../types';
 
 const MIN_VISIBLE_MS = 2800;
@@ -121,21 +121,7 @@ export default function AgentDrawOverlay({ active, agents, onSettled, pulseKey, 
   }
 
   function handleOpenAll() {
-    const openedTabs = launchTargets.map((target) => ({
-      target,
-      tab: window.open('about:blank', '_blank'),
-    }));
-
-    openedTabs.forEach(({ target, tab }) => {
-      if (tab) {
-        tab.opener = null;
-        tab.location.replace(target.href);
-
-        return;
-      }
-
-      window.open(target.href, '_blank', 'noopener,noreferrer');
-    });
+    openAgentLaunchTargets(launchTargets);
   }
 
   if (phase === 'hidden') {
