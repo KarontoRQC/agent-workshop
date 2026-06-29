@@ -45,6 +45,18 @@ type SpeechWindow = Window & {
 };
 
 const COMMAND_SILENCE_MS = 2800;
+const NON_SECURE_VOICE_MESSAGE = '语音识别在非安全连接下不可用，请使用 HTTPS 或本机 localhost 访问。';
+
+function isSecureForVoice() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return (
+    window.isSecureContext ||
+    ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  );
+}
 
 function getSpeechRecognition() {
   if (typeof window === 'undefined') {
@@ -68,7 +80,8 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const sessionRef = useRef(0);
   const onCommandRef = useRef(onCommand);
   const Recognition = useMemo(getSpeechRecognition, []);
-  const supported = Boolean(Recognition);
+  const canUseVoice = isSecureForVoice();
+  const supported = Boolean(Recognition && canUseVoice);
 
   useEffect(() => {
     onCommandRef.current = onCommand;
@@ -146,6 +159,11 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   }, [pause, resetTranscriptState]);
 
   const start = useCallback(() => {
+    if (!canUseVoice) {
+      setError(NON_SECURE_VOICE_MESSAGE);
+      return;
+    }
+
     if (!Recognition) {
       setError('SpeechRecognition unavailable');
       return;
@@ -271,6 +289,10 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   }, [Recognition, clearRestartTimer]);
 
   useEffect(() => {
+    if (!canUseVoice) {
+      setError(NON_SECURE_VOICE_MESSAGE);
+    }
+
     return () => {
       keepAliveRef.current = false;
       clearRestartTimer();

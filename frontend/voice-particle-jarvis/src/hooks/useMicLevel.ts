@@ -10,6 +10,18 @@ export function useMicLevel() {
   const sessionRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef(0);
+  const NON_SECURE_MIC_MESSAGE = '麦克风在非安全连接下不可用，请使用 HTTPS 或本机 localhost 访问。';
+
+  const isSecureForAudio = () => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return (
+      window.isSecureContext ||
+      ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+    );
+  };
 
   const stop = useCallback(() => {
     sessionRef.current += 1;
@@ -32,6 +44,11 @@ export function useMicLevel() {
   }, []);
 
   const start = useCallback(async () => {
+    if (!isSecureForAudio()) {
+      setError(NON_SECURE_MIC_MESSAGE);
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Microphone unavailable');
       return;

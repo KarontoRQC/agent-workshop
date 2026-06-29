@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowUpRight, BrainCircuit, ExternalLink, GitBranch, Keyboard, Mic, MicOff, PackageOpen, Send, Sparkles, UserRound } from 'lucide-react';
-import AgentDrawOverlay from './components/AgentDrawOverlay';
+import {
+  ArrowUpRight,
+  BrainCircuit,
+  ExternalLink,
+  GitBranch,
+  Keyboard,
+  Mic,
+  MicOff,
+  PackageOpen,
+  Send,
+  Sparkles,
+  UserRound,
+} from 'lucide-react';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
@@ -89,10 +100,22 @@ const wakeWords = ['jarvis', '贾维斯', '贾贾维斯', '加维斯', '甲维�
 const knowledgeGraphTextTypes = ['THINKING_PROCESS', 'ACK', 'DIRECT_REPLY', 'KG_PATH', 'EXPLANATION'] as const;
 const agentRecommendationTextTypes = ['THINKING_PROCESS', 'ACK', 'SUMMARY'] as const;
 const PATH_MATCH_ANIMATION_MS = 3600;
-const CARD_DRAW_ACTIVE_MS = 3200;
+const RECOMMENDATION_DOCK_REVEAL_MS = 900;
 const SPEECH_SEGMENT_WAIT_MS = 45000;
 
 type SpeechSegmentKey = 'knowledgeAck' | 'knowledgeExplanation' | 'recommendationAck' | 'recommendationSummary';
+
+type WorkflowRevealState = {
+  knowledgeAck: boolean;
+  knowledgeExplanation: boolean;
+  knowledgePath: boolean;
+  recommendationAck: boolean;
+  recommendationAgents: boolean;
+  recommendationSummary: boolean;
+};
+
+type WorkflowTextKey = 'knowledgeGraph.ACK' | 'knowledgeGraph.EXPLANATION' | 'agentRecommendation.ACK' | 'agentRecommendation.SUMMARY';
+type WorkflowTextOverrides = Map<WorkflowTextKey, string>;
 
 type PreloadedSpeechAsset = {
   audioPromise: Promise<Blob>;
@@ -115,6 +138,8 @@ type SpeechOutputOptions = {
 };
 
 type InputMode = 'text' | 'voice';
+
+type WorkflowHighlight = 'none' | 'route' | 'agents';
 
 type SubmitMessageOptions = {
   resumeListening?: boolean;
@@ -422,6 +447,79 @@ function createEmptyAgentWorkflow(): AgentWorkflow {
   };
 }
 
+function createEmptyWorkflowRevealState(): WorkflowRevealState {
+  return {
+    knowledgeAck: false,
+    knowledgeExplanation: false,
+    knowledgePath: false,
+    recommendationAck: false,
+    recommendationAgents: false,
+    recommendationSummary: false,
+  };
+}
+
+function getVisibleWorkflow(
+  workflow: AgentWorkflow,
+  reveal: WorkflowRevealState,
+  textOverrides?: WorkflowTextOverrides,
+  agentRevealCount?: number | null,
+): AgentWorkflow {
+  const getText = (key: WorkflowTextKey, fallback: string) => textOverrides?.get(key) ?? fallback;
+  const visibleAgents =
+    reveal.recommendationAgents && typeof agentRevealCount === 'number'
+      ? workflow.agentRecommendation.agents.slice(0, Math.min(agentRevealCount, workflow.agentRecommendation.agents.length))
+      : workflow.agentRecommendation.agents;
+
+  return {
+    agentRecommendation: {
+      ACK: reveal.recommendationAck ? getText('agentRecommendation.ACK', workflow.agentRecommendation.ACK) : '',
+      SUMMARY: reveal.recommendationSummary ? getText('agentRecommendation.SUMMARY', workflow.agentRecommendation.SUMMARY) : '',
+      THINKING_PROCESS: reveal.recommendationAck ? workflow.agentRecommendation.THINKING_PROCESS : '',
+      agents: reveal.recommendationAgents ? visibleAgents : [],
+    },
+    knowledgeGraph: {
+      ACK: reveal.knowledgeAck ? getText('knowledgeGraph.ACK', workflow.knowledgeGraph.ACK) : '',
+      DIRECT_REPLY: reveal.knowledgeAck ? workflow.knowledgeGraph.DIRECT_REPLY : '',
+      EXPLANATION: reveal.knowledgeExplanation ? getText('knowledgeGraph.EXPLANATION', workflow.knowledgeGraph.EXPLANATION) : '',
+      KG_PATH: reveal.knowledgePath ? workflow.knowledgeGraph.KG_PATH : '',
+      THINKING_PROCESS: reveal.knowledgeAck ? workflow.knowledgeGraph.THINKING_PROCESS : '',
+      graphPath: reveal.knowledgePath ? workflow.knowledgeGraph.graphPath : null,
+    },
+  };
+}
+
+function getRevealForSpeechSegment(segment: SpeechSegmentKey): Partial<WorkflowRevealState> {
+  if (segment === 'knowledgeAck') {
+    return { knowledgeAck: true };
+  }
+
+  if (segment === 'knowledgeExplanation') {
+    return { knowledgeExplanation: true };
+  }
+
+  if (segment === 'recommendationAck') {
+    return { recommendationAck: true };
+  }
+
+  return { recommendationSummary: true };
+}
+
+function getTextKeyForSpeechSegment(segment: SpeechSegmentKey): WorkflowTextKey {
+  if (segment === 'knowledgeAck') {
+    return 'knowledgeGraph.ACK';
+  }
+
+  if (segment === 'knowledgeExplanation') {
+    return 'knowledgeGraph.EXPLANATION';
+  }
+
+  if (segment === 'recommendationAck') {
+    return 'agentRecommendation.ACK';
+  }
+
+  return 'agentRecommendation.SUMMARY';
+}
+
 function createAgentTurn(id: string, user: string): AgentTurn {
   return {
     error: '',
@@ -687,6 +785,10 @@ function stripSpeechTagSyntax(text: string) {
     .trim();
 }
 
+function normalizeSubtitleText(text: string) {
+  return stripSpeechTagSyntax(text).replace(/\s+/g, ' ').trim();
+}
+
 function hasAgentOutput(turn: AgentTurn | null) {
   if (!turn) {
     return false;
@@ -735,22 +837,21 @@ function updateTurnById(turnId: string, update: (turn: AgentTurn) => AgentTurn) 
 
 export default function App() {
   const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
+  const speechCaptionTimerRef = useRef<number | null>(null);
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
   const speechSessionRef = useRef(0);
   const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
   const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
-  const cardAnimationSettledResolversRef = useRef<Array<() => void>>([]);
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
-  const [drawOverlayPulse, setDrawOverlayPulse] = useState(0);
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
   const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
-  const [recommendationAnimationReady, setRecommendationAnimationReady] = useState(false);
+  const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
   const [draft, setDraft] = useState('');
   const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [interfaceLanguage, setInterfaceLanguage] = useState<ConversationLanguage>('zh-CN');
@@ -772,6 +873,47 @@ export default function App() {
     }
   }, []);
 
+  const clearSpeechCaptionTimer = useCallback(() => {
+    if (speechCaptionTimerRef.current !== null) {
+      window.clearTimeout(speechCaptionTimerRef.current);
+      speechCaptionTimerRef.current = null;
+    }
+  }, []);
+
+  const startSpeechCaption = useCallback(
+    (displayText: string, speechSessionId: number) => {
+      clearSpeechCaptionTimer();
+      setCurrentSpeechText('');
+
+      const normalizedDisplayText = displayText.trim();
+
+      if (!normalizedDisplayText) {
+        return;
+      }
+
+      const chunkSize = normalizedDisplayText.length > 150 ? 5 : normalizedDisplayText.length > 72 ? 4 : 3;
+      let cursor = 0;
+
+      const tick = () => {
+        if (speechSessionId !== speechSessionRef.current) {
+          return;
+        }
+
+        cursor = Math.min(normalizedDisplayText.length, cursor + chunkSize);
+        setCurrentSpeechText(normalizedDisplayText.slice(0, cursor));
+
+        if (cursor < normalizedDisplayText.length) {
+          speechCaptionTimerRef.current = window.setTimeout(tick, 26);
+        } else {
+          speechCaptionTimerRef.current = null;
+        }
+      };
+
+      tick();
+    },
+    [clearSpeechCaptionTimer],
+  );
+
   const beginSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
     speechOutputActiveRef.current = true;
@@ -792,10 +934,11 @@ export default function App() {
 
   const finishSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
+    clearSpeechCaptionTimer();
     speechOutputActiveRef.current = false;
     setCurrentSpeechText('');
     setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-  }, [clearSpeechEndTimer]);
+  }, [clearSpeechCaptionTimer, clearSpeechEndTimer]);
 
   const speakWithParticleOutput = useCallback(
     (text: string, options: SpeechOutputOptions = {}) => {
@@ -804,7 +947,7 @@ export default function App() {
       speechSessionRef.current = speechSessionId;
 
       setSpeechError('');
-      setCurrentSpeechText(options.displayText ?? text);
+      startSpeechCaption(options.displayText ?? text, speechSessionId);
       voiceControlRef.current?.pause();
       beginSpeechOutput();
 
@@ -862,12 +1005,13 @@ export default function App() {
 
       speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration + 30000 : 5200);
     },
-    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
+    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput, startSpeechCaption],
   );
 
   const finishReplyWithoutSpeech = useCallback(
     (shouldResumeListening: boolean) => {
       clearSpeechEndTimer();
+      clearSpeechCaptionTimer();
       speechOutputActiveRef.current = false;
       setCurrentSpeechText('');
       setSpeechError('');
@@ -880,7 +1024,7 @@ export default function App() {
         }, 260);
       }
     },
-    [clearSpeechEndTimer],
+    [clearSpeechCaptionTimer, clearSpeechEndTimer],
   );
 
   const submitMessage = useCallback(
@@ -912,7 +1056,7 @@ export default function App() {
       setLastHeard('');
       setRouteDockVisible(false);
       setRecommendationDockVisible(false);
-      setRecommendationAnimationReady(false);
+      setWorkflowHighlight('none');
       setAgentTurns((current) => [...current.slice(-3), createAgentTurn(turnId, text)]);
       setMessages((current) => [
         ...current.slice(-3),
@@ -922,6 +1066,7 @@ export default function App() {
       setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
 
       let accumulatedWorkflow = createEmptyAgentWorkflow();
+      let revealState: WorkflowRevealState = { ...createEmptyWorkflowRevealState(), knowledgeAck: true };
       let cardsCompleted = false;
       let routeActionReady = false;
       let committedRouteAction: AgentAction | null = null;
@@ -933,9 +1078,72 @@ export default function App() {
       const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
       const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
       const speechWaiters = new Map<SpeechSegmentKey, Array<(asset: PreloadedSpeechAsset | null) => void>>();
+      const textOverrides: WorkflowTextOverrides = new Map();
+      let agentRevealCount: number | null = null;
+      const publishVisibleWorkflow = () => {
+        const visibleWorkflow = getVisibleWorkflow(accumulatedWorkflow, revealState, textOverrides, agentRevealCount);
+        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, workflow: visibleWorkflow })));
+      };
       const commitWorkflow = (workflow: AgentWorkflow) => {
         accumulatedWorkflow = workflow;
-        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, workflow })));
+        publishVisibleWorkflow();
+      };
+      const revealWorkflow = (nextReveal: Partial<WorkflowRevealState>) => {
+        revealState = { ...revealState, ...nextReveal };
+        publishVisibleWorkflow();
+      };
+      const isSpeechSegmentVisible = (segment: SpeechSegmentKey) => {
+        if (segment === 'knowledgeAck') {
+          return revealState.knowledgeAck;
+        }
+
+        if (segment === 'knowledgeExplanation') {
+          return revealState.knowledgeExplanation;
+        }
+
+        if (segment === 'recommendationAck') {
+          return revealState.recommendationAck;
+        }
+
+        return revealState.recommendationSummary;
+      };
+      const replayBufferedText = async (key: WorkflowTextKey, text: string) => {
+        const normalizedText = text.trim();
+
+        if (!normalizedText) {
+          textOverrides.delete(key);
+          publishVisibleWorkflow();
+          return;
+        }
+
+        const chunkSize = normalizedText.length > 140 ? 5 : normalizedText.length > 72 ? 4 : 3;
+
+        for (let index = chunkSize; index < normalizedText.length; index += chunkSize) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          textOverrides.set(key, normalizedText.slice(0, index));
+          publishVisibleWorkflow();
+          await wait(24);
+        }
+
+        textOverrides.delete(key);
+        publishVisibleWorkflow();
+      };
+      const revealSpeechSegment = (segment: SpeechSegmentKey, text: string) => {
+        const alreadyVisible = isSpeechSegmentVisible(segment);
+        const textKey = getTextKeyForSpeechSegment(segment);
+
+        if (!alreadyVisible) {
+          textOverrides.set(textKey, '');
+        }
+
+        revealWorkflow(getRevealForSpeechSegment(segment));
+
+        if (!alreadyVisible) {
+          void replayBufferedText(textKey, text);
+        }
       };
       const commitRouteAction = (routeText: string) => {
         const routeAction = getActionFromRoute(routeText);
@@ -1014,24 +1222,25 @@ export default function App() {
       };
       const playSpeechSegment = async (segment: SpeechSegmentKey) => {
         const asset = await waitForSpeechSegment(segment);
+        const speechText = asset?.text || getSpeechTextForSegment(accumulatedWorkflow, segment);
 
-        if (!asset) {
+        if (!speechText) {
           return;
         }
 
-        const audioBlob = await asset.audioPromise.catch((error) => {
-          setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
-          return null;
-        });
+        revealSpeechSegment(segment, speechText);
 
-        if (!audioBlob) {
-          return;
-        }
+        const audioBlob = asset
+          ? await asset.audioPromise.catch((error) => {
+              setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
+              return null;
+            })
+          : undefined;
 
         await new Promise<void>((resolve) => {
-          speakWithParticleOutput(asset.text, {
-            audioBlob,
-            displayText: asset.text,
+          speakWithParticleOutput(speechText, {
+            audioBlob: audioBlob ?? undefined,
+            displayText: speechText,
             minimumVisualDurationMs: 0,
             onSettled: resolve,
             resumeListening: false,
@@ -1058,6 +1267,11 @@ export default function App() {
         cardsCompleted = true;
         cardReadyWaiters.splice(0).forEach((resolve) => resolve(true));
       };
+      const markCardsReadyIfAvailable = () => {
+        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          markCardsReady();
+        }
+      };
       const closeCardsReady = () => {
         const hasCards = accumulatedWorkflow.agentRecommendation.agents.length > 0;
 
@@ -1080,10 +1294,6 @@ export default function App() {
           });
         });
       };
-      const waitForCardAnimationSettled = () =>
-        new Promise<void>((resolve) => {
-          cardAnimationSettledResolversRef.current.push(resolve);
-        });
       const runPathAnimation = async () => {
         const routeAction = await waitForRouteAction();
 
@@ -1091,9 +1301,12 @@ export default function App() {
           return;
         }
 
+        revealWorkflow({ knowledgePath: true });
         setLastAction(routeAction);
         setRouteDockVisible(true);
+        setWorkflowHighlight('route');
         await wait(PATH_MATCH_ANIMATION_MS);
+        setWorkflowHighlight('none');
       };
       const runCardAnimation = async () => {
         const hasCards = await waitForCardsReady();
@@ -1102,20 +1315,43 @@ export default function App() {
           return;
         }
 
-        const settled = waitForCardAnimationSettled();
+        agentRevealCount = 1;
+        revealWorkflow({ recommendationAgents: true });
         setRecommendationDockVisible(true);
-        setRecommendationAnimationReady(true);
-        setDrawOverlayPulse((pulse) => pulse + 1);
-        window.setTimeout(() => setRecommendationAnimationReady(false), CARD_DRAW_ACTIVE_MS);
-        await settled;
+        setWorkflowHighlight('agents');
+
+        while (agentRevealCount < accumulatedWorkflow.agentRecommendation.agents.length) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          await wait(260);
+          agentRevealCount += 1;
+          publishVisibleWorkflow();
+        }
+
+        agentRevealCount = null;
+        publishVisibleWorkflow();
+        await wait(RECOMMENDATION_DOCK_REVEAL_MS);
+      };
+      const revealCompletedWorkflow = () => {
+        revealWorkflow({
+          knowledgeAck: true,
+          knowledgeExplanation: true,
+          knowledgePath: true,
+          recommendationAck: true,
+          recommendationAgents: true,
+          recommendationSummary: true,
+        });
       };
       const orchestrationPromise = (async () => {
         await playSpeechSegment('knowledgeAck');
         await runPathAnimation();
         await playSpeechSegment('knowledgeExplanation');
         await playSpeechSegment('recommendationAck');
-        await runCardAnimation();
-        await playSpeechSegment('recommendationSummary');
+        await Promise.all([playSpeechSegment('recommendationSummary'), runCardAnimation()]);
+        setWorkflowHighlight('none');
+        revealCompletedWorkflow();
       })();
 
       try {
@@ -1142,10 +1378,6 @@ export default function App() {
             const nextWorkflow = appendWorkflowContent(accumulatedWorkflow, section, event.type, event.content || '');
             commitWorkflow(nextWorkflow);
 
-            if (section === 'agentRecommendation') {
-              setDrawOverlayPulse((pulse) => pulse + 1);
-            }
-
             if (event.stage === 'knowledge_graph' && event.type === 'KG_PATH') {
               hasSeenKnowledgePath = true;
               return;
@@ -1171,7 +1403,7 @@ export default function App() {
               { streamStatus: 'streaming' },
             );
             commitWorkflow(nextWorkflow);
-            setDrawOverlayPulse((pulse) => pulse + 1);
+            markCardsReadyIfAvailable();
           },
           onRecommendedAgent(agent, event) {
             commitKnowledgePathIfReady();
@@ -1181,7 +1413,7 @@ export default function App() {
               streamStatus: 'streaming',
             });
             commitWorkflow(nextWorkflow);
-            setDrawOverlayPulse((pulse) => pulse + 1);
+            markCardsReadyIfAvailable();
           },
           onRecommendedAgentCompleted(agent) {
             commitKnowledgePathIfReady();
@@ -1190,13 +1422,12 @@ export default function App() {
               streamStatus: 'completed',
             });
             commitWorkflow(nextWorkflow);
-            setDrawOverlayPulse((pulse) => pulse + 1);
+            markCardsReadyIfAvailable();
           },
           onRecommendedAgentsCompleted(agents) {
             commitKnowledgePathIfReady();
             commitWorkflow(replaceRecommendedAgents(accumulatedWorkflow, agents));
             markCardsReady();
-            setDrawOverlayPulse((pulse) => pulse + 1);
           },
           onWorkflowError(event) {
             commitKnowledgePathIfReady();
@@ -1221,9 +1452,9 @@ export default function App() {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: finalText }];
         });
+        setAgentStatus(finalStatus);
+        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
         void orchestrationPromise.finally(() => {
-          setAgentStatus(finalStatus);
-          setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
           finishReplyWithoutSpeech(shouldResumeListening);
         });
       } catch (error) {
@@ -1231,12 +1462,14 @@ export default function App() {
           closeSpeechSegments();
           closeRouteAction();
           closeCardsReady();
+          setWorkflowHighlight('none');
           return;
         }
 
         closeSpeechSegments();
         closeRouteAction();
         closeCardsReady();
+        setWorkflowHighlight('none');
 
         try {
           const response = await requestAIReply(text, history);
@@ -1453,23 +1686,9 @@ export default function App() {
     [draft, submitMessage],
   );
 
-  const handleDrawOverlaySettled = useCallback(() => {
-    cardAnimationSettledResolversRef.current.splice(0).forEach((resolve) => resolve());
-  }, []);
-
   const latestAgentTurn = agentTurns.at(-1) ?? null;
   const latestRecommendation = latestAgentTurn?.workflow.agentRecommendation;
   const recommendedAgents = latestRecommendation?.agents ?? [];
-  const drawOverlayActive = Boolean(
-    recommendationAnimationReady &&
-      agentStatus === 'streaming' &&
-      latestRecommendation &&
-      (latestRecommendation.THINKING_PROCESS ||
-        latestRecommendation.ACK ||
-        latestRecommendation.SUMMARY ||
-        latestRecommendation.agents.length),
-  );
-  const drawOverlayPulseKey = recommendationAnimationReady ? drawOverlayPulse : 0;
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
   const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
@@ -1510,7 +1729,12 @@ export default function App() {
     <main className="app-shell">
       <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
       <div className="scene-vignette" />
-      <WorkflowDock active={agentStatus === 'streaming'} agents={dockRecommendedAgents} routeSegments={dockRouteSegments} />
+      <WorkflowDock
+        active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
+        agents={dockRecommendedAgents}
+        highlight={workflowHighlight}
+        routeSegments={dockRouteSegments}
+      />
 
       <section className="dialogue-stage" aria-label="AI particle dialogue">
         {captionText ? (
@@ -1545,18 +1769,21 @@ export default function App() {
         voiceTranscript={voice.transcript}
         voiceSupported={voice.supported}
       />
-      <AgentDrawOverlay
-        active={drawOverlayActive}
-        agents={recommendedAgents}
-        onSettled={handleDrawOverlaySettled}
-        pulseKey={drawOverlayPulseKey}
-        replyText=""
-      />
     </main>
   );
 }
 
-function WorkflowDock({ active, agents, routeSegments }: { active: boolean; agents: RecommendedAgent[]; routeSegments: string[] }) {
+function WorkflowDock({
+  active,
+  agents,
+  highlight,
+  routeSegments,
+}: {
+  active: boolean;
+  agents: RecommendedAgent[];
+  highlight: WorkflowHighlight;
+  routeSegments: string[];
+}) {
   const hasRoute = routeSegments.length > 0;
   const hasAgents = agents.length > 0;
   const visibleAgents = agents.slice(0, 4);
@@ -1566,10 +1793,15 @@ function WorkflowDock({ active, agents, routeSegments }: { active: boolean; agen
   }
 
   return (
-    <aside className="workflow-dock" data-active={active} aria-label="Agent workflow context">
-      {hasRoute ? <RouteResult active={active} routeSegments={routeSegments} /> : null}
+    <aside
+      className="workflow-dock"
+      data-active={active}
+      data-highlight={highlight}
+      aria-label="Agent workflow context"
+    >
+      {hasRoute ? <RouteResult highlighted={highlight === 'route'} routeSegments={routeSegments} /> : null}
       {hasAgents ? (
-        <section className="workflow-dock-section workflow-agent-panel">
+        <section className={`workflow-dock-section workflow-agent-panel ${highlight === 'agents' ? 'is-prism' : ''}`}>
           <div className="workflow-dock-title">
             <Sparkles size={14} />
             <strong>推荐智能体</strong>
@@ -1759,6 +1991,7 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
   const workflow = turn.workflow;
   const knowledgeGraph = workflow.knowledgeGraph;
   const recommendation = workflow.agentRecommendation;
+  const routeSegments = splitRouteText(knowledgeGraph.KG_PATH);
   const showOutput = hasAgentOutput(turn);
 
   if (!showOutput && active) {
@@ -1768,11 +2001,42 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
   return (
     <article className="agent-response">
       {renderThinkingText('思考过程', knowledgeGraph.THINKING_PROCESS, active && !knowledgeGraph.ACK)}
-      {renderAgentSubtitle(speakingText)}
+      {renderAgentSubtitle(knowledgeGraph.DIRECT_REPLY, speakingText)}
+      {renderAgentSubtitle(knowledgeGraph.ACK, speakingText)}
+      {renderToolCallDivider('route', routeSegments.length)}
+      {renderAgentSubtitle(knowledgeGraph.EXPLANATION, speakingText)}
       {renderThinkingText('推荐思考', recommendation.THINKING_PROCESS, active && !recommendation.ACK)}
+      {renderAgentSubtitle(recommendation.ACK, speakingText)}
+      {renderToolCallDivider('agents', recommendation.agents.length)}
+      {renderAgentSubtitle(recommendation.SUMMARY, speakingText)}
+      {renderAgentSubtitle(turn.fallbackText, speakingText)}
       {turn.error && <p className="agent-error-text">{turn.error}</p>}
       {active && <TypingLine />}
     </article>
+  );
+}
+
+function renderToolCallDivider(kind: 'agents' | 'route', count: number) {
+  if (count <= 0) {
+    return null;
+  }
+
+  const isRoute = kind === 'route';
+  const title = isRoute ? '知识路径工具调用' : '智能体推荐工具调用';
+  const detail = isRoute ? `${count} 个路径节点已匹配` : `${count} 个推荐智能体已生成`;
+
+  return (
+    <section className={`agent-tool-call agent-tool-call-${kind}`} aria-label={title}>
+      <span className="agent-tool-call-rail" />
+      <div className="agent-tool-call-core">
+        <span className="agent-tool-call-icon" aria-hidden="true">
+          {isRoute ? <GitBranch size={13} /> : <Sparkles size={13} />}
+        </span>
+        <strong>{title}</strong>
+        <em>{detail}</em>
+      </div>
+      <span className="agent-tool-call-rail" />
+    </section>
   );
 }
 
@@ -1784,7 +2048,7 @@ function renderThinkingText(label: string, text: string, active: boolean) {
   }
 
   return (
-    <section className="agent-thinking-stream" data-active={active}>
+    <section className="agent-thinking-stream" data-active={active} data-collapsed={!active}>
       <div>
         <BrainCircuit size={13} />
         <strong>{label}</strong>
@@ -1794,19 +2058,28 @@ function renderThinkingText(label: string, text: string, active: boolean) {
   );
 }
 
-function renderAgentSubtitle(text: string) {
+function renderAgentSubtitle(text: string, speakingText: string) {
   const visibleText = stripSpeechTagSyntax(text);
+  const normalizedVisibleText = normalizeSubtitleText(visibleText);
+  const normalizedSpeakingText = normalizeSubtitleText(speakingText);
+  const isSpeaking = Boolean(
+    normalizedVisibleText &&
+      normalizedSpeakingText &&
+      (normalizedVisibleText === normalizedSpeakingText ||
+        normalizedVisibleText.startsWith(normalizedSpeakingText) ||
+        normalizedSpeakingText.startsWith(normalizedVisibleText)),
+  );
 
   return visibleText ? (
-    <section className="agent-subtitle-line">
+    <section className="agent-subtitle-line" data-speaking={isSpeaking}>
       <p>{visibleText}</p>
     </section>
   ) : null;
 }
 
-function RouteResult({ active, routeSegments }: { active: boolean; routeSegments: string[] }) {
+function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; routeSegments: string[] }) {
   return (
-    <section className={`workflow-dock-section workflow-route-panel ${active ? 'is-running' : ''}`}>
+    <section className={`workflow-dock-section workflow-route-panel ${highlighted ? 'is-prism' : ''}`}>
       <div className="workflow-dock-title">
         <GitBranch size={14} />
         <strong>知识路径</strong>
@@ -1830,8 +2103,9 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
   const stage = enrichedAgent.stageLabel || getAgentStage(agent, index);
   const reason = String(agent.reason || enrichedAgent.fallbackReason || '').trim();
   const variant = ['cyan', 'gold', 'violet'][index % 3];
-  const statusLabel = active ? '匹配中' : enrichedAgent.canOpen ? '可跳转' : '已匹配';
-  const cardClassName = `recommended-agent-card recommended-agent-${variant} ${enrichedAgent.canOpen ? 'is-clickable' : 'is-static'}`;
+  const canOpen = Boolean(enrichedAgent.launchTarget);
+  const statusLabel = active ? '匹配中' : canOpen ? '可打开' : '已匹配';
+  const cardClassName = `recommended-agent-card recommended-agent-${variant} ${canOpen ? 'is-clickable' : 'is-static'}`;
   const cardBody = (
     <>
       <span className="recommended-agent-index">{String(index + 1).padStart(2, '0')}</span>
@@ -1850,7 +2124,7 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
         {reason ? <p>{reason}</p> : null}
       </div>
       <span className="recommended-agent-open-hint">
-        {enrichedAgent.canOpen ? (
+        {canOpen ? (
           <>
             <ExternalLink size={13} />
             打开
@@ -1862,7 +2136,7 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
     </>
   );
 
-  if (enrichedAgent.launchTarget) {
+  if (canOpen) {
     return (
       <a className={cardClassName} data-active={active} href={enrichedAgent.launchTarget} rel="noopener noreferrer" target="_blank">
         {cardBody}
@@ -1871,7 +2145,7 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
   }
 
   return (
-    <article aria-disabled="true" className={cardClassName} data-active={active}>
+    <article aria-disabled="true" aria-label={`${name} 推荐智能体`} className={cardClassName} data-active={active}>
       {cardBody}
     </article>
   );
