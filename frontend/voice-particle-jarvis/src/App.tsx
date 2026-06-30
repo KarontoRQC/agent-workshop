@@ -836,6 +836,34 @@ function getLatestAgentUserState(turns: AgentTurn[]) {
   return undefined;
 }
 
+function hasDisplayableRecommendedAgent(agent: RecommendedAgent) {
+  return Boolean(cleanStateText(agent.agent_name || agent.name || agent.stage || agent.reason));
+}
+
+function getLatestDisplayableRecommendedAgents(turns: AgentTurn[]) {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const agents = turns[index].workflow.agentRecommendation.agents;
+
+    if (agents.some(hasDisplayableRecommendedAgent)) {
+      return agents;
+    }
+  }
+
+  return [];
+}
+
+function getLatestRouteSegments(turns: AgentTurn[]) {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const route = splitRouteText(turns[index].workflow.knowledgeGraph.KG_PATH);
+
+    if (route.length > 0) {
+      return route;
+    }
+  }
+
+  return [];
+}
+
 function getActionFromRoute(routeText: string): AgentAction | null {
   const route = splitRouteText(routeText);
 
@@ -1029,6 +1057,7 @@ export default function App() {
   const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
+  const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
   const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
   const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
@@ -1246,10 +1275,7 @@ export default function App() {
       setDraft('');
       setReplySource('coze-stream');
       setAgentStatus('streaming');
-      setLastAction(null);
       setLastHeard('');
-      setRouteDockVisible(false);
-      setRecommendationDockVisible(false);
       setWorkflowHighlight('none');
       setAgentTurns((current) => [...current.slice(-9), createAgentTurn(turnId, text)]);
       setMessages((current) => [
@@ -1902,15 +1928,16 @@ export default function App() {
     [draft, submitMessage],
   );
 
-  const latestAgentTurn = agentTurns.at(-1) ?? null;
-  const latestRecommendation = latestAgentTurn?.workflow.agentRecommendation;
-  const recommendedAgents = latestRecommendation?.agents ?? [];
-  const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
+  const latestDisplayableRecommendedAgents = getLatestDisplayableRecommendedAgents(agentTurns);
+  const recommendedAgents =
+    latestDisplayableRecommendedAgents.length > 0 ? latestDisplayableRecommendedAgents : pinnedRecommendedAgents;
+  const fallbackRoute = getLatestRouteSegments(agentTurns);
+  const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
   const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
   const graphFocusKey =
-    lastAction?.type === 'focus_graph_path'
-      ? `${lastAction.label}:${lastAction.route.join('/')}`
+    graphRoute.length > 0
+      ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
       : '';
   const readoutText =
     settings.mode === 'thinking'
@@ -1940,6 +1967,12 @@ export default function App() {
       : isChineseLanguage(interfaceLanguage)
         ? '语音待命。'
         : 'Voice standby.');
+
+  useEffect(() => {
+    if (latestDisplayableRecommendedAgents.length > 0) {
+      setPinnedRecommendedAgents(latestDisplayableRecommendedAgents);
+    }
+  }, [latestDisplayableRecommendedAgents]);
 
   return (
     <main className="app-shell">
