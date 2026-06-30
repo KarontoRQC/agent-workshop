@@ -26,7 +26,7 @@ RECOMMENDER_CONVERSATION_KEY = "agent_recommendation"
 COMPLETION_EVENTS = {"chat.completed", "message.completed", "done"}
 ROUTE_SECTION_TYPES = {"THINKING_PROCESS", "ACK", DIRECT_REPLY_TYPE, "KG_PATH", "EXPLANATION"}
 RECOMMENDATION_SECTION_TYPES = {"RECOMMENDED_AGENTS", "SUMMARY"}
-DEFAULT_RECOMMENDATION_ACK = "接下来我将根据这条路径，为你推荐合适的智能体组合。"
+DEFAULT_RECOMMENDATION_ACK = "我把本轮智能体组合整理出来，并在最后给你一个简短总结。"
 MAX_USER_STATE_AGENTS = 10
 MAX_USER_STATE_TEXT_LENGTH = 600
 MAX_USER_STATE_SUMMARY_LENGTH = 800
@@ -54,6 +54,7 @@ def start_chat_workflow_stream(
     selected_agent_names = _normalize_agent_names(agent_names) or settings.agent_names
     selected_conversation_ids = _normalize_conversation_ids(conversation_ids)
     normalized_user_state = _normalize_user_state(user_state)
+    state_edit_mode = _detect_state_edit_mode(message, normalized_user_state)
     user_state_system_context = build_user_state_system_context(normalized_user_state)
 
     if not route_planner_bot_id:
@@ -65,6 +66,7 @@ def start_chat_workflow_stream(
         unified_message = build_unified_orchestration_message(
             original_message=message,
             agent_names=selected_agent_names,
+            state_edit_mode=state_edit_mode,
         )
         route_upstream = coze_client.stream_single_turn_chat(
             message=unified_message,
@@ -81,6 +83,7 @@ def start_chat_workflow_stream(
             original_message=message,
             agent_names=selected_agent_names,
             conversation_ids=selected_conversation_ids,
+            state_edit_mode=state_edit_mode,
         )
 
     route_upstream = coze_client.stream_single_turn_chat(
@@ -113,14 +116,17 @@ def _iter_unified_chat_workflow_stream(
     original_message,
     agent_names,
     conversation_ids,
+    state_edit_mode="general",
 ):
     conversation_ids = dict(conversation_ids or {})
     chat_ids = {}
     route_sections = defaultdict(str)
     direct_reply_parts = []
+    recommended_agents = []
     summary = ""
     route_stage_closed = False
     recommendation_stage_started = False
+    suppress_recommendation_stage = state_edit_mode == "path_only"
 
     def selected_route():
         return route_sections.get("KG_PATH", "").strip()
@@ -228,10 +234,16 @@ def _iter_unified_chat_workflow_stream(
             elif event_type == "SUMMARY":
                 summary += event.get("content", "")
 
+        if event.get("event") == "recommended_agents.completed":
+            recommended_agents = event.get("agents") or recommended_agents
+
         if event.get("event") in COMPLETION_EVENTS:
             continue
 
         if _is_recommendation_event(event):
+            if suppress_recommendation_stage:
+                continue
+
             if not route_stage_closed:
                 route_stage_closed = True
                 route_matched = yield from close_route_stage()
@@ -249,7 +261,7 @@ def _iter_unified_chat_workflow_stream(
             route_stage_closed = True
             route_matched = yield from close_route_stage()
 
-            if route_matched:
+            if route_matched and not suppress_recommendation_stage:
                 yield from start_recommendation_stage()
 
     if not route_stage_closed:
@@ -271,10 +283,14 @@ def _iter_unified_chat_workflow_stream(
             )
             return
 
-    if selected_route() and not recommendation_stage_started:
+    if selected_route() and not recommendation_stage_started and not suppress_recommendation_stage:
         yield from start_recommendation_stage()
 
     if recommendation_stage_started:
+        if not summary.strip() and recommended_agents:
+            summary = _build_recommendation_summary_fallback(recommended_agents)
+            yield from _fixed_text_section_events("SUMMARY", summary, AGENT_RECOMMENDATION_STAGE)
+
         yield _stage_event(
             "workflow.stage.completed",
             AGENT_RECOMMENDATION_STAGE,
@@ -433,6 +449,7 @@ def _iter_chat_workflow_stream(
 
     summary = ""
     recommendation_thinking_process = ""
+    recommended_agents = []
 
     for event in iter_tagged_events(
         recommendation_upstream,
@@ -450,10 +467,17 @@ def _iter_chat_workflow_stream(
             elif event.get("type") == "THINKING_PROCESS":
                 recommendation_thinking_process += event.get("content", "")
 
+        if event.get("event") == "recommended_agents.completed":
+            recommended_agents = event.get("agents") or recommended_agents
+
         if event.get("event") in COMPLETION_EVENTS:
             continue
 
         yield format_sse_event(_with_stage(event, AGENT_RECOMMENDATION_STAGE))
+
+    if not summary.strip() and recommended_agents:
+        summary = _build_recommendation_summary_fallback(recommended_agents)
+        yield from _fixed_text_section_events("SUMMARY", summary, AGENT_RECOMMENDATION_STAGE)
 
     yield _stage_event(
         "workflow.stage.completed",
@@ -484,18 +508,27 @@ def build_recommender_message(selected_route, agent_names, original_message, use
     return "\n".join(parts)
 
 
-def build_unified_orchestration_message(original_message, agent_names, user_state=None):
+def build_unified_orchestration_message(original_message, agent_names, user_state=None, state_edit_mode="general"):
     available_agents = _format_agent_names(agent_names)
     user_state_text = _format_user_state_for_message(user_state)
     parts = [
         "请一次完成知识路径规划和智能体组合推荐，不要再把推荐拆成第二轮。",
         "路径只用于前端可视化和业务拆解；智能体推荐必须直接根据用户原始需求、业务阶段、任务目标和可用智能体能力判断。",
         "如果用户没有业务、学习、行业或企业经营相关需求，只输出 THINKING_PROCESS 和 ACK 两个 XML 标签。",
-        "如果存在可匹配需求，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
+        "如果本轮只是修改知识路径，必须只输出 THINKING_PROCESS、ACK、KG_PATH、EXPLANATION，禁止输出 RECOMMENDED_AGENTS 和 SUMMARY。",
+        "如果本轮需要推荐或修改智能体组合，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
         "KG_PATH 必须输出 6-10 个节点，节点之间只用半角连字符连接。",
         "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-10 个原始名称，不能改名、不能新增。",
+        "凡输出 RECOMMENDED_AGENTS，必须在其后立即输出 SUMMARY，不能省略。",
         f"用户原始需求：{original_message}",
     ]
+
+    if state_edit_mode == "path_only":
+        parts.append("本轮状态修改类型：只修改知识路径。不要输出 RECOMMENDED_AGENTS 或 SUMMARY。")
+    elif state_edit_mode == "agents_only":
+        parts.append("本轮状态修改类型：只修改智能体组合。KG_PATH 必须沿用当前知识路径，推荐后必须输出 SUMMARY。")
+    elif state_edit_mode == "both":
+        parts.append("本轮状态修改类型：同时修改知识路径和智能体组合。")
 
     if available_agents:
         parts.append(f"可用智能体集合：{available_agents}")
@@ -543,7 +576,7 @@ def build_user_state_system_context(user_state):
             "1. 当用户要求修改、调整、替换、增加或删除知识路径时，在 <KG_PATH> 输出修改后的完整路径，不输出补丁或局部片段。",
             "2. 当用户要求修改、调整、替换、增加或删除智能体组合时，在 <RECOMMENDED_AGENTS> 输出修改后的完整组合，并保持 AGENT_NAME 来自可用智能体集合。",
             "3. 当前状态已存在时，单项修改必须只改用户明确点名的对象，不能自动联动修改另一项。",
-            "4. 用户只改知识路径时，RECOMMENDED_AGENTS 必须原样沿用当前已推荐智能体组合，即使新路径看起来会影响组合，也不能自行重算。",
+            "4. 用户只改知识路径时，只输出 THINKING_PROCESS、ACK、KG_PATH、EXPLANATION，禁止输出 RECOMMENDED_AGENTS 和 SUMMARY。",
             "5. 用户只改智能体组合时，KG_PATH 必须原样沿用当前知识路径，即使新组合看起来会影响路径，也不能自行重规划。",
             "6. 只有用户明确同时要求修改路径和智能体组合时，才可以同时更新 KG_PATH 与 RECOMMENDED_AGENTS。",
             "7. 如果当前状态为空，就按新的需求正常规划路径和推荐组合。",
@@ -637,6 +670,65 @@ def _normalize_user_state(user_state):
         normalized["recommendation_summary"] = recommendation_summary
 
     return normalized
+
+
+def _detect_state_edit_mode(message, user_state):
+    if not user_state:
+        return "general"
+
+    text = _normalize_optional_string(message).lower()
+
+    if not text:
+        return "general"
+
+    edit_signal = any(
+        keyword in text
+        for keyword in (
+            "改",
+            "修改",
+            "调整",
+            "更新",
+            "替换",
+            "换成",
+            "换掉",
+            "增加",
+            "新增",
+            "删除",
+            "删掉",
+            "去掉",
+            "不要",
+            "保留",
+            "重配",
+            "重新搭配",
+            "重规划",
+        )
+    )
+
+    if not edit_signal:
+        return "general"
+
+    has_path_state = bool(user_state.get("knowledge_path") or user_state.get("knowledge_path_nodes"))
+    has_agent_state = bool(user_state.get("recommended_agents"))
+    path_signal = has_path_state and any(
+        keyword in text for keyword in ("知识路径", "图谱路径", "路径", "图谱", "节点", "路线", "kg_path")
+    )
+    agent_signal = has_agent_state and any(
+        keyword in text for keyword in ("智能体", "组合", "推荐", "agent", "助手", "工具")
+    )
+
+    if path_signal and agent_signal:
+        return "both"
+
+    if path_signal:
+        return "path_only"
+
+    if agent_signal:
+        return "agents_only"
+
+    if has_path_state and not agent_signal:
+        return "path_only"
+
+    return "general"
 
 
 def _normalize_state_agents(raw_agents):
@@ -744,6 +836,30 @@ def _fixed_text_section_events(section_type, text, stage):
         )
     )
     yield format_sse_event(_with_stage(content_event("content.completed", {"type": section_type}), stage))
+
+
+def _build_recommendation_summary_fallback(agents):
+    names = []
+
+    for agent in agents or []:
+        if not isinstance(agent, dict):
+            continue
+
+        name = _normalize_optional_string(agent.get("agent_name") or agent.get("name"))
+
+        if name:
+            names.append(name)
+
+    if not names:
+        return "这套智能体组合已经整理完成，你可以继续指定要保留、替换或补充的智能体。"
+
+    visible_names = "、".join(names[:3])
+    extra_count = len(names) - 3
+
+    if extra_count > 0:
+        visible_names = f"{visible_names}等 {len(names)} 个智能体"
+
+    return f"这套组合已整理完成，{visible_names}会分别承接当前需求中的关键环节；你可以继续指定要保留、替换或补充的智能体。"
 
 
 def _mirror_unified_recommendation_conversation(conversation_ids, chat_ids):
