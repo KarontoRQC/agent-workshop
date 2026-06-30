@@ -30,7 +30,7 @@ Vite may warn that the Three.js chunk is larger than 500 kB. That is expected fo
 Development mode uses `vite.config.ts`.
 
 - `/api/tts/*` proxies to `TTS_PROXY_TARGET`, defaulting to `http://127.0.0.1:5000`.
-- Other `/api/*` requests proxy to `API_PROXY_BASE_URL`, `VITE_AGENT_API_BASE_URL`, `VITE_API_BASE_URL`, or the default remote backend.
+- Other `/api/*` requests proxy to `API_PROXY_BASE_URL`, `VITE_AGENT_API_BASE_URL`, `VITE_API_BASE_URL`, or the default local backend at `http://127.0.0.1:5000`.
 
 Useful switches:
 
