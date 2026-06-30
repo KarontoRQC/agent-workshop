@@ -20,6 +20,7 @@ DEFAULT_LONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1"
 DEFAULT_LONGCAT_MODEL = "LongCat-2.0-Preview"
 DEFAULT_ROUTE_PLANNER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "knowledge_graph_agent.txt")
 DEFAULT_RECOMMENDER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "recommended_agent.txt")
+DEFAULT_UNIFIED_ORCHESTRATOR_PROMPT_PATH = os.path.join(PROMPTS_DIR, "unified_orchestration_agent.txt")
 
 if load_dotenv:
     load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -54,6 +55,7 @@ def _get_int_env(name, default):
 @dataclass(frozen=True)
 class CozeSettings:
     chat_provider: str
+    workflow_mode: str
     chat_url: str
     bot_id: str
     route_planner_bot_id: str
@@ -66,6 +68,7 @@ class CozeSettings:
     longcat_max_tokens: int
     route_planner_prompt_path: str
     recommender_prompt_path: str
+    unified_orchestrator_prompt_path: str
     connect_timeout: float
     read_timeout: float
     agent_names: tuple
@@ -97,6 +100,7 @@ def get_coze_settings():
 
     return CozeSettings(
         chat_provider=chat_provider,
+        workflow_mode=os.getenv("WORKFLOW_MODE", "unified").strip().lower(),
         chat_url=os.getenv("COZE_CHAT_URL", "https://api.coze.cn/v3/chat"),
         bot_id=bot_id,
         route_planner_bot_id=os.getenv("COZE_ROUTE_PLANNER_BOT_ID") or DEFAULT_ROUTE_PLANNER_BOT_ID,
@@ -109,6 +113,10 @@ def get_coze_settings():
         longcat_max_tokens=_get_int_env("LONGCAT_MAX_TOKENS", "1000"),
         route_planner_prompt_path=os.getenv("ROUTE_PLANNER_PROMPT_PATH", DEFAULT_ROUTE_PLANNER_PROMPT_PATH),
         recommender_prompt_path=os.getenv("RECOMMENDER_PROMPT_PATH", DEFAULT_RECOMMENDER_PROMPT_PATH),
+        unified_orchestrator_prompt_path=os.getenv(
+            "UNIFIED_ORCHESTRATOR_PROMPT_PATH",
+            DEFAULT_UNIFIED_ORCHESTRATOR_PROMPT_PATH,
+        ),
         connect_timeout=_get_float_env("COZE_CONNECT_TIMEOUT", "10"),
         read_timeout=_get_float_env("COZE_READ_TIMEOUT", "300"),
         agent_names=_get_agent_names_env(),

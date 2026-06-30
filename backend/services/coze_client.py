@@ -323,10 +323,17 @@ def _append_longcat_history(conversation_id, user_message, assistant_message):
 
 
 def _select_longcat_prompt_path(settings, bot_id):
+    if _is_unified_workflow(settings) and bot_id != settings.recommender_bot_id:
+        return settings.unified_orchestrator_prompt_path
+
     if bot_id == settings.recommender_bot_id:
         return settings.recommender_prompt_path
 
     return settings.route_planner_prompt_path
+
+
+def _is_unified_workflow(settings):
+    return str(getattr(settings, "workflow_mode", "")).strip().lower() in {"unified", "single", "single_turn"}
 
 
 def _read_prompt(path):

@@ -8,6 +8,7 @@ from services.coze_client import (
 from services.coze_stream_transformer import (
     RECOMMENDER_TAGS,
     ROUTE_PLANNER_TAGS,
+    UNIFIED_WORKFLOW_TAGS,
     content_event,
     format_sse_event,
     iter_tagged_events,
@@ -22,6 +23,9 @@ DIRECT_REPLY_TYPE = "DIRECT_REPLY"
 ROUTE_PLANNER_CONVERSATION_KEY = "route_planner"
 RECOMMENDER_CONVERSATION_KEY = "agent_recommendation"
 COMPLETION_EVENTS = {"chat.completed", "message.completed", "done"}
+ROUTE_SECTION_TYPES = {"THINKING_PROCESS", "ACK", DIRECT_REPLY_TYPE, "KG_PATH", "EXPLANATION"}
+RECOMMENDATION_SECTION_TYPES = {"RECOMMENDED_AGENTS", "SUMMARY"}
+DEFAULT_RECOMMENDATION_ACK = "接下来我将根据这条路径，为你推荐合适的智能体组合。"
 STAGE_CONVERSATION_KEYS = {
     KNOWLEDGE_GRAPH_STAGE: ROUTE_PLANNER_CONVERSATION_KEY,
     AGENT_RECOMMENDATION_STAGE: RECOMMENDER_CONVERSATION_KEY,
@@ -41,13 +45,35 @@ def start_chat_workflow_stream(
     settings = coze_client.settings_factory()
     route_planner_bot_id = settings.route_planner_bot_id
     recommender_bot_id = settings.recommender_bot_id
+    workflow_mode = getattr(settings, "workflow_mode", "unified")
     selected_agent_names = _normalize_agent_names(agent_names) or settings.agent_names
     selected_conversation_ids = _normalize_conversation_ids(conversation_ids)
 
     if not route_planner_bot_id:
         raise CozeConfigurationError("COZE_ROUTE_PLANNER_BOT_ID is not configured")
-    if not recommender_bot_id:
+    if not recommender_bot_id and not _is_unified_workflow_mode(workflow_mode):
         raise CozeConfigurationError("COZE_RECOMMENDER_BOT_ID is not configured")
+
+    if _is_unified_workflow_mode(workflow_mode):
+        unified_message = build_unified_orchestration_message(
+            original_message=message,
+            agent_names=selected_agent_names,
+        )
+        route_upstream = coze_client.stream_single_turn_chat(
+            message=unified_message,
+            parameters=parameters,
+            user_id=user_id,
+            bot_id=route_planner_bot_id,
+            conversation_id=selected_conversation_ids.get(ROUTE_PLANNER_CONVERSATION_KEY),
+            auto_save_history=auto_save_history,
+        )
+
+        return _iter_unified_chat_workflow_stream(
+            route_upstream=route_upstream,
+            original_message=message,
+            agent_names=selected_agent_names,
+            conversation_ids=selected_conversation_ids,
+        )
 
     route_upstream = coze_client.stream_single_turn_chat(
         message=message,
@@ -69,6 +95,185 @@ def start_chat_workflow_stream(
         conversation_ids=selected_conversation_ids,
         auto_save_history=auto_save_history,
     )
+
+
+def _iter_unified_chat_workflow_stream(
+    route_upstream,
+    original_message,
+    agent_names,
+    conversation_ids,
+):
+    conversation_ids = dict(conversation_ids or {})
+    chat_ids = {}
+    route_sections = defaultdict(str)
+    direct_reply_parts = []
+    summary = ""
+    route_stage_closed = False
+    recommendation_stage_started = False
+
+    def selected_route():
+        return route_sections.get("KG_PATH", "").strip()
+
+    def route_explanation():
+        return route_sections.get("EXPLANATION", "").strip()
+
+    def thinking_process():
+        return route_sections.get("THINKING_PROCESS", "").strip()
+
+    def close_route_stage():
+        route = selected_route()
+
+        if not route:
+            direct_reply = "".join(direct_reply_parts).strip()
+
+            if direct_reply:
+                yield format_sse_event(
+                    _with_stage(content_event("content.completed", {"type": DIRECT_REPLY_TYPE}), KNOWLEDGE_GRAPH_STAGE)
+                )
+
+            yield _stage_event(
+                "workflow.stage.completed",
+                KNOWLEDGE_GRAPH_STAGE,
+                selected_route=route,
+                route_explanation=route_explanation(),
+                thinking_process=thinking_process(),
+                direct_reply=direct_reply,
+                route_matched=False,
+                **_stage_conversation_payload(KNOWLEDGE_GRAPH_STAGE, conversation_ids, chat_ids),
+            )
+            return False
+
+        graph_path = graph_path_resolver.resolve(route)
+
+        for node in graph_path["nodes"]:
+            yield _stage_event(
+                "graph.node.delta",
+                KNOWLEDGE_GRAPH_STAGE,
+                route=route,
+                node=node,
+            )
+
+        yield _stage_event(
+            "graph.path.resolved",
+            KNOWLEDGE_GRAPH_STAGE,
+            **graph_path,
+        )
+
+        yield _stage_event(
+            "workflow.stage.completed",
+            KNOWLEDGE_GRAPH_STAGE,
+            selected_route=route,
+            route_explanation=route_explanation(),
+            thinking_process=thinking_process(),
+            graph_path=graph_path,
+            **_stage_conversation_payload(KNOWLEDGE_GRAPH_STAGE, conversation_ids, chat_ids),
+        )
+        return True
+
+    def start_recommendation_stage():
+        nonlocal recommendation_stage_started
+
+        if recommendation_stage_started:
+            return
+
+        recommendation_stage_started = True
+        _mirror_unified_recommendation_conversation(conversation_ids, chat_ids)
+
+        yield _stage_event(
+            "workflow.stage.started",
+            AGENT_RECOMMENDATION_STAGE,
+            selected_route=selected_route(),
+            agent_names=list(agent_names),
+            **_stage_conversation_payload(AGENT_RECOMMENDATION_STAGE, conversation_ids, chat_ids),
+        )
+        yield from _fixed_text_section_events("ACK", DEFAULT_RECOMMENDATION_ACK, AGENT_RECOMMENDATION_STAGE)
+
+    yield _workflow_event("workflow.started", **_conversation_payload(conversation_ids, chat_ids))
+    yield _stage_event(
+        "workflow.stage.started",
+        KNOWLEDGE_GRAPH_STAGE,
+        workflow_mode="unified",
+        **_stage_conversation_payload(KNOWLEDGE_GRAPH_STAGE, conversation_ids, chat_ids),
+    )
+
+    for event in iter_tagged_events(
+        route_upstream,
+        section_tags=UNIFIED_WORKFLOW_TAGS,
+        section_stream_emitters={"RECOMMENDED_AGENTS": RecommendedAgentsStreamEmitter},
+        untagged_type=DIRECT_REPLY_TYPE,
+    ):
+        conversation_update = _conversation_update_event(event, KNOWLEDGE_GRAPH_STAGE, conversation_ids, chat_ids)
+
+        if conversation_update:
+            yield conversation_update
+
+        if event.get("event") == "content.delta":
+            event_type = event.get("type")
+
+            if event_type == DIRECT_REPLY_TYPE:
+                direct_reply_parts.append(event.get("content", ""))
+            elif event_type in ROUTE_SECTION_TYPES:
+                route_sections[event_type] += event.get("content", "")
+            elif event_type == "SUMMARY":
+                summary += event.get("content", "")
+
+        if event.get("event") in COMPLETION_EVENTS:
+            continue
+
+        if _is_recommendation_event(event):
+            if not route_stage_closed:
+                route_stage_closed = True
+                route_matched = yield from close_route_stage()
+
+                if not route_matched:
+                    continue
+
+            yield from start_recommendation_stage()
+            yield format_sse_event(_with_stage(event, AGENT_RECOMMENDATION_STAGE))
+            continue
+
+        yield format_sse_event(_with_stage(event, KNOWLEDGE_GRAPH_STAGE))
+
+        if event.get("event") == "content.completed" and event.get("type") == "EXPLANATION" and not route_stage_closed:
+            route_stage_closed = True
+            route_matched = yield from close_route_stage()
+
+            if route_matched:
+                yield from start_recommendation_stage()
+
+    if not route_stage_closed:
+        route_stage_closed = True
+        route_matched = yield from close_route_stage()
+
+        if not route_matched:
+            yield _workflow_event(
+                "chat.completed",
+                status="completed",
+                route_matched=False,
+                **_conversation_payload(conversation_ids, chat_ids),
+            )
+            yield _workflow_event(
+                "workflow.completed",
+                status="completed",
+                route_matched=False,
+                **_conversation_payload(conversation_ids, chat_ids),
+            )
+            return
+
+    if selected_route() and not recommendation_stage_started:
+        yield from start_recommendation_stage()
+
+    if recommendation_stage_started:
+        yield _stage_event(
+            "workflow.stage.completed",
+            AGENT_RECOMMENDATION_STAGE,
+            summary=summary.strip(),
+            thinking_process="",
+            **_stage_conversation_payload(AGENT_RECOMMENDATION_STAGE, conversation_ids, chat_ids),
+        )
+
+    yield _workflow_event("chat.completed", status="completed", **_conversation_payload(conversation_ids, chat_ids))
+    yield _workflow_event("workflow.completed", status="completed", **_conversation_payload(conversation_ids, chat_ids))
 
 
 def _iter_chat_workflow_stream(
@@ -258,6 +463,63 @@ def build_recommender_message(selected_route, agent_names, original_message):
     parts.append(f"可能包含业务需求、学习目标或任务描述：{original_message}")
 
     return "\n".join(parts)
+
+
+def build_unified_orchestration_message(original_message, agent_names):
+    available_agents = _format_agent_names(agent_names)
+    parts = [
+        "请一次完成知识路径规划和智能体组合推荐，不要再把推荐拆成第二轮。",
+        "路径只用于前端可视化和业务拆解；智能体推荐必须直接根据用户原始需求、业务阶段、任务目标和可用智能体能力判断。",
+        "如果用户没有业务、学习、行业或企业经营相关需求，只输出 THINKING_PROCESS 和 ACK 两个 XML 标签。",
+        "如果存在可匹配需求，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
+        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-3 个原始名称，不能改名、不能新增。",
+        f"用户原始需求：{original_message}",
+    ]
+
+    if available_agents:
+        parts.append(f"可用智能体集合：{available_agents}")
+
+    return "\n".join(parts)
+
+
+def _is_unified_workflow_mode(workflow_mode):
+    return str(workflow_mode or "").strip().lower() in {"unified", "single", "single_turn"}
+
+
+def _is_recommendation_event(event):
+    event_name = str(event.get("event", ""))
+    event_type = event.get("type")
+
+    return event_type in RECOMMENDATION_SECTION_TYPES or event_name.startswith("recommended_")
+
+
+def _fixed_text_section_events(section_type, text, stage):
+    yield format_sse_event(_with_stage(content_event("content.started", {"type": section_type}), stage))
+    yield format_sse_event(
+        _with_stage(
+            content_event(
+                "content.delta",
+                {
+                    "type": section_type,
+                    "content_type": "text",
+                    "content": text,
+                },
+            ),
+            stage,
+        )
+    )
+    yield format_sse_event(_with_stage(content_event("content.completed", {"type": section_type}), stage))
+
+
+def _mirror_unified_recommendation_conversation(conversation_ids, chat_ids):
+    route_conversation_id = (conversation_ids or {}).get(ROUTE_PLANNER_CONVERSATION_KEY)
+    route_chat_id = (chat_ids or {}).get(ROUTE_PLANNER_CONVERSATION_KEY)
+
+    if route_conversation_id and not conversation_ids.get(RECOMMENDER_CONVERSATION_KEY):
+        conversation_ids[RECOMMENDER_CONVERSATION_KEY] = route_conversation_id
+
+    if route_chat_id and not chat_ids.get(RECOMMENDER_CONVERSATION_KEY):
+        chat_ids[RECOMMENDER_CONVERSATION_KEY] = route_chat_id
 
 
 def _with_stage(event, stage):
