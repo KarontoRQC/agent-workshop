@@ -48,6 +48,7 @@ class CozeClient:
                 parameters=parameters,
                 bot_id=bot_id,
                 conversation_id=conversation_id,
+                auto_save_history=auto_save_history,
                 system_context=system_context,
             )
 
@@ -109,6 +110,7 @@ class CozeClient:
         parameters=None,
         bot_id=None,
         conversation_id=None,
+        auto_save_history=True,
         system_context=None,
     ):
         if not settings.longcat_api_key:
@@ -129,6 +131,7 @@ class CozeClient:
             conversation_id=selected_conversation_id,
             message=message,
             parameters=parameters,
+            include_history=auto_save_history,
         )
 
         try:
@@ -157,6 +160,7 @@ class CozeClient:
             chat_id=chat_id,
             bot_id=selected_bot_id,
             user_message=message,
+            save_history=auto_save_history,
         )
 
     @staticmethod
@@ -179,12 +183,13 @@ class CozeClient:
 
 
 class LongCatStreamAdapter:
-    def __init__(self, upstream, conversation_id, chat_id, bot_id, user_message):
+    def __init__(self, upstream, conversation_id, chat_id, bot_id, user_message, save_history=True):
         self.upstream = upstream
         self.conversation_id = conversation_id
         self.chat_id = chat_id
         self.bot_id = bot_id
         self.user_message = user_message
+        self.save_history = save_history
         self.closed = False
 
     def iter_lines(self, decode_unicode=False):
@@ -224,7 +229,8 @@ class LongCatStreamAdapter:
                 yield self._line("", decode_unicode=decode_unicode)
 
             completed = True
-            _append_longcat_history(self.conversation_id, self.user_message, "".join(assistant_parts))
+            if self.save_history:
+                _append_longcat_history(self.conversation_id, self.user_message, "".join(assistant_parts))
 
             yield self._line(
                 "event: conversation.message.completed",
@@ -290,11 +296,11 @@ _LONGCAT_HISTORY = {}
 _LONGCAT_HISTORY_LIMIT = 12
 
 
-def _build_longcat_payload(settings, system_prompt, conversation_id, message, parameters=None):
+def _build_longcat_payload(settings, system_prompt, conversation_id, message, parameters=None, include_history=True):
     payload = {
         "model": settings.longcat_model,
         "stream": True,
-        "messages": _build_longcat_messages(system_prompt, conversation_id, message),
+        "messages": _build_longcat_messages(system_prompt, conversation_id, message, include_history=include_history),
     }
 
     if settings.longcat_max_tokens > 0:
@@ -309,9 +315,12 @@ def _build_longcat_payload(settings, system_prompt, conversation_id, message, pa
     return payload
 
 
-def _build_longcat_messages(system_prompt, conversation_id, message):
+def _build_longcat_messages(system_prompt, conversation_id, message, include_history=True):
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(_get_longcat_history(conversation_id))
+
+    if include_history:
+        messages.extend(_get_longcat_history(conversation_id))
+
     messages.append({"role": "user", "content": message})
     return messages
 

@@ -65,7 +65,6 @@ def start_chat_workflow_stream(
         unified_message = build_unified_orchestration_message(
             original_message=message,
             agent_names=selected_agent_names,
-            user_state=normalized_user_state,
         )
         route_upstream = coze_client.stream_single_turn_chat(
             message=unified_message,
@@ -73,7 +72,7 @@ def start_chat_workflow_stream(
             user_id=user_id,
             bot_id=route_planner_bot_id,
             conversation_id=selected_conversation_ids.get(ROUTE_PLANNER_CONVERSATION_KEY),
-            auto_save_history=auto_save_history,
+            auto_save_history=False,
             system_context=user_state_system_context,
         )
 
