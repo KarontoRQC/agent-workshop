@@ -110,7 +110,7 @@ def get_coze_settings():
         longcat_api_key=longcat_api_key,
         longcat_base_url=os.getenv("LONGCAT_BASE_URL", DEFAULT_LONGCAT_BASE_URL),
         longcat_model=os.getenv("LONGCAT_MODEL", DEFAULT_LONGCAT_MODEL),
-        longcat_max_tokens=_get_int_env("LONGCAT_MAX_TOKENS", "1000"),
+        longcat_max_tokens=_get_int_env("LONGCAT_MAX_TOKENS", "3000"),
         route_planner_prompt_path=os.getenv("ROUTE_PLANNER_PROMPT_PATH", DEFAULT_ROUTE_PLANNER_PROMPT_PATH),
         recommender_prompt_path=os.getenv("RECOMMENDER_PROMPT_PATH", DEFAULT_RECOMMENDER_PROMPT_PATH),
         unified_orchestrator_prompt_path=os.getenv(

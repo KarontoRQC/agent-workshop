@@ -66,6 +66,7 @@ def start_chat_workflow_stream(
         unified_message = build_unified_orchestration_message(
             original_message=message,
             agent_names=selected_agent_names,
+            user_state=normalized_user_state,
             state_edit_mode=state_edit_mode,
         )
         route_upstream = coze_client.stream_single_turn_chat(
@@ -496,24 +497,21 @@ def build_unified_orchestration_message(original_message, agent_names, user_stat
     available_agents = _format_agent_names(agent_names)
     user_state_text = _format_user_state_for_message(user_state)
     parts = [
-        "如果是首次完整流程或用户提出新需求，请一次完成知识路径规划和智能体组合推荐，不要再把推荐拆成第二轮；如果只是修改当前状态中的一项，只执行这一项修改。",
-        "路径只用于前端可视化和业务拆解；智能体推荐必须直接根据用户原始需求、业务阶段、任务目标和可用智能体能力判断。",
-        "如果用户没有业务、学习、行业或企业经营相关需求，只输出 THINKING_PROCESS 和 ACK 两个 XML 标签。",
-        "如果本轮只是修改知识路径，必须只输出 THINKING_PROCESS、ACK、KG_PATH，禁止输出 RECOMMENDED_AGENTS 和 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。",
-        "如果本轮只是修改智能体组合，必须输出 THINKING_PROCESS、ACK、KG_PATH、RECOMMENDED_AGENTS、SUMMARY，KG_PATH 必须沿用当前知识路径；除非用户明确要求说明，否则不要输出 EXPLANATION。",
-        "如果当前用户状态为空、没有可沿用的知识路径，或用户提出新的完整需求，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
+        "请根据系统提示词判断本轮属于 A、B、C 哪一种，并严格按对应 XML 结构输出。",
         "KG_PATH 必须输出 6-10 个节点，节点之间只用半角连字符连接。",
-        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-10 个原始名称，不能改名、不能新增；每个 REASON 控制在 18-45 个中文字符。",
-        "凡输出 RECOMMENDED_AGENTS，必须由模型亲自输出 SUMMARY，不能省略，不能在 </RECOMMENDED_AGENTS> 后结束；包含 RECOMMENDED_AGENTS 的回答最终合法结束标签只能是 </SUMMARY>。",
+        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的原始名称，不能改名、不能新增；默认推荐 3-5 个，复杂需求最多 6 个。",
+        "只要输出 RECOMMENDED_AGENTS，就必须继续输出 SUMMARY。",
         f"用户原始需求：{original_message}",
     ]
 
     if state_edit_mode == "path_only":
-        parts.append("本轮状态修改类型：只修改知识路径。不要输出 RECOMMENDED_AGENTS 或 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。")
+        parts.append("本轮模式提示：B1，只修改知识路径。不要输出 RECOMMENDED_AGENTS 或 SUMMARY。")
     elif state_edit_mode == "agents_only":
-        parts.append("本轮状态修改类型：只修改智能体组合。KG_PATH 必须沿用当前知识路径，推荐后必须由模型亲自输出 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。")
+        parts.append("本轮模式提示：B2，只修改智能体组合。KG_PATH 沿用当前知识路径，推荐后输出 SUMMARY。")
     elif state_edit_mode == "both":
-        parts.append("本轮状态修改类型：同时修改知识路径和智能体组合。")
+        parts.append("本轮模式提示：用户同时要求修改知识路径和智能体组合，按完整结构输出。")
+    else:
+        parts.append("本轮模式提示：如果这是业务、学习或经营需求，按 C 完整输出 THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY；EXPLANATION 控制在 40-80 字。")
 
     if available_agents:
         parts.append(f"可用智能体集合：{available_agents}")
@@ -565,7 +563,7 @@ def build_user_state_system_context(user_state):
             "5. 用户只改智能体组合时，KG_PATH 必须原样沿用当前知识路径，即使新组合看起来会影响路径，也不能自行重规划；除非用户明确要求说明，否则不要输出 EXPLANATION。",
             "6. 只有用户明确同时要求修改路径和智能体组合时，才可以同时更新 KG_PATH 与 RECOMMENDED_AGENTS。",
             "7. 如果当前状态为空、没有可沿用的知识路径，或用户提出新的完整需求，就按完整流程正常规划路径和推荐组合。",
-            "8. 凡输出 RECOMMENDED_AGENTS，都必须由模型亲自输出 SUMMARY，不能依赖工具或系统补写。",
+            "8. 凡输出 RECOMMENDED_AGENTS，都必须继续输出 SUMMARY。",
         ]
     )
 
