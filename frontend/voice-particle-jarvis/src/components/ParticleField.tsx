@@ -26,14 +26,11 @@ const ROLE_CORE = 0;
 const ROLE_SHELL = 1;
 const ROLE_RIBBON = 2;
 const ROLE_HALO = 3;
-const STAR_SCALE_BOOST = 1.3;
-const STAR_BRIGHTNESS_BOOST = 1.36;
-const STAR_SPIN_SPEED = 0.2;
-const STAR_TILT_Z = 0;
-const INNER_DIAMOND_SPIN_SPEED = 0.58;
-const HALO_RING_COUNT = 9;
-const HALO_RING_SCALE_BOOST = 1.18;
-const OUTER_PARTICLE_BRIGHTNESS_BOOST = 1.2;
+const BODY_FACET_COUNT = 8;
+const BODY_SPIN_SPEED = 0.54;
+const BODY_RADIUS = 1.18;
+const BODY_INNER_RADIUS = 0.94;
+const BODY_HALF_HEIGHT = 1.68;
 
 const modePalettes: Record<DialogueMode, THREE.Color[]> = {
   idle: ['#f7fbff', '#b6e8ff', '#5fb8ff', '#776dff', '#173571'].map((color) => new THREE.Color(color)),
@@ -51,17 +48,6 @@ function smoothstep(edge0: number, edge1: number, value: number) {
   return nextValue * nextValue * (3 - 2 * nextValue);
 }
 
-function seededUnit(seed: number) {
-  let value = seed >>> 0;
-  value = Math.imul(value ^ (value >>> 15), 0x2c1b3c6d);
-  value = Math.imul(value ^ (value >>> 12), 0x297a2d39);
-  return ((value ^ (value >>> 15)) >>> 0) / 4294967295;
-}
-
-function seededSigned(seed: number) {
-  return seededUnit(seed) * 2 - 1;
-}
-
 function sphericalToPoint(theta: number, latitude: number, radius: number, target: THREE.Vector3) {
   const horizontal = Math.cos(latitude);
 
@@ -70,6 +56,14 @@ function sphericalToPoint(theta: number, latitude: number, radius: number, targe
     Math.sin(latitude) * radius,
     Math.sin(theta) * horizontal * radius,
   );
+}
+
+function rotateTargetY(target: THREE.Vector3, cos: number, sin: number) {
+  const x = target.x;
+  const z = target.z;
+
+  target.x = x * cos - z * sin;
+  target.z = x * sin + z * cos;
 }
 
 function createParticleTexture() {
@@ -142,12 +136,8 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     host.appendChild(renderer.domElement);
 
-    const labelLayer = document.createElement('div');
-    labelLayer.className = 'graph-node-label-layer';
-    host.appendChild(labelLayer);
-
     const width = host.clientWidth || window.innerWidth;
-    const particleCount = width < 720 ? 15000 : 28000;
+    const particleCount = width < 720 ? 16800 : 28600;
     const defaultGraphFocus = new THREE.Vector3(width < 720 ? 0.22 : 0.36, width < 720 ? 0.3 : 0.22, 0.16);
     const graphFocus = defaultGraphFocus.clone();
     const graphFocusTarget = defaultGraphFocus.clone();
@@ -155,12 +145,11 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
     const colors = new Float32Array(particleCount * 3);
     const seeds = new Float32Array(particleCount * SEED_STRIDE);
     const target = new THREE.Vector3();
-    const labelProjection = new THREE.Vector3();
 
     for (let index = 0; index < particleCount; index += 1) {
       const seedOffset = index * SEED_STRIDE;
       const mix = index / particleCount;
-      const role = mix < 0.045 ? ROLE_CORE : mix < 0.5 ? ROLE_SHELL : mix < 0.69 ? ROLE_RIBBON : ROLE_HALO;
+      const role = mix < 0.05 ? ROLE_CORE : mix < 0.54 ? ROLE_SHELL : mix < 0.72 ? ROLE_RIBBON : ROLE_HALO;
       const randomA = Math.random();
       const randomB = Math.random();
       const randomC = Math.random();
@@ -188,6 +177,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     const maxLockPoints = 6;
     const maxLockEdges = 8;
+    const lockCandidatePoolSize = 36;
     const lockLinePositions = new Float32Array(maxLockEdges * 6);
     const lockLineGeometry = new THREE.BufferGeometry();
     lockLineGeometry.setAttribute('position', new THREE.BufferAttribute(lockLinePositions, 3));
@@ -200,15 +190,15 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       color: 0xffffff,
       depthWrite: false,
       map: createParticleTexture(),
-      opacity: 1,
-      size: width < 720 ? 0.035 : 0.031,
+      opacity: 0.96,
+      size: width < 720 ? 0.033 : 0.029,
       sizeAttenuation: true,
       transparent: true,
       vertexColors: true,
     });
 
     const points = new THREE.Points(geometry, material);
-    points.scale.setScalar((width < 720 ? 1.22 : 1.56) * STAR_SCALE_BOOST);
+    points.scale.setScalar(width < 720 ? 1.22 : 1.56);
     scene.add(points);
 
     const lockLineMaterial = new THREE.LineBasicMaterial({
@@ -252,122 +242,89 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
     let lastGraphFocusKey = '';
     let pendingGraphFocusKey = '';
     let lastPulseSeed = settingsRef.current.pulseSeed;
-    type LockedGraphNode = { label: string; particleIndex: number; phase: number; routeIndex: number; x: number; y: number; z: number };
-    let lockedGraphNodes: LockedGraphNode[] = [];
+    let lockedGraphNodes: { phase: number; x: number; y: number; z: number }[] = [];
     let lockedGraphEdges: [number, number][] = [];
-    let lockedParticleTargets = new Map<number, { x: number; y: number; z: number }>();
-    let lockedGraphLabels: HTMLSpanElement[] = [];
     const defaultGraphDisplayCenter = new THREE.Vector3(0, width < 720 ? 0.03 : 0.06, 0.34);
     const graphDisplayCenter = defaultGraphDisplayCenter.clone();
     const graphDisplayCenterTarget = defaultGraphDisplayCenter.clone();
 
-    const clearGraphLabels = () => {
-      if (lockedGraphLabels.length === 0) {
-        return;
-      }
-
-      labelLayer.replaceChildren();
-      lockedGraphLabels = [];
-    };
-
-    const syncGraphLabels = (labels: string[]) => {
-      labelLayer.replaceChildren();
-      lockedGraphLabels = labels.map((label, index) => {
-        const element = document.createElement('span');
-        element.className = 'graph-node-label';
-        element.dataset.index = String(index + 1);
-        element.textContent = label;
-        element.title = label;
-        labelLayer.appendChild(element);
-        return element;
-      });
-    };
-
-    const updateGraphLabels = (localGraphReveal: number, deepCollapse: number) => {
-      if (lockedGraphLabels.length === 0) {
-        return;
-      }
-
-      const hostWidth = host.clientWidth || window.innerWidth;
-      const hostHeight = host.clientHeight || window.innerHeight;
-      const labelOpacity = clamp(localGraphReveal, 0, 1);
-
-      lockPoints.updateMatrixWorld(true);
-      camera.updateMatrixWorld(true);
-
-      lockedGraphLabels.forEach((label, index) => {
-        const node = lockedGraphNodes[index];
-
-        if (!node) {
-          label.style.opacity = '0';
-          return;
-        }
-
-        labelProjection.set(
-          graphDisplayCenter.x + node.x,
-          graphDisplayCenter.y + node.y,
-          graphDisplayCenter.z + deepCollapse * 0.12 + node.z,
-        );
-        lockPoints.localToWorld(labelProjection);
-        labelProjection.project(camera);
-
-        const isVisible =
-          labelProjection.z >= -1 &&
-          labelProjection.z <= 1 &&
-          labelProjection.x > -1.18 &&
-          labelProjection.x < 1.18 &&
-          labelProjection.y > -1.18 &&
-          labelProjection.y < 1.18;
-        const screenX = (labelProjection.x * 0.5 + 0.5) * hostWidth;
-        const screenY = (-labelProjection.y * 0.5 + 0.5) * hostHeight;
-
-        label.style.opacity = isVisible ? String(labelOpacity) : '0';
-        label.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -150%)`;
-      });
-    };
-
     const chooseGraphFocus = () => {
-      const routeNodes = graphRouteRef.current.map((node) => node.trim()).filter(Boolean).slice(0, maxLockPoints);
-      const routeCount = routeNodes.length;
-      const routeKey = routeNodes.join('/');
-      let routeHash = 0;
+      const desiredAngle = Math.random() * TAU;
+      const desiredRadius = width < 720 ? 0.62 + Math.random() * 1.1 : 0.86 + Math.random() * 1.62;
+      const desiredX = Math.cos(desiredAngle) * desiredRadius;
+      const desiredY = Math.sin(desiredAngle) * desiredRadius * 0.74 + (Math.random() - 0.5) * (width < 720 ? 0.32 : 0.54);
+      const desiredZ = -0.38 + Math.random() * 1.05;
+      let chosenIndex = Math.floor((0.05 + Math.random() * 0.94) * particleCount);
+      let bestFocusScore = Infinity;
 
-      if (routeCount === 0) {
+      for (let attempt = 0; attempt < 520; attempt += 1) {
+        const candidateIndex = Math.floor((0.05 + Math.random() * 0.94) * particleCount);
+        const candidateRole = seeds[candidateIndex * SEED_STRIDE + S_ROLE];
+        const candidateOffset = candidateIndex * 3;
+        const candidateX = positions[candidateOffset];
+        const candidateY = positions[candidateOffset + 1];
+        const candidateZ = positions[candidateOffset + 2];
+        const radialDistance = Math.hypot(candidateX, candidateY);
+        const comfortablyVisible =
+          Math.abs(candidateX) < 2.28 &&
+          Math.abs(candidateY) < 1.72 &&
+          candidateZ > -0.92 &&
+          candidateZ < 0.96 &&
+          radialDistance > 0.34;
+        const canBecomeFocus = candidateRole === ROLE_SHELL || candidateRole === ROLE_RIBBON || candidateRole === ROLE_HALO;
+
+        if (canBecomeFocus && comfortablyVisible) {
+          const desiredDx = candidateX - desiredX;
+          const desiredDy = candidateY - desiredY;
+          const desiredDz = candidateZ - desiredZ;
+          const focusScore =
+            Math.sqrt(desiredDx * desiredDx + desiredDy * desiredDy * 1.2 + desiredDz * desiredDz * 0.46) +
+            seeds[candidateIndex * SEED_STRIDE + S_A] * 0.04;
+
+          if (focusScore < bestFocusScore) {
+            bestFocusScore = focusScore;
+            chosenIndex = candidateIndex;
+          }
+        }
+      }
+
+      const offset = chosenIndex * 3;
+      graphFocusTarget.set(positions[offset], positions[offset + 1], positions[offset + 2]);
+
+      if (!Number.isFinite(graphFocusTarget.x) || graphFocusTarget.lengthSq() < 0.08) {
         graphFocusTarget.copy(defaultGraphFocus);
-        graphDisplayCenterTarget.copy(defaultGraphDisplayCenter);
-        lockedGraphNodes = [];
-        lockedGraphEdges = [];
-        lockedParticleTargets = new Map();
-        clearGraphLabels();
-        return;
       }
 
-      for (let index = 0; index < routeKey.length; index += 1) {
-        routeHash = (routeHash * 31 + routeKey.charCodeAt(index)) >>> 0;
-      }
+      const focusAngle = desiredAngle + (Math.random() - 0.5) * 0.34;
+      const normalizedFocusReach = clamp(desiredRadius * 0.34, 0.24, 0.88);
+      const focusReach =
+        width < 720
+          ? clamp(normalizedFocusReach * 0.5 + Math.random() * 0.08, 0.16, 0.3)
+          : clamp(normalizedFocusReach + Math.random() * 0.18, 0.34, 0.78);
+      graphDisplayCenterTarget.set(
+        Math.cos(focusAngle) * focusReach,
+        (width < 720 ? 0.02 : 0.05) + Math.sin(focusAngle) * focusReach * 0.48 + (Math.random() - 0.5) * (width < 720 ? 0.05 : 0.11),
+        0.34 + Math.random() * 0.08,
+      );
 
-      const candidatePool: { index: number; score: number; x: number; y: number; z: number }[] = [];
+      const candidatePool: { angle: number; index: number; score: number; x: number; y: number; z: number }[] = [];
 
       for (let index = 0; index < particleCount; index += 1) {
         const seedOffset = index * SEED_STRIDE;
-        const role = seeds[seedOffset + S_ROLE];
         const offset = index * 3;
         const x = positions[offset];
         const y = positions[offset + 1];
         const z = positions[offset + 2];
-        const radialDistance = Math.hypot(x, y);
-        const comfortablyVisible =
-          Math.abs(x) < 2.34 &&
-          Math.abs(y) < 1.76 &&
-          z > -1 &&
-          z < 1.04 &&
-          radialDistance > 0.28;
-        const canBecomeRouteNode = role === ROLE_SHELL || role === ROLE_RIBBON || role === ROLE_HALO;
+        const dx = x - graphFocusTarget.x;
+        const dy = y - graphFocusTarget.y;
+        const dz = z - graphFocusTarget.z;
+        const distance = Math.sqrt(dx * dx * 1.06 + dy * dy * 1.42 + dz * dz * 0.72);
 
-        if (canBecomeRouteNode && comfortablyVisible) {
+        if (distance < 0.74) {
           candidatePool.push({
+            angle: Math.atan2(dy, dx),
             index,
-            score: seededUnit(routeHash + index * 2654435761) + seeds[seedOffset + S_A] * 0.22 + seeds[seedOffset + S_E] * 0.08,
+            score: distance + seeds[seedOffset + S_A] * 0.006,
             x,
             y,
             z,
@@ -375,120 +332,95 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         }
       }
 
-      const selectedCandidates = candidatePool.sort((left, right) => left.score - right.score).slice(0, routeCount);
+      const nearbyCandidates = candidatePool
+        .sort((left, right) => left.score - right.score)
+        .slice(0, lockCandidatePoolSize)
+        .sort((left, right) => left.angle - right.angle);
+      const selectedCandidates: { angle: number; index: number; score: number; x: number; y: number; z: number }[] = [];
 
-      if (selectedCandidates.length === 0) {
-        graphFocusTarget.copy(defaultGraphFocus);
-        graphDisplayCenterTarget.copy(defaultGraphDisplayCenter);
-        lockedGraphNodes = [];
-        lockedGraphEdges = [];
-        lockedParticleTargets = new Map();
-        clearGraphLabels();
-        return;
+      for (let sector = 0; sector < maxLockPoints; sector += 1) {
+        const sectorCenter = -Math.PI + ((sector + 0.5) / maxLockPoints) * TAU;
+        const sectorCandidate = nearbyCandidates
+          .map((candidate) => {
+            const angleDelta = Math.abs(Math.atan2(Math.sin(candidate.angle - sectorCenter), Math.cos(candidate.angle - sectorCenter)));
+
+            return { candidate, sectorScore: candidate.score + angleDelta * 0.055 };
+          })
+          .filter(({ candidate }) => !selectedCandidates.includes(candidate))
+          .sort((left, right) => left.sectorScore - right.sectorScore)[0]?.candidate;
+
+        if (sectorCandidate) {
+          selectedCandidates.push(sectorCandidate);
+        }
       }
 
-      const focusSum = selectedCandidates.reduce(
-        (sum, candidate) => {
-          sum.x += candidate.x;
-          sum.y += candidate.y;
-          sum.z += candidate.z;
-          return sum;
-        },
-        { x: 0, y: 0, z: 0 },
-      );
-      graphFocusTarget.set(
-        focusSum.x / selectedCandidates.length,
-        focusSum.y / selectedCandidates.length,
-        focusSum.z / selectedCandidates.length,
-      );
+      if (selectedCandidates.length < Math.min(maxLockPoints, nearbyCandidates.length)) {
+        nearbyCandidates.some((candidate) => {
+          if (!selectedCandidates.includes(candidate)) {
+            selectedCandidates.push(candidate);
+          }
 
-      if (!Number.isFinite(graphFocusTarget.x) || graphFocusTarget.lengthSq() < 0.08) {
-        graphFocusTarget.copy(defaultGraphFocus);
+          return selectedCandidates.length >= maxLockPoints;
+        });
       }
 
-      const driftAngle = ((routeHash % 360) / 360) * TAU;
-      const centerDrift = width < 720 ? 0.035 : 0.07;
-      graphDisplayCenterTarget.set(
-        Math.cos(driftAngle) * centerDrift,
-        defaultGraphDisplayCenter.y + Math.sin(driftAngle) * centerDrift * 0.45,
-        0.34 + ((routeHash % 17) / 17) * 0.035,
-      );
+      selectedCandidates.sort((left, right) => left.angle - right.angle);
 
-      const isCompact = width < 720;
-      const pathWidth = routeCount <= 2 ? (isCompact ? 0.68 : 0.96) : isCompact ? 1.08 : 1.56;
-      const pathHeight = isCompact ? 0.32 : 0.46;
-      const depthSpread = isCompact ? 0.12 : 0.2;
-      const routeTilt = seededSigned(routeHash + 53) * (isCompact ? 0.11 : 0.18);
-      const routeWaveCount = 1.35 + seededUnit(routeHash + 71) * 1.2;
-      const horizontalJitter = isCompact ? 0.08 : 0.13;
-      const verticalJitter = isCompact ? 0.09 : 0.15;
-      const routePhase = routeHash * 0.0007;
-
-      lockedGraphNodes = selectedCandidates.map((candidate, routeIndex) => {
-        const progress = routeCount === 1 ? 0.5 : routeIndex / (routeCount - 1);
-        const centeredProgress = progress - 0.5;
-        const pathBend = Math.sin(progress * Math.PI);
-        const nodeSeed = routeHash + routeIndex * 19349663;
-        const edgeDamping = routeIndex === 0 || routeIndex === routeCount - 1 ? 0.42 : 1;
-        const nodeX =
-          centeredProgress * pathWidth +
-          seededSigned(nodeSeed + 17) * horizontalJitter * edgeDamping +
-          pathBend * routeTilt;
-        const nodeY =
-          Math.sin((progress - 0.5) * Math.PI) * pathHeight * 0.62 +
-          Math.sin(progress * Math.PI * routeWaveCount + routePhase) * pathHeight * 0.42 +
-          (routeIndex % 2 === 0 ? -1 : 1) * (0.07 + seededUnit(nodeSeed + 29) * 0.06) * (0.76 + pathBend * 0.24) +
-          seededSigned(nodeSeed + 37) * verticalJitter;
-        const nodeZ =
-          Math.cos(progress * Math.PI * (1.05 + seededUnit(routeHash + 97) * 0.75) + routePhase) * depthSpread +
-          seededSigned(nodeSeed + 43) * depthSpread * 0.58;
+      const localGraphMagnify = width < 720 ? 8.4 : 9.8;
+      lockedGraphNodes = selectedCandidates.map((candidate) => {
+        const dx = candidate.x - graphFocusTarget.x;
+        const dy = candidate.y - graphFocusTarget.y;
+        const dz = candidate.z - graphFocusTarget.z;
+        const distance = Math.max(0.001, Math.hypot(dx, dy, dz));
+        const readableRadius = clamp(distance * localGraphMagnify, 0.2, width < 720 ? 0.48 : 0.54);
+        const depthOffset = clamp(dz * localGraphMagnify * 0.38, -0.12, 0.18);
 
         return {
-          particleIndex: candidate.index,
-          label: routeNodes[routeIndex],
           phase: seeds[candidate.index * SEED_STRIDE + S_E] * TAU,
-          routeIndex,
-          x: nodeX,
-          y: nodeY,
-          z: nodeZ,
+          x: Math.cos(candidate.angle) * readableRadius,
+          y: Math.sin(candidate.angle) * readableRadius * 0.76,
+          z: depthOffset,
         };
       });
 
-      const minNodeDistance = isCompact ? 0.24 : 0.32;
-      lockedGraphNodes.forEach((node, nodeIndex) => {
-        for (let previousIndex = 0; previousIndex < nodeIndex; previousIndex += 1) {
-          const previousNode = lockedGraphNodes[previousIndex];
-          const dx = node.x - previousNode.x;
-          const dy = node.y - previousNode.y;
-          const distance = Math.hypot(dx, dy);
-
-          if (distance >= minNodeDistance) {
-            continue;
-          }
-
-          const push = minNodeDistance - distance;
-          const pushAngle = routePhase + nodeIndex * 1.37 + previousIndex * 0.61;
-          node.x += Math.cos(pushAngle) * push * 0.72;
-          node.y += Math.sin(pushAngle) * push * 0.9 + (nodeIndex % 2 === 0 ? -push : push) * 0.36;
+      const nextEdges: [number, number, number][] = [];
+      const addStableEdge = (fromIndex: number, toIndex: number, edgeLength: number) => {
+        if (fromIndex === toIndex) {
+          return;
         }
 
-        node.x = clamp(node.x, -pathWidth * 0.68, pathWidth * 0.68);
-        node.y = clamp(node.y, -pathHeight * 1.08, pathHeight * 1.08);
-        node.z = clamp(node.z, -depthSpread * 1.42, depthSpread * 1.42);
-      });
+        const normalizedFrom = Math.min(fromIndex, toIndex);
+        const normalizedTo = Math.max(fromIndex, toIndex);
+        const exists = nextEdges.some(([left, right]) => left === normalizedFrom && right === normalizedTo);
 
-      lockedGraphEdges = lockedGraphNodes.slice(1).map((_, index) => [index, index + 1]);
-      lockedParticleTargets = new Map();
-      syncGraphLabels(lockedGraphNodes.map((node) => node.label));
-      const particlePathScale = isCompact ? 0.46 : 0.56;
+        if (!exists) {
+          nextEdges.push([normalizedFrom, normalizedTo, edgeLength]);
+        }
+      };
 
-      lockedGraphNodes.forEach((node) => {
-        lockedParticleTargets.set(node.particleIndex, {
-          x: graphFocusTarget.x + node.x * particlePathScale,
-          y: graphFocusTarget.y + node.y * particlePathScale,
-          z: graphFocusTarget.z + node.z * particlePathScale,
-        });
-      });
+      for (let pointIndex = 0; pointIndex < lockedGraphNodes.length; pointIndex += 1) {
+        const nextIndex = (pointIndex + 1) % lockedGraphNodes.length;
+        const from = lockedGraphNodes[pointIndex];
+        const to = lockedGraphNodes[nextIndex];
+        addStableEdge(pointIndex, nextIndex, Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z));
+      }
+
+      for (let fromIndex = 0; fromIndex < lockedGraphNodes.length; fromIndex += 1) {
+        for (let toIndex = fromIndex + 1; toIndex < lockedGraphNodes.length; toIndex += 1) {
+          const from = lockedGraphNodes[fromIndex];
+          const to = lockedGraphNodes[toIndex];
+          const edgeLength = Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z);
+
+          if (edgeLength < (width < 720 ? 0.52 : 0.62)) {
+            addStableEdge(fromIndex, toIndex, edgeLength);
+          }
+        }
+      }
+
+      lockedGraphEdges = nextEdges
+        .sort((left, right) => left[2] - right[2])
+        .slice(0, maxLockEdges)
+        .map(([fromIndex, toIndex]) => [fromIndex, toIndex]);
     };
 
     const resize = () => {
@@ -520,8 +452,8 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       currentSettings: ParticleSettings,
       voiceEnergy: number,
       voiceBeat: number,
-      innerDiamondCos: number,
-      innerDiamondSin: number,
+      bodySpinCos: number,
+      bodySpinSin: number,
     ) => {
       const seedOffset = index * SEED_STRIDE;
       const role = seeds[seedOffset + S_ROLE];
@@ -551,10 +483,10 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       }
 
       if (role === ROLE_RIBBON) {
-        const energyLine = seeds[seedOffset + S_D] > 0.72;
-        const column = Math.floor(seeds[seedOffset + S_A] * 104);
-        const columnProgress = column / 103;
-        const x = (columnProgress - 0.5) * 4.1;
+        const energyLine = false;
+        const column = Math.floor(seeds[seedOffset + S_A] * 118);
+        const columnProgress = column / 117;
+        const x = (columnProgress - 0.5) * 3.88;
         const envelope = clamp(1 - Math.pow(Math.abs(x) / 2.3, 1.72), 0, 1);
         const verticalSeed = seeds[seedOffset + S_B] * 2 - 1;
         const sideFade = smoothstep(2.18, 0.2, Math.abs(x));
@@ -563,20 +495,20 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         if (energyLine) {
           const travel = (seeds[seedOffset + S_B] + time * (0.028 + voiceBeat * 0.026)) % 1;
           const wave =
-            Math.sin(x * 2.35 - time * (1.15 + voiceBeat * 1.1) + phase) * 0.12 +
-            Math.sin(x * 4.35 + time * 0.58 + phase) * 0.045;
-          const lineY = wave + (seeds[seedOffset + S_WIDTH] * 0.55);
+            Math.sin(x * 2.42 - time * (1.32 + voiceBeat * 1.45) + phase) * (0.1 + voiceEnergy * 0.06) +
+            Math.sin(x * 4.65 + time * 0.72 + phase) * 0.036;
+          const lineY = wave + seeds[seedOffset + S_WIDTH] * 0.42;
           const linePulse =
-            Math.pow(Math.max(0, Math.sin(travel * TAU * 2.2 + x * 1.35 - time * 2.2)), 5) *
-            (0.48 + voiceEnergy * 0.58);
+            Math.pow(Math.max(0, Math.sin(travel * TAU * 2.5 + x * 1.38 - time * (2.45 + voiceBeat * 0.8))), 4.4) *
+            (0.46 + voiceEnergy * 0.56);
 
           target.set(
-            x * (1.02 + linePulse * 0.025),
+            x * (1 + linePulse * 0.016),
             lineY,
-            0.1 + Math.sin(x * 1.4 + phase) * 0.08 + linePulse * 0.12,
+            0.08 + Math.sin(x * 1.4 + phase) * 0.045 + linePulse * 0.08,
           );
 
-          return 0.12 + crossFade * 0.18 + linePulse * 1.24 + voiceBeat * 0.12;
+          return 0.1 + crossFade * 0.14 + linePulse * 0.92 + voiceBeat * 0.09;
         }
 
         const curtainHeight =
@@ -614,49 +546,47 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       }
 
       if (role === ROLE_HALO) {
-        const basePad = seeds[seedOffset + S_E] < 0.1;
-        const orbitWrap = !basePad && seeds[seedOffset + S_D] < 0.9;
+        const basePad = seeds[seedOffset + S_E] < 0.14;
+        const orbitWrap = !basePad && seeds[seedOffset + S_D] < 0.82;
         const frame = !basePad && !orbitWrap;
         const side = Math.floor(seeds[seedOffset + S_C] * 8);
         const lane = seeds[seedOffset + S_A] * 2 - 1;
         const level = seeds[seedOffset + S_B] * 2 - 1;
 
         if (basePad) {
-          const ring = Math.floor(seeds[seedOffset + S_C] * 7);
+          const ring = Math.floor(seeds[seedOffset + S_C] * 5);
           const theta = seeds[seedOffset + S_A] * TAU + time * (0.045 + ring * 0.008);
-          const radius = (0.76 + ring * 0.24 + seeds[seedOffset + S_B] * 0.14) * HALO_RING_SCALE_BOOST;
+          const radius = 0.72 + ring * 0.22 + seeds[seedOffset + S_B] * 0.1;
           const basePulse =
             Math.pow(Math.max(0, Math.sin(theta * 3 + time * (1.2 + voiceBeat * 1.6) + phase)), 7) *
             (0.32 + voiceEnergy * 0.38);
 
           target.set(
-            Math.cos(theta) * radius * 1.34,
+            Math.cos(theta) * radius * 1.28,
             -1.64 + seeds[seedOffset + S_WIDTH] * 0.35,
-            Math.sin(theta) * radius * 0.48 - 0.36 + basePulse * 0.08,
+            Math.sin(theta) * radius * 0.42 - 0.36 + basePulse * 0.08,
           );
-          return 0.09 + basePulse * 0.86 + voiceBeat * 0.1;
+          return 0.06 + basePulse * 0.72 + voiceBeat * 0.08;
         }
 
         if (orbitWrap) {
-          const band = Math.floor(seeds[seedOffset + S_C] * HALO_RING_COUNT);
+          const band = Math.floor(seeds[seedOffset + S_C] * 6);
           const direction = band % 2 === 0 ? 1 : -1;
           const theta =
             seeds[seedOffset + S_A] * TAU +
-            direction * time * (0.08 + band * 0.007 + seeds[seedOffset + S_FLOW] * 0.014);
-          const radius = (2.02 + band * 0.082 + seeds[seedOffset + S_B] * 0.17) * HALO_RING_SCALE_BOOST;
-          const tube = seeds[seedOffset + S_WIDTH] * (0.98 + band * 0.026);
-          const bandLatitude =
-            (band - (HALO_RING_COUNT - 1) / 2) * 0.13 + Math.sin(time * 0.05 + band * 1.6) * 0.062;
+            direction * time * (0.088 + band * 0.009 + seeds[seedOffset + S_FLOW] * 0.014);
+          const radius = 1.94 + band * 0.09 + seeds[seedOffset + S_B] * 0.13;
+          const tube = seeds[seedOffset + S_WIDTH] * (0.84 + band * 0.035);
+          const bandLatitude = (band - 2.5) * 0.18 + Math.sin(time * 0.05 + band * 1.6) * 0.055;
           const roll = Math.sin(theta * 1.5 + phase + time * 0.22 * direction);
-          const grandSweep = 1 + seeds[seedOffset + S_E] * 0.1 + (band % 3 === 0 ? 0.08 : 0);
-          const baseX = Math.cos(theta) * (radius + tube * 0.24 + roll * 0.042) * grandSweep;
+          const baseX = Math.cos(theta) * (radius + tube * 0.2 + roll * 0.035);
           const baseY =
             bandLatitude +
             Math.sin(theta + phase) * (0.2 + band * 0.006) +
             Math.sin(theta * 2.4 - time * 0.46 * direction + phase) * 0.055 +
             tube * 0.72;
           const baseZ =
-            Math.sin(theta) * (0.92 + band * 0.014) * grandSweep +
+            Math.sin(theta) * (0.82 + band * 0.018) +
             Math.cos(theta * 0.68 + phase) * 0.06 +
             roll * 0.045;
           const tiltX = -0.5 + Math.sin(band * 1.42) * 0.24 + Math.sin(time * 0.045 + phase) * 0.06;
@@ -674,16 +604,15 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
           const ridgeLight =
             Math.pow(0.5 + Math.cos(theta * 1.9 - time * 0.38 * direction + band * 0.8 + phase) * 0.5, 2.2) *
             (0.24 + voiceEnergy * 0.18);
-          const frontArc = smoothstep(-0.58, 0.82, rotatedZ);
-          const edgeRead = smoothstep(0.98, 2.24, Math.abs(rotatedX));
-          const shellBreath = 1 + restrainedPulse * 0.014 + streamPulse * 0.02;
+          const frontArc = smoothstep(-0.28, 0.92, rotatedZ);
+          const shellBreath = 1 + restrainedPulse * 0.008 + streamPulse * 0.006;
 
           target.set(
             (rotatedX * cosZ - rotatedY * sinZ) * shellBreath,
             (rotatedX * sinZ + rotatedY * cosZ) * shellBreath,
-            rotatedZ - 0.12 + streamPulse * 0.12,
+            rotatedZ - 0.18 + streamPulse * 0.035,
           );
-          return 0.3 + ridgeLight * 1.12 + frontArc * 0.3 + edgeRead * 0.22 + streamPulse * 1.46 + voiceBeat * 0.14;
+          return 0.12 + ridgeLight * 0.1 + frontArc * 0.055 + streamPulse * 0.16 + voiceBeat * 0.04;
         }
 
         if (frame) {
@@ -705,7 +634,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
           const orbitDepth = Math.sin(localAngle - time * 0.12 + phase * 0.16);
           const rollHighlight = Math.pow(Math.max(0, Math.cos(localAngle * 1.4 - time * 0.86 + phase)), 5.8);
           const frontLayer = seeds[seedOffset + S_BAND] > 2 ? 1 : 0;
-          const rib = seeds[seedOffset + S_A] > 0.82;
+          const rib = false;
           const zLayer = frontLayer
             ? 0.22 + layer * 0.05 + wrap * 0.08 + orbitDepth * 0.16
             : -0.76 + layer * 0.12 - wrap * 0.12 + orbitDepth * 0.22;
@@ -719,7 +648,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
               (ribProgress - 0.5) * 2.7,
               -0.34 + frontLayer * 0.48 + ribFold * 0.18 + pulse * 0.05,
             );
-            return 0.17 + frontLayer * 0.07 + pulse * 0.72 + voiceBeat * 0.05;
+            return 0.06 + frontLayer * 0.02 + pulse * 0.14 + voiceBeat * 0.025;
           }
 
           target.set(
@@ -727,7 +656,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
             ay + (by - ay) * blend + level * 0.05,
             zLayer + pulse * 0.06 + Math.sin(time * 0.08 + phase) * 0.02,
           );
-          return 0.18 + frontLayer * 0.09 + pulse * 0.78 + rollHighlight * 0.5 + voiceBeat * 0.065;
+          return 0.095 + frontLayer * 0.035 + pulse * 0.12 + rollHighlight * 0.055 + voiceBeat * 0.03;
         }
 
         const column = Math.floor(seeds[seedOffset + S_A] * 46);
@@ -738,63 +667,100 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         const fall = (seeds[seedOffset + S_C] + time * (0.012 + seeds[seedOffset + S_FLOW] * 0.006)) % 1;
         const sparkle = Math.pow(Math.max(0, Math.sin(fall * TAU * 2.8 - time * 1.2 + phase)), 6);
         target.set(x + seeds[seedOffset + S_WIDTH] * 0.34, y + (fall - 0.5) * 0.12, -0.82 + sparkle * 0.1);
-        return 0.035 + gridFade * 0.16 + sparkle * 0.36 + voiceBeat * 0.04;
+        return 0.02 + gridFade * 0.12 + sparkle * 0.28 + voiceBeat * 0.03;
       }
 
-      const facetEdge = seeds[seedOffset + S_D] > 0.58;
-      const side = Math.floor(seeds[seedOffset + S_C] * 6);
+      const facetEdge = seeds[seedOffset + S_D] > 0.68;
+      const side = Math.floor(seeds[seedOffset + S_C] * BODY_FACET_COUNT);
       const topFacet = seeds[seedOffset + S_E] > 0.5;
-      const sideAngle = side * (TAU / 6) + Math.PI / 6;
-      const nextAngle = sideAngle + TAU / 6;
+      const sideAngle = side * (TAU / BODY_FACET_COUNT) + TAU / BODY_FACET_COUNT / 2;
+      const nextAngle = sideAngle + TAU / BODY_FACET_COUNT;
       const oppositeAngle = sideAngle + Math.PI;
-      const apexY = topFacet ? 1.46 : -1.46;
-      const baseAx = Math.cos(sideAngle) * 0.96;
-      const baseAz = Math.sin(sideAngle) * 0.56;
-      const baseBx = Math.cos(nextAngle) * 0.96;
-      const baseBz = Math.sin(nextAngle) * 0.56;
-      const baseOx = Math.cos(oppositeAngle) * 0.74;
-      const baseOz = Math.sin(oppositeAngle) * 0.44;
-      const ax = baseAx * innerDiamondCos - baseAz * innerDiamondSin;
-      const az = baseAx * innerDiamondSin + baseAz * innerDiamondCos;
-      const bx = baseBx * innerDiamondCos - baseBz * innerDiamondSin;
-      const bz = baseBx * innerDiamondSin + baseBz * innerDiamondCos;
-      const ox = baseOx * innerDiamondCos - baseOz * innerDiamondSin;
-      const oz = baseOx * innerDiamondSin + baseOz * innerDiamondCos;
+      const apexY = topFacet ? BODY_HALF_HEIGHT : -BODY_HALF_HEIGHT;
+      const ax = Math.cos(sideAngle) * BODY_RADIUS;
+      const az = Math.sin(sideAngle) * BODY_RADIUS;
+      const bx = Math.cos(nextAngle) * BODY_RADIUS;
+      const bz = Math.sin(nextAngle) * BODY_RADIUS;
+      const ox = Math.cos(oppositeAngle) * BODY_INNER_RADIUS;
+      const oz = Math.sin(oppositeAngle) * BODY_INNER_RADIUS;
       const crystalWaveSpeed = currentSettings.mode === 'speaking' ? 2.2 + voiceBeat * 1.5 : 0.86 + voiceEnergy * 0.48;
 
       if (facetEdge) {
         const progress = seeds[seedOffset + S_A];
-        const edgeKind = Math.floor(seeds[seedOffset + S_B] * 7);
-        const edgePulse = Math.pow(Math.max(0, Math.sin(progress * TAU * 2.4 - time * crystalWaveSpeed + phase)), 5.4);
+        const edgeKind = Math.floor(seeds[seedOffset + S_B] * 4);
+        const edgePulse = Math.pow(Math.max(0, Math.sin(progress * TAU * 2.4 - time * crystalWaveSpeed + phase)), 5.8);
 
         if (edgeKind === 0) {
           target.set(ax * progress, apexY * (1 - progress), az * progress);
         } else if (edgeKind === 1) {
           target.set(bx * progress, apexY * (1 - progress), bz * progress);
         } else if (edgeKind === 2) {
-          target.set(ax + (bx - ax) * progress, 0, az + (bz - az) * progress);
+          const bow = Math.sin(progress * Math.PI);
+          target.set(
+            (ax + (bx - ax) * progress) * (0.82 + bow * 0.08),
+            apexY * (0.14 + bow * 0.1),
+            (az + (bz - az) * progress) * (0.82 + bow * 0.08),
+          );
         } else if (edgeKind === 3) {
-          const centerY = -1.36 + progress * 2.72;
-          target.set(seeds[seedOffset + S_WIDTH] * 0.18, centerY, seeds[seedOffset + S_WIDTH] * 0.22);
+          const midX = (ax + bx) * 0.5;
+          const midZ = (az + bz) * 0.5;
+          target.set(
+            midX * progress,
+            apexY * (1 - progress) * 0.96,
+            midZ * progress,
+          );
         } else if (edgeKind === 4) {
-          target.set(ax + (ox - ax) * progress, (progress - 0.5) * 0.22, az + (oz - az) * progress);
+          const inner = Math.sin(progress * Math.PI);
+          target.set(
+            bx * (1 - progress) + ox * progress,
+            apexY * (0.58 - progress * 0.82),
+            bz * (1 - progress) + oz * progress - inner * 0.08,
+          );
         } else if (edgeKind === 5) {
           const midX = (ax + bx) * 0.5;
           const midZ = (az + bz) * 0.5;
-          target.set(midX * progress, apexY * (1 - progress) * 0.72, midZ * progress);
+          target.set(midX * progress, apexY * (1 - progress) * 0.82, midZ * progress);
+        } else if (edgeKind === 6) {
+          const fold = Math.sin(progress * Math.PI);
+          target.set(
+            (ax * (1 - progress) + bx * progress) * (0.62 + fold * 0.16),
+            apexY * (0.46 - Math.abs(progress - 0.5) * 0.92),
+            (az * (1 - progress) + bz * progress) * (0.62 + fold * 0.14),
+          );
+        } else if (edgeKind === 7) {
+          const fold = Math.sin(progress * Math.PI);
+          const midX = (ax + bx) * 0.5;
+          const midZ = (az + bz) * 0.5;
+          target.set(
+            midX * (0.32 + fold * 0.1) * (1 - progress) + ox * progress,
+            apexY * (0.36 - progress * 0.72),
+            midZ * (0.32 + fold * 0.1) * (1 - progress) + oz * progress,
+          );
         } else {
           const inner = Math.sin(progress * Math.PI);
           target.set(
-            (ax * (1 - progress) + bx * progress) * (0.46 + inner * 0.18),
-            apexY * (0.42 - Math.abs(progress - 0.5) * 0.84),
-            (az * (1 - progress) + bz * progress) * (0.46 + inner * 0.14),
+            (ax * (1 - progress) + bx * progress) * (0.48 + inner * 0.2),
+            apexY * (0.38 - Math.abs(progress - 0.5) * 0.76),
+            (az * (1 - progress) + bz * progress) * (0.48 + inner * 0.17),
           );
         }
 
-        target.x *= 1 + edgePulse * 0.012;
-        target.z *= 1 + edgePulse * 0.015;
-        target.y += seeds[seedOffset + S_WIDTH] * 0.08;
-        return 0.32 + edgePulse * 1.32 + voiceEnergy * 0.12 + voiceBeat * 0.25;
+        target.x *= 1 + edgePulse * 0.004;
+        target.z *= 1 + edgePulse * 0.004;
+        target.y += seeds[seedOffset + S_WIDTH] * 0.03;
+        rotateTargetY(target, bodySpinCos, bodySpinSin);
+        const frontEdge = smoothstep(-0.16, 0.72, target.z);
+        const lowerEdgeRead = topFacet ? 0 : smoothstep(0.08, BODY_HALF_HEIGHT * 0.92, -target.y);
+        const lowerApexRead = topFacet ? 0 : Math.pow(smoothstep(0.34, BODY_HALF_HEIGHT, -target.y), 1.8);
+        return (
+          0.33 +
+          frontEdge * 0.26 +
+          lowerEdgeRead * 0.28 +
+          lowerApexRead * 0.32 +
+          edgePulse * (topFacet ? 1.08 : 1.28) +
+          voiceEnergy * 0.1 +
+          voiceBeat * 0.22
+        );
       }
 
       const root = Math.sqrt(seeds[seedOffset + S_A]);
@@ -806,20 +772,33 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         Math.max(0, Math.sin((sideWeightA + sideWeightB) * TAU * 2.8 - time * crystalWaveSpeed + phase)),
         5,
       );
-      const facetBreath = 1 + restrainedPulse * 0.018 + facetPulse * (0.006 + voiceBeat * 0.006);
-      const inset = 0.92 + seeds[seedOffset + S_SHADE] * 0.08;
+      const facetBreath = 1 + restrainedPulse * 0.005 + facetPulse * (0.002 + voiceBeat * 0.002);
+      const inset = 0.93 + seeds[seedOffset + S_SHADE] * 0.06;
 
       target.set(
         (sideWeightA * ax + sideWeightB * bx) * inset * facetBreath,
         apexWeight * apexY * facetBreath,
         (sideWeightA * az + sideWeightB * bz) * inset * facetBreath,
       );
+      rotateTargetY(target, bodySpinCos, bodySpinSin);
 
       const facetDepth = smoothstep(-0.18, 0.62, target.z);
       const apexLight = smoothstep(0.1, 1.4, Math.abs(target.y)) * 0.26;
+      const lowerFacetRead = topFacet ? 0 : smoothstep(0.12, BODY_HALF_HEIGHT * 0.86, -target.y);
       const innerRidge =
-        Math.pow(Math.max(0, Math.cos((sideWeightA - sideWeightB) * TAU * 2.2 + time * 0.72 + phase)), 7) * 0.22;
-      return 0.24 + facetDepth * 0.5 + apexLight * 1.12 + innerRidge * 1.16 + facetPulse * 0.52 + voiceEnergy * 0.09 + voiceBeat * 0.16;
+        Math.pow(Math.max(0, Math.cos((sideWeightA - sideWeightB) * TAU * 2.45 + time * 0.72 + phase)), 7) * 0.14;
+      const frontFacet = smoothstep(-0.1, 0.72, target.z);
+      return (
+        0.22 +
+        facetDepth * 0.5 +
+        frontFacet * 0.18 +
+        lowerFacetRead * 0.26 +
+        apexLight * (topFacet ? 1.08 : 1.24) +
+        innerRidge * (topFacet ? 1 : 1.24) +
+        facetPulse * 0.38 +
+        voiceEnergy * 0.07 +
+        voiceBeat * 0.13
+      );
     };
 
     const animate = () => {
@@ -865,8 +844,6 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         pendingGraphFocusKey = activeGraphFocusKey;
         lockedGraphNodes = [];
         lockedGraphEdges = [];
-        lockedParticleTargets = new Map();
-        clearGraphLabels();
       }
 
       if (!activeGraphFocusKey) {
@@ -876,8 +853,6 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         graphDisplayCenterTarget.copy(defaultGraphDisplayCenter);
         lockedGraphNodes = [];
         lockedGraphEdges = [];
-        lockedParticleTargets = new Map();
-        clearGraphLabels();
       }
 
       if (pendingGraphFocusKey && graphProgress > 0.34) {
@@ -893,15 +868,15 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         triggerPulse();
       }
 
-      const innerDiamondSpin = -elapsed * INNER_DIAMOND_SPIN_SPEED;
-      const innerDiamondCos = Math.cos(innerDiamondSpin);
-      const innerDiamondSin = Math.sin(innerDiamondSpin);
+      const bodySpin = elapsed * BODY_SPIN_SPEED * (1 - graphBlend * 0.5);
+      const bodySpinCos = Math.cos(bodySpin);
+      const bodySpinSin = Math.sin(bodySpin);
 
       for (let index = 0; index < particleCount; index += 1) {
         const offset = index * 3;
         const seedOffset = index * SEED_STRIDE;
         const role = seeds[seedOffset + S_ROLE];
-        let shapeLight = writeTarget(index, elapsed, currentSettings, voiceEnergy, voiceBeat, innerDiamondCos, innerDiamondSin);
+        let shapeLight = writeTarget(index, elapsed, currentSettings, voiceEnergy, voiceBeat, bodySpinCos, bodySpinSin);
         const lerpAmount = role === ROLE_RIBBON ? 0.095 : role === ROLE_HALO ? 0.045 : 0.07;
 
         if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
@@ -956,16 +931,6 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         target.x += -dy * swirl;
         target.y += dx * swirl;
         target.z += magnet * (role === ROLE_HALO ? 0.2 : 0.1);
-
-        const lockedParticleTarget = lockedParticleTargets.get(index);
-
-        if (lockedParticleTarget) {
-          const routeNodeBlend = smoothstep(0.16, 0.86, graphProgress);
-          target.x += (lockedParticleTarget.x - target.x) * routeNodeBlend;
-          target.y += (lockedParticleTarget.y - target.y) * routeNodeBlend;
-          target.z += (lockedParticleTarget.z - target.z) * routeNodeBlend;
-          shapeLight += routeNodeBlend * 1.7;
-        }
 
         positions[offset] += (target.x - positions[offset]) * lerpAmount;
         positions[offset + 1] += (target.y - positions[offset + 1]) * lerpAmount;
@@ -1036,20 +1001,14 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
             frontLight *
             sphereWeight +
           specular;
-        const baseGlow = role === ROLE_CORE ? 0.08 : role === ROLE_HALO ? 0.044 : 0.026;
+        const baseGlow = role === ROLE_CORE ? 0.08 : role === ROLE_HALO ? 0.064 : 0.026;
 
         const finalVisibility =
           (1 - earthLock * 0.66) * (1 - deepCollapse * 0.72) +
           earthLock * focusWeight * 0.16 * (1 - deepCollapse) +
           deepCollapse * (focusNeedle * 0.24 + localLock * 0.42) +
           solarBand * solarReveal * focusCore * 0.16;
-        const roleBrightness =
-          role === ROLE_HALO ? OUTER_PARTICLE_BRIGHTNESS_BOOST : role === ROLE_RIBBON ? 1.1 : 1;
-        const finalGlow =
-          (shimmer + baseGlow) *
-          clamp(finalVisibility, 0.012 + 0.04 * (1 - deepCollapse), 3.8) *
-          STAR_BRIGHTNESS_BOOST *
-          roleBrightness;
+        const finalGlow = (shimmer + baseGlow) * clamp(finalVisibility, 0.012 + 0.04 * (1 - deepCollapse), 3.8);
         colors[offset] = color.r * finalGlow;
         colors[offset + 1] = color.g * finalGlow;
         colors[offset + 2] = color.b * finalGlow;
@@ -1059,8 +1018,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       lockPointPositions.fill(0);
       const lockedCount = lockedGraphNodes.length;
       const localGraphReveal = smoothstep(0.68, 0.95, graphProgress);
-      const pointAlpha = localGraphReveal * (lockedCount > 0 ? 1 : 0);
-      const lineAlpha = localGraphReveal * (lockedCount > 1 ? 1 : 0);
+      const lineAlpha = localGraphReveal * smoothstep(2, maxLockPoints, lockedCount);
       const projectedLockPoints = lockedGraphNodes.map((node) => ({
         x: graphDisplayCenter.x + node.x,
         y: graphDisplayCenter.y + node.y,
@@ -1093,27 +1051,25 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       lockLineGeometry.attributes.position.needsUpdate = true;
       lockPointGeometry.attributes.position.needsUpdate = true;
       lockLineMaterial.opacity += (lineAlpha * 0.78 - lockLineMaterial.opacity) * 0.08;
-      lockPointMaterial.opacity += (pointAlpha * 1 - lockPointMaterial.opacity) * 0.1;
+      lockPointMaterial.opacity += (lineAlpha * 1 - lockPointMaterial.opacity) * 0.1;
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.color.needsUpdate = true;
 
-      const spinSpeed = STAR_SPIN_SPEED * (1 - graphBlend * 0.46);
-      points.rotation.y = elapsed * spinSpeed + 0.16 * (1 - graphBlend) + pointer.x * 0.04;
+      points.rotation.y +=
+        ((0.16 * (1 - graphBlend) + pointer.x * 0.04 + Math.sin(elapsed * 0.12) * 0.025) - points.rotation.y) * 0.04;
       points.rotation.x = Math.sin(elapsed * 0.07) * 0.014 * (1 - graphBlend * 0.8) + pointer.y * 0.018;
-      points.rotation.z = STAR_TILT_Z + Math.sin(elapsed * 0.055) * 0.008 * (1 - graphBlend);
-      lockLines.rotation.copy(points.rotation);
-      lockPoints.rotation.copy(points.rotation);
+      points.rotation.z = Math.sin(elapsed * 0.055) * 0.008 * (1 - graphBlend);
       pulsePower = Math.max(0, pulsePower - delta * 1.35);
 
-      const coreScale = (width < 720 ? 1.22 : 1.56) * STAR_SCALE_BOOST;
-      const graphScale = (width < 720 ? 2.35 : 2.92) * STAR_SCALE_BOOST;
+      const coreScale = width < 720 ? 1.22 : 1.56;
+      const graphScale = width < 720 ? 2.35 : 2.92;
       const baseScale = coreScale + (graphScale - coreScale) * graphBlend;
       const outputScale =
         currentSettings.mode === 'speaking'
           ? 0.03 + voiceEnergy * 0.075 + voiceBeat * 0.04
           : voiceEnergy * 0.018;
       points.scale.setScalar(baseScale * (1 + outputScale + pulsePower * 0.018));
-      const focusLayerScale = (width < 720 ? 1.38 : 1.54) * STAR_SCALE_BOOST;
+      const focusLayerScale = width < 720 ? 1.38 : 1.54;
       lockLines.scale.setScalar(focusLayerScale);
       lockPoints.scale.setScalar(focusLayerScale);
       const sceneLift = (width < 720 ? 0.62 : 0.42) + graphBlend * (width < 720 ? 0.08 : 0.12);
@@ -1146,7 +1102,6 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       camera.position.y += (cameraY - camera.position.y) * 0.04;
       camera.position.z += (cameraZ - camera.position.z) * 0.04;
       camera.lookAt(lookAtX, lookAtY, lookAtZ);
-      updateGraphLabels(localGraphReveal, deepCollapse);
       renderer.render(scene, camera);
       animationId = requestAnimationFrame(animate);
     };
@@ -1174,7 +1129,6 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       lockPointMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
-      labelLayer.remove();
     };
   }, []);
 

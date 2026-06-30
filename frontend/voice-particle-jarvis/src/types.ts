@@ -2,8 +2,6 @@ export type DialogueMode = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 export type ReplySource = 'coze-stream' | 'endpoint' | 'local-mock';
 
-export type AgentStatus = 'idle' | 'streaming' | 'completed' | 'error';
-
 export type AgentAction =
   | {
       type: 'chat';
@@ -30,45 +28,33 @@ export type Message = {
 export type RecommendedAgent = {
   activeField?: string | null;
   agent_index?: number;
+  agent_key?: string;
   agent_name?: string;
+  endpoint?: string;
+  id?: string;
+  jump_url?: string;
+  link?: string;
   name?: string;
   rank?: number | string;
   reason?: string;
+  score?: number | string;
   stage?: string;
-  streamStatus?: 'streaming' | 'completed';
+  streamStatus?: 'completed' | 'streaming';
+  url?: string;
   [key: string]: unknown;
 };
 
 export type AgentGraphPath = {
   edges?: unknown[];
-  nodes?: unknown[];
+  nodes?: Array<{ label?: string; [key: string]: unknown }>;
   route?: string;
   [key: string]: unknown;
 };
 
-export type AgentWorkflow = {
-  knowledgeGraph: {
-    ACK: string;
-    DIRECT_REPLY: string;
-    EXPLANATION: string;
-    KG_PATH: string;
-    THINKING_PROCESS: string;
-    graphPath: AgentGraphPath | null;
-  };
-  agentRecommendation: {
-    ACK: string;
-    SUMMARY: string;
-    THINKING_PROCESS: string;
-    agents: RecommendedAgent[];
-  };
-};
-
-export type AgentTurn = {
-  error: string;
-  fallbackText: string;
-  id: string;
+export type ChatResponse = {
+  actions: AgentAction[];
+  recommendedAgents?: RecommendedAgent[];
   source: ReplySource;
-  status: AgentStatus;
-  user: string;
-  workflow: AgentWorkflow;
+  spokenText?: string;
+  text: string;
 };

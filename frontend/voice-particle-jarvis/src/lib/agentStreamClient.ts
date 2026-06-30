@@ -54,11 +54,34 @@ export function resolveApiBaseUrl() {
     return trimTrailingSlash(configuredBaseUrl);
   }
 
-  return import.meta.env.DEV ? '/api' : DEFAULT_REMOTE_API_BASE_URL;
+  if (import.meta.env.DEV) {
+    return '/api';
+  }
+
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return '/api';
+  }
+
+  return DEFAULT_REMOTE_API_BASE_URL;
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
 export const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
+
+export function isAgentStreamEnabled() {
+  const configured = String(import.meta.env.VITE_AGENT_STREAM_ENABLED || '').trim().toLowerCase();
+  const query = new URLSearchParams(window.location.search);
+
+  if (query.has('noAgentStream')) {
+    return false;
+  }
+
+  if (configured) {
+    return !['0', 'false', 'off', 'no'].includes(configured);
+  }
+
+  return true;
+}
 
 export async function streamAgentChat(message: string, handlers: StreamAgentHandlers = {}) {
   const body: {

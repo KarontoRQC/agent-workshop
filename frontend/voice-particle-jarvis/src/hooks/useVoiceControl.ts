@@ -45,17 +45,14 @@ type SpeechWindow = Window & {
 };
 
 const COMMAND_SILENCE_MS = 2800;
-const NON_SECURE_VOICE_MESSAGE = '语音识别在非安全连接下不可用，请使用 HTTPS 或本机 localhost 访问。';
+const NON_SECURE_VOICE_MESSAGE = '语音识别在非安全连接下不可用，请使用 HTTPS 或 localhost / 127.0.0.1 访问。';
 
 function isSecureForVoice() {
   if (typeof window === 'undefined') {
     return false;
   }
 
-  return (
-    window.isSecureContext ||
-    ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-  );
+  return window.isSecureContext || ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 }
 
 function getSpeechRecognition() {
@@ -286,7 +283,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
     };
 
     beginRecognition();
-  }, [Recognition, clearRestartTimer]);
+  }, [Recognition, canUseVoice, clearCommandTimer, clearRestartTimer, scheduleCommandEmit]);
 
   useEffect(() => {
     if (!canUseVoice) {
@@ -299,7 +296,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
       clearCommandTimer();
       recognitionRef.current?.abort();
     };
-  }, [clearCommandTimer, clearRestartTimer]);
+  }, [canUseVoice, clearCommandTimer, clearRestartTimer]);
 
   return {
     error,

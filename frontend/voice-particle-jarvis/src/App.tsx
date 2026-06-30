@@ -1,35 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import {
-  ArrowUpRight,
-  BrainCircuit,
-  ExternalLink,
-  GitBranch,
-  Keyboard,
-  Mic,
-  MicOff,
-  PackageOpen,
-  Send,
-  Sparkles,
-  UserRound,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Bot, Keyboard, Mic, MicOff, Send, Sparkles } from 'lucide-react';
+import AgentDialoguePanel from './components/AgentDialoguePanel';
+import AgentDrawOverlay from './components/AgentDrawOverlay';
+import ParticleWordmark from './components/ParticleWordmark';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
-import { API_BASE_URL, streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
+import { API_BASE_URL } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
-import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from './lib/agentLaunchCatalog';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
-import type {
-  AgentAction,
-  AgentGraphPath,
-  AgentStatus,
-  AgentTurn,
-  AgentWorkflow,
-  Message,
-  ParticleSettings,
-  RecommendedAgent,
-  ReplySource,
-} from './types';
+import type { AgentAction, Message, ParticleSettings, RecommendedAgent, ReplySource } from './types';
 import './App.css';
 
 const baseSettings: ParticleSettings = {
@@ -38,12 +18,43 @@ const baseSettings: ParticleSettings = {
   pulseSeed: 0,
 };
 
+const TTS_SPEECH_URL = `${API_BASE_URL}/tts/speech`;
+
+type InputMode = 'voice' | 'text';
+
 const demoGraphAction: AgentAction = {
   confidence: 1,
   label: 'knowledge graph preview',
   route: ['Agent Workshop', 'Knowledge Graph', 'Path selection', 'Graph controller'],
   type: 'focus_graph_path',
 };
+
+const demoRecommendedAgents: RecommendedAgent[] = [
+  {
+    agent_index: 0,
+    agent_name: '路径规划智能体',
+    reason: '把自然语言任务拆成知识图谱路径和控制动作。',
+    score: 96,
+    stage: 'LOCAL PREVIEW',
+    streamStatus: 'completed',
+  },
+  {
+    agent_index: 1,
+    agent_name: '知识图谱导航员',
+    reason: '负责节点聚焦、边高亮和局部放大视角。',
+    score: 92,
+    stage: 'LOCAL PREVIEW',
+    streamStatus: 'completed',
+  },
+  {
+    agent_index: 2,
+    agent_name: '业务标签分析师',
+    reason: '补全标签、语义分类和下一步建议。',
+    score: 88,
+    stage: 'LOCAL PREVIEW',
+    streamStatus: 'completed',
+  },
+];
 
 const preferredVoiceHints = [
   'microsoft george online natural',
@@ -84,7 +95,6 @@ const matureMaleVoiceHints = [
 ];
 
 const avoidedVoiceHints = ['zira', 'hazel', 'susan', 'zira desktop', 'female', 'aria', 'jenny', 'emma', 'samantha'];
-const TTS_SPEECH_URL = `${API_BASE_URL}/tts/speech`;
 const preferredChineseVoiceHints = [
   'microsoft yunyang',
   'microsoft yunjian',
@@ -96,32 +106,6 @@ const preferredChineseVoiceHints = [
   'huihui',
   'chinese',
 ];
-const wakeWords = ['jarvis', '贾维斯', '贾贾维斯', '加维斯', '甲维斯', '嘉维斯'];
-const knowledgeGraphTextTypes = ['THINKING_PROCESS', 'ACK', 'DIRECT_REPLY', 'KG_PATH', 'EXPLANATION'] as const;
-const agentRecommendationTextTypes = ['THINKING_PROCESS', 'ACK', 'SUMMARY'] as const;
-const PATH_MATCH_ANIMATION_MS = 3600;
-const RECOMMENDATION_DOCK_REVEAL_MS = 900;
-const SPEECH_SEGMENT_WAIT_MS = 45000;
-
-type SpeechSegmentKey = 'knowledgeAck' | 'knowledgeExplanation' | 'recommendationAck' | 'recommendationSummary';
-
-type WorkflowRevealState = {
-  knowledgeAck: boolean;
-  knowledgeExplanation: boolean;
-  knowledgePath: boolean;
-  recommendationAck: boolean;
-  recommendationAgents: boolean;
-  recommendationSummary: boolean;
-};
-
-type WorkflowTextKey = 'knowledgeGraph.ACK' | 'knowledgeGraph.EXPLANATION' | 'agentRecommendation.ACK' | 'agentRecommendation.SUMMARY';
-type WorkflowTextOverrides = Map<WorkflowTextKey, string>;
-
-type PreloadedSpeechAsset = {
-  audioPromise: Promise<Blob>;
-  text: string;
-};
-
 type SpeechCallbacks = {
   onEnd?: () => void;
   onError?: (reason: string) => void;
@@ -132,50 +116,13 @@ type SpeechCallbacks = {
 type SpeechOutputOptions = {
   audioBlob?: Blob;
   displayText?: string;
-  minimumVisualDurationMs?: number;
-  onSettled?: () => void;
   resumeListening?: boolean;
 };
 
-type InputMode = 'text' | 'voice';
-
-type WorkflowHighlight = 'none' | 'route' | 'agents';
-
-type SubmitMessageOptions = {
-  resumeListening?: boolean;
-};
-
-type AgentConversationIds = Record<string, string>;
-
-function createClientConversationIds(): AgentConversationIds {
-  const newId = (key: string) => {
-    const randomId =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-
-    return `web-${key}-${randomId}`;
-  };
-
-  return {
-    agent_recommendation: newId('agent-recommendation'),
-    route_planner: newId('route-planner'),
-  };
-}
-
-function ensureClientConversationIds(conversationIds: AgentConversationIds): AgentConversationIds {
-  if (conversationIds.route_planner && conversationIds.agent_recommendation) {
-    return conversationIds;
-  }
-
-  const generatedConversationIds = createClientConversationIds();
-
-  return {
-    ...conversationIds,
-    agent_recommendation: conversationIds.agent_recommendation || generatedConversationIds.agent_recommendation,
-    route_planner: conversationIds.route_planner || generatedConversationIds.route_planner,
-  };
-}
+let speechOutputUnlocked = false;
+let activeSpeechAudio: HTMLAudioElement | null = null;
+let activeSpeechObjectUrl = '';
+let serverTtsUnavailable = false;
 
 class TtsRequestError extends Error {
   fallbackToBrowser: boolean;
@@ -185,24 +132,6 @@ class TtsRequestError extends Error {
     this.name = 'TtsRequestError';
     this.fallbackToBrowser = fallbackToBrowser;
   }
-}
-
-function extractWakeCommand(raw: string) {
-  const text = raw.trim();
-  const lowered = text.toLowerCase();
-  const matchedWord = wakeWords.find((word) => lowered.includes(word.toLowerCase()));
-
-  if (!matchedWord) {
-    return null;
-  }
-
-  const startIndex = lowered.indexOf(matchedWord.toLowerCase());
-  const command = text
-    .slice(startIndex + matchedWord.length)
-    .replace(/^[\s,，.。:：;；!?！？]+/, '')
-    .trim();
-
-  return { command, wakeWord: matchedWord };
 }
 
 function wantsSleep(raw: string) {
@@ -280,8 +209,26 @@ function primeSpeechOutput() {
   window.speechSynthesis.resume();
 }
 
-let activeSpeechAudio: HTMLAudioElement | null = null;
-let activeSpeechObjectUrl = '';
+function unlockSpeechOutput() {
+  if (speechOutputUnlocked || !('speechSynthesis' in window)) {
+    return;
+  }
+
+  primeSpeechOutput();
+
+  const utterance = new SpeechSynthesisUtterance(' ');
+  utterance.volume = 0;
+  utterance.rate = 1;
+  utterance.onend = () => {
+    speechOutputUnlocked = true;
+  };
+  utterance.onerror = () => {
+    speechOutputUnlocked = false;
+  };
+
+  speechOutputUnlocked = true;
+  window.speechSynthesis.speak(utterance);
+}
 
 function getTtsMode() {
   const rawMode = String(import.meta.env.VITE_TTS_BROWSER_FALLBACK ?? 'auto')
@@ -307,6 +254,17 @@ function isFallbackableTtsError(error: unknown) {
   return getTtsMode() === 'auto' && error instanceof TypeError;
 }
 
+function shouldUseBrowserSpeechOnly() {
+  const ttsMode = getTtsMode();
+  return ttsMode === 'browser' || (ttsMode === 'auto' && serverTtsUnavailable);
+}
+
+function markServerTtsUnavailable(error: unknown) {
+  if (getTtsMode() === 'auto' && isFallbackableTtsError(error)) {
+    serverTtsUnavailable = true;
+  }
+}
+
 function cancelSpeechPlayback() {
   if (activeSpeechAudio) {
     activeSpeechAudio.pause();
@@ -322,25 +280,34 @@ function cancelSpeechPlayback() {
 }
 
 async function requestTtsAudio(text: string) {
-  const response = await fetch(TTS_SPEECH_URL, {
-    body: JSON.stringify({ mood: 'neutral', text }),
-    headers: {
-      'content-type': 'application/json',
-    },
-    method: 'POST',
-  });
-
-  if (!response.ok) {
-    throw await formatTtsResponseError(response);
+  if (shouldUseBrowserSpeechOnly()) {
+    throw new TtsRequestError('Browser speech fallback is active.', true);
   }
 
-  const audio = await response.blob();
+  try {
+    const response = await fetch(TTS_SPEECH_URL, {
+      body: JSON.stringify({ mood: 'neutral', text }),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
 
-  if (!audio.size) {
-    throw new Error('TTS interface returned empty audio.');
+    if (!response.ok) {
+      throw await formatTtsResponseError(response);
+    }
+
+    const audio = await response.blob();
+
+    if (!audio.size) {
+      throw new Error('TTS interface returned empty audio.');
+    }
+
+    return audio;
+  } catch (error) {
+    markServerTtsUnavailable(error);
+    throw error;
   }
-
-  return audio;
 }
 
 async function formatTtsResponseError(response: Response) {
@@ -413,6 +380,7 @@ async function playTtsSpeech(text: string, callbacks: SpeechCallbacks, preparedA
     cancelSpeechPlayback();
 
     if (isFallbackableTtsError(error)) {
+      markServerTtsUnavailable(error);
       playBrowserSpeech(text, callbacks);
       return;
     }
@@ -453,7 +421,9 @@ function speakNow(text: string, callbacks: SpeechCallbacks) {
   utterance.onerror = (event) => {
     stopResumeTimer();
     const reason = event.error || 'Speech synthesis failed.';
-    console.warn(reason);
+    if (reason !== 'not-allowed' && reason !== 'interrupted' && reason !== 'canceled') {
+      console.warn(reason);
+    }
     callbacks.onError?.(reason);
     callbacks.onEnd?.();
   };
@@ -513,486 +483,49 @@ function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Bl
   return true;
 }
 
-function createEmptyAgentWorkflow(): AgentWorkflow {
-  return {
-    agentRecommendation: {
-      ACK: '',
-      SUMMARY: '',
-      THINKING_PROCESS: '',
-      agents: [],
-    },
-    knowledgeGraph: {
-      ACK: '',
-      DIRECT_REPLY: '',
-      EXPLANATION: '',
-      KG_PATH: '',
-      THINKING_PROCESS: '',
-      graphPath: null,
-    },
-  };
-}
-
-function createEmptyWorkflowRevealState(): WorkflowRevealState {
-  return {
-    knowledgeAck: false,
-    knowledgeExplanation: false,
-    knowledgePath: false,
-    recommendationAck: false,
-    recommendationAgents: false,
-    recommendationSummary: false,
-  };
-}
-
-function getVisibleWorkflow(
-  workflow: AgentWorkflow,
-  reveal: WorkflowRevealState,
-  textOverrides?: WorkflowTextOverrides,
-  agentRevealCount?: number | null,
-): AgentWorkflow {
-  const getText = (key: WorkflowTextKey, fallback: string) => textOverrides?.get(key) ?? fallback;
-  const visibleAgents =
-    reveal.recommendationAgents && typeof agentRevealCount === 'number'
-      ? workflow.agentRecommendation.agents.slice(0, Math.min(agentRevealCount, workflow.agentRecommendation.agents.length))
-      : workflow.agentRecommendation.agents;
-
-  return {
-    agentRecommendation: {
-      ACK: reveal.recommendationAck ? getText('agentRecommendation.ACK', workflow.agentRecommendation.ACK) : '',
-      SUMMARY: reveal.recommendationSummary ? getText('agentRecommendation.SUMMARY', workflow.agentRecommendation.SUMMARY) : '',
-      THINKING_PROCESS: reveal.recommendationAck ? workflow.agentRecommendation.THINKING_PROCESS : '',
-      agents: reveal.recommendationAgents ? visibleAgents : [],
-    },
-    knowledgeGraph: {
-      ACK: reveal.knowledgeAck ? getText('knowledgeGraph.ACK', workflow.knowledgeGraph.ACK) : '',
-      DIRECT_REPLY: reveal.knowledgeAck ? workflow.knowledgeGraph.DIRECT_REPLY : '',
-      EXPLANATION: reveal.knowledgeExplanation ? getText('knowledgeGraph.EXPLANATION', workflow.knowledgeGraph.EXPLANATION) : '',
-      KG_PATH: reveal.knowledgePath ? workflow.knowledgeGraph.KG_PATH : '',
-      THINKING_PROCESS: reveal.knowledgeAck ? workflow.knowledgeGraph.THINKING_PROCESS : '',
-      graphPath: reveal.knowledgePath ? workflow.knowledgeGraph.graphPath : null,
-    },
-  };
-}
-
-function getRevealForSpeechSegment(segment: SpeechSegmentKey): Partial<WorkflowRevealState> {
-  if (segment === 'knowledgeAck') {
-    return { knowledgeAck: true };
-  }
-
-  if (segment === 'knowledgeExplanation') {
-    return { knowledgeExplanation: true };
-  }
-
-  if (segment === 'recommendationAck') {
-    return { recommendationAck: true };
-  }
-
-  return { recommendationSummary: true };
-}
-
-function getTextKeyForSpeechSegment(segment: SpeechSegmentKey): WorkflowTextKey {
-  if (segment === 'knowledgeAck') {
-    return 'knowledgeGraph.ACK';
-  }
-
-  if (segment === 'knowledgeExplanation') {
-    return 'knowledgeGraph.EXPLANATION';
-  }
-
-  if (segment === 'recommendationAck') {
-    return 'agentRecommendation.ACK';
-  }
-
-  return 'agentRecommendation.SUMMARY';
-}
-
-function createAgentTurn(id: string, user: string): AgentTurn {
-  return {
-    error: '',
-    fallbackText: '',
-    id,
-    source: 'coze-stream',
-    status: 'streaming',
-    user,
-    workflow: createEmptyAgentWorkflow(),
-  };
-}
-
-function getWorkflowSection(event: AgentStreamEvent): keyof AgentWorkflow | null {
-  if (
-    event.stage === 'knowledge_graph' &&
-    (knowledgeGraphTextTypes as readonly string[]).includes(event.type || '')
-  ) {
-    return 'knowledgeGraph';
-  }
-
-  if (event.stage === 'agent_recommendation' && (agentRecommendationTextTypes as readonly string[]).includes(event.type || '')) {
-    return 'agentRecommendation';
-  }
-
-  return null;
-}
-
-function appendWorkflowContent(workflow: AgentWorkflow, section: keyof AgentWorkflow, type: string | undefined, content: string) {
-  if (!type || !content) {
-    return workflow;
-  }
-
-  if (section === 'knowledgeGraph') {
-    if (!(knowledgeGraphTextTypes as readonly string[]).includes(type)) {
-      return workflow;
-    }
-
-    return {
-      ...workflow,
-      knowledgeGraph: {
-        ...workflow.knowledgeGraph,
-        [type]: `${workflow.knowledgeGraph[type as keyof AgentWorkflow['knowledgeGraph']] || ''}${content}`,
-      },
-    };
-  }
-
-  if (!(agentRecommendationTextTypes as readonly string[]).includes(type)) {
-    return workflow;
-  }
-
-  return {
-    ...workflow,
-    agentRecommendation: {
-      ...workflow.agentRecommendation,
-      [type]: `${workflow.agentRecommendation[type as keyof AgentWorkflow['agentRecommendation']] || ''}${content}`,
-    },
-  };
-}
-
-function setWorkflowGraphPath(workflow: AgentWorkflow, graphPath: AgentGraphPath): AgentWorkflow {
-  return {
-    ...workflow,
-    knowledgeGraph: {
-      ...workflow.knowledgeGraph,
-      graphPath,
-    },
-  };
-}
-
-function upsertRecommendedAgent(workflow: AgentWorkflow, agent: RecommendedAgent | undefined, options: Partial<RecommendedAgent> = {}) {
-  if (!agent) {
-    return workflow;
-  }
-
-  const currentAgents = workflow.agentRecommendation.agents;
-  const normalizedAgent = normalizeRecommendedAgent(agent);
-  const key = getRecommendedAgentKey(normalizedAgent);
-  const existingIndex = currentAgents.findIndex((item) => getRecommendedAgentKey(item) === key);
-  const hasActiveField = Object.prototype.hasOwnProperty.call(options, 'activeField');
-
-  if (existingIndex >= 0) {
-    return {
-      ...workflow,
-      agentRecommendation: {
-        ...workflow.agentRecommendation,
-        agents: currentAgents.map((item, index) =>
-          index === existingIndex
-            ? {
-                ...item,
-                ...normalizedAgent,
-                activeField: hasActiveField ? options.activeField ?? null : item.activeField ?? null,
-                streamStatus: options.streamStatus || item.streamStatus || 'streaming',
-              }
-            : item,
-        ),
-      },
-    };
-  }
-
-  return {
-    ...workflow,
-    agentRecommendation: {
-      ...workflow.agentRecommendation,
-      agents: [
-        ...currentAgents,
-        {
-          ...normalizedAgent,
-          activeField: hasActiveField ? options.activeField ?? null : null,
-          streamStatus: options.streamStatus || 'streaming',
-        },
-      ],
-    },
-  };
-}
-
-function replaceRecommendedAgents(workflow: AgentWorkflow, agents: RecommendedAgent[]) {
-  const currentAgents = workflow.agentRecommendation.agents;
-
-  return {
-    ...workflow,
-    agentRecommendation: {
-      ...workflow.agentRecommendation,
-      agents: agents.map((agent, index) => {
-        const normalizedAgent = normalizeRecommendedAgent(agent, index);
-        const existing = currentAgents.find((item) => getRecommendedAgentKey(item) === getRecommendedAgentKey(normalizedAgent));
-
-        return {
-          ...existing,
-          ...normalizedAgent,
-          activeField: null,
-          streamStatus: 'completed' as const,
-        };
-      }),
-    },
-  };
-}
-
-function normalizeRecommendedAgent(agent: RecommendedAgent, fallbackIndex?: number): RecommendedAgent {
-  if (agent.agent_index !== undefined && agent.agent_index !== null) {
-    return agent;
-  }
-
-  if (fallbackIndex === undefined) {
-    return agent;
-  }
-
-  return {
-    agent_index: fallbackIndex,
-    ...agent,
-  };
-}
-
-function getRecommendedAgentKey(agent: RecommendedAgent) {
-  if (agent.agent_index !== undefined && agent.agent_index !== null) {
-    return `agent-index-${agent.agent_index}`;
-  }
-
-  return `${agent.rank || ''}-${agent.agent_name || agent.name || 'pending'}`;
-}
-
-function splitRouteText(routeText: string) {
-  return String(routeText || '')
-    .split(/\s*(?:>|›|→|->|-|—|–|\/|、|，|,)\s*/g)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .slice(0, 6);
-}
-
-function getActionFromRoute(routeText: string): AgentAction | null {
-  const route = splitRouteText(routeText);
-
-  if (route.length === 0) {
-    return null;
-  }
-
-  return {
-    confidence: 0.92,
-    label: route.at(-1) || 'agent route',
-    route,
-    type: 'focus_graph_path',
-  };
-}
-
-function buildAgentReplyText(workflow: AgentWorkflow, fallbackText = '') {
-  const knowledgeGraph = workflow.knowledgeGraph;
-  const agentRecommendation = workflow.agentRecommendation;
-
-  return (
-    knowledgeGraph.DIRECT_REPLY ||
-    [knowledgeGraph.ACK, knowledgeGraph.EXPLANATION, agentRecommendation.ACK, agentRecommendation.SUMMARY]
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join('\n\n') ||
-    fallbackText
-  ).trim();
-}
-
-function getCompletedSpeechSegment(event: AgentStreamEvent): SpeechSegmentKey | null {
-  if (event.event !== 'content.completed') {
-    return null;
-  }
-
-  if (event.stage === 'knowledge_graph' && event.type === 'ACK') {
-    return 'knowledgeAck';
-  }
-
-  if (event.stage === 'knowledge_graph' && event.type === 'EXPLANATION') {
-    return 'knowledgeExplanation';
-  }
-
-  if (event.stage === 'agent_recommendation' && event.type === 'ACK') {
-    return 'recommendationAck';
-  }
-
-  if (event.stage === 'agent_recommendation' && event.type === 'SUMMARY') {
-    return 'recommendationSummary';
-  }
-
-  return null;
-}
-
-function getSpeechTextForSegment(workflow: AgentWorkflow, segment: SpeechSegmentKey) {
-  if (segment === 'knowledgeAck') {
-    return cleanSpeechText(workflow.knowledgeGraph.ACK);
-  }
-
-  if (segment === 'knowledgeExplanation') {
-    return cleanSpeechText(workflow.knowledgeGraph.EXPLANATION);
-  }
-
-  if (segment === 'recommendationAck') {
-    return cleanSpeechText(workflow.agentRecommendation.ACK);
-  }
-
-  return cleanSpeechText(workflow.agentRecommendation.SUMMARY);
-}
-
-function extractAckSpeechText(text: string) {
-  const matches = String(text || '').matchAll(/<ACK\b[^>]*>([\s\S]*?)<\/ACK>/gi);
-
-  return Array.from(matches)
-    .map((match) => cleanSpeechText(match[1] || ''))
-    .filter(Boolean)
-    .join('\n\n');
-}
-
-function cleanSpeechText(text: string) {
-  return String(text || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function wait(durationMs: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, durationMs);
-  });
-}
-
-function stripSpeechTagSyntax(text: string) {
-  return String(text || '')
-    .replace(/<\/?(?:ACK|EXPLANATION|EXPLATION|SUMMARY)\b[^>]*>/gi, '')
-    .trim();
-}
-
-function normalizeSubtitleText(text: string) {
-  return stripSpeechTagSyntax(text).replace(/\s+/g, ' ').trim();
-}
-
-function hasAgentOutput(turn: AgentTurn | null) {
-  if (!turn) {
-    return false;
-  }
-
-  const workflow = turn.workflow;
-
-  return Boolean(
-    turn.fallbackText ||
-      turn.error ||
-      workflow.knowledgeGraph.THINKING_PROCESS ||
-      workflow.knowledgeGraph.ACK ||
-      workflow.knowledgeGraph.DIRECT_REPLY ||
-      workflow.knowledgeGraph.KG_PATH ||
-      workflow.knowledgeGraph.EXPLANATION ||
-      workflow.agentRecommendation.THINKING_PROCESS ||
-      workflow.agentRecommendation.ACK ||
-      workflow.agentRecommendation.SUMMARY ||
-      workflow.agentRecommendation.agents.length,
-  );
-}
-
-function formatWorkflowError(event: AgentStreamEvent) {
-  if (typeof event.detail === 'string') {
-    return event.detail;
-  }
-
-  if (typeof event.error === 'string') {
-    return event.error;
-  }
-
-  return '智能体接口返回异常';
-}
-
-function getAgentDisplayName(agent: RecommendedAgent) {
-  return String(agent.agent_name || agent.name || '智能体生成中');
-}
-
-function getAgentStage(agent: RecommendedAgent, index: number) {
-  return String(agent.stage || ['核心阶段', '需求挖掘', '精准定位'][index % 3]);
-}
-
-function updateTurnById(turnId: string, update: (turn: AgentTurn) => AgentTurn) {
-  return (current: AgentTurn[]) => current.map((turn) => (turn.id === turnId ? update(turn) : turn));
-}
-
-function mergeConversationIdsFromEvent(current: AgentConversationIds, event: AgentStreamEvent) {
-  const next = { ...current };
-  let changed = false;
-
-  const setConversationId = (key: string, value: unknown) => {
-    const conversationId = String(value ?? '').trim();
-
-    if (!key || !conversationId || next[key] === conversationId) {
-      return;
-    }
-
-    next[key] = conversationId;
-    changed = true;
-  };
-
-  if (event.conversation_ids && typeof event.conversation_ids === 'object') {
-    for (const [key, value] of Object.entries(event.conversation_ids)) {
-      setConversationId(key, value);
-    }
-  }
-
-  setConversationId('route_planner', event.master_conversation_id);
-
-  if (typeof event.conversation_key === 'string') {
-    setConversationId(event.conversation_key, event.conversation_id);
-  }
-
-  return changed ? next : current;
-}
-
 export default function App() {
-  const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
-  const speechCaptionTimerRef = useRef<number | null>(null);
+  const searchParams = new URLSearchParams(window.location.search);
+  const demoGraphEnabled = searchParams.has('demoGraph');
+  const demoRecommendEnabled = searchParams.has('demoRecommend');
+  const demoSpeakingEnabled = searchParams.has('demoSpeaking');
+  const agentUiVisible = searchParams.has('agentUi') || searchParams.has('debugAgent');
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
   const speechSessionRef = useRef(0);
+  const drawSettleTimerRef = useRef<number | null>(null);
   const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
-  const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
+  const micLevelRef = useRef<{ stop: () => void } | null>(null);
   const lastSpeechPulseAtRef = useRef(0);
-  const agentRequestRef = useRef<AbortController | null>(null);
-  const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
-  const [, setReplySource] = useState<ReplySource>('local-mock');
-  const [, setConversationIdsVersion] = useState(0);
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
-  const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
-  const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
-  const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
-  const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
-  const [draft, setDraft] = useState('');
-  const [inputMode, setInputMode] = useState<InputMode>('voice');
+  const [replySource, setReplySource] = useState<ReplySource>('local-mock');
   const [interfaceLanguage, setInterfaceLanguage] = useState<ConversationLanguage>('zh-CN');
   const [lastAction, setLastAction] = useState<AgentAction | null>(demoGraphEnabled ? demoGraphAction : null);
   const [lastHeard, setLastHeard] = useState('');
   const [manualVoiceSession, setManualVoiceSession] = useState(false);
   const recognitionLanguage: ConversationLanguage = 'zh-CN';
   const [currentSpeechText, setCurrentSpeechText] = useState('');
+  const [agentLiveText, setAgentLiveText] = useState('');
+  const [drawActive, setDrawActive] = useState(false);
+  const [drawAgents, setDrawAgents] = useState<RecommendedAgent[]>([]);
+  const [latestRecommendedAgents, setLatestRecommendedAgents] = useState<RecommendedAgent[]>([]);
+  const [drawPulseKey, setDrawPulseKey] = useState(0);
+  const [drawReplyText, setDrawReplyText] = useState('');
+  const [draft, setDraft] = useState('');
+  const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [speechError, setSpeechError] = useState('');
   const [voiceAwake, setVoiceAwake] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
 
-  const rememberConversationIds = useCallback((event: AgentStreamEvent) => {
-    const nextConversationIds = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
-
-    if (nextConversationIds === agentConversationIdsRef.current) {
+  useEffect(() => {
+    if (!demoSpeakingEnabled) {
       return;
     }
 
-    agentConversationIdsRef.current = nextConversationIds;
-    setConversationIdsVersion((version) => version + 1);
-  }, []);
+    setCurrentSpeechText('Particle voice preview online.');
+    setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
+  }, [demoSpeakingEnabled]);
 
   const clearSpeechEndTimer = useCallback(() => {
     if (speechEndTimerRef.current !== null) {
@@ -1001,45 +534,27 @@ export default function App() {
     }
   }, []);
 
-  const clearSpeechCaptionTimer = useCallback(() => {
-    if (speechCaptionTimerRef.current !== null) {
-      window.clearTimeout(speechCaptionTimerRef.current);
-      speechCaptionTimerRef.current = null;
+  const clearDrawSettleTimer = useCallback(() => {
+    if (drawSettleTimerRef.current !== null) {
+      window.clearTimeout(drawSettleTimerRef.current);
+      drawSettleTimerRef.current = null;
     }
   }, []);
 
-  const startSpeechCaption = useCallback(
-    (displayText: string, speechSessionId: number) => {
-      clearSpeechCaptionTimer();
-      setCurrentSpeechText('');
-
-      const normalizedDisplayText = displayText.trim();
-
-      if (!normalizedDisplayText) {
+  const showAgentDraw = useCallback(
+    (agents: RecommendedAgent[] | undefined, replyText: string) => {
+      if (!agents || agents.length === 0) {
         return;
       }
 
-      const chunkSize = normalizedDisplayText.length > 150 ? 5 : normalizedDisplayText.length > 72 ? 4 : 3;
-      let cursor = 0;
-
-      const tick = () => {
-        if (speechSessionId !== speechSessionRef.current) {
-          return;
-        }
-
-        cursor = Math.min(normalizedDisplayText.length, cursor + chunkSize);
-        setCurrentSpeechText(normalizedDisplayText.slice(0, cursor));
-
-        if (cursor < normalizedDisplayText.length) {
-          speechCaptionTimerRef.current = window.setTimeout(tick, 26);
-        } else {
-          speechCaptionTimerRef.current = null;
-        }
-      };
-
-      tick();
+      clearDrawSettleTimer();
+      setDrawAgents(agents);
+      setDrawReplyText(replyText);
+      setDrawActive(true);
+      setDrawPulseKey((current) => current + 1);
+      drawSettleTimerRef.current = window.setTimeout(() => setDrawActive(false), 1200);
     },
-    [clearSpeechCaptionTimer],
+    [clearDrawSettleTimer],
   );
 
   const beginSpeechOutput = useCallback(() => {
@@ -1062,11 +577,10 @@ export default function App() {
 
   const finishSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
-    clearSpeechCaptionTimer();
     speechOutputActiveRef.current = false;
     setCurrentSpeechText('');
     setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-  }, [clearSpeechCaptionTimer, clearSpeechEndTimer]);
+  }, [clearSpeechEndTimer]);
 
   const speakWithParticleOutput = useCallback(
     (text: string, options: SpeechOutputOptions = {}) => {
@@ -1075,7 +589,7 @@ export default function App() {
       speechSessionRef.current = speechSessionId;
 
       setSpeechError('');
-      startSpeechCaption(options.displayText ?? text, speechSessionId);
+      setCurrentSpeechText(options.displayText ?? text);
       voiceControlRef.current?.pause();
       beginSpeechOutput();
 
@@ -1088,13 +602,8 @@ export default function App() {
 
         finishSpeechOutput();
         if (shouldResumeListening) {
-          window.setTimeout(() => {
-            void micLevelRef.current?.start();
-            voiceControlRef.current?.resume();
-          }, 260);
+          window.setTimeout(() => voiceControlRef.current?.resume(), 260);
         }
-
-        options.onSettled?.();
       };
       const finishAfterMinimum = () => {
         if (speechSessionId !== speechSessionRef.current) {
@@ -1102,7 +611,7 @@ export default function App() {
         }
 
         const elapsed = performance.now() - startedAt;
-        const minimumVisualDuration = options.minimumVisualDurationMs ?? Math.min(estimatedDuration, 5200);
+        const minimumVisualDuration = Math.min(estimatedDuration, 5200);
         const remaining = Math.max(0, minimumVisualDuration - elapsed);
 
         clearSpeechEndTimer();
@@ -1114,7 +623,9 @@ export default function App() {
           onEnd: finishAfterMinimum,
           onError: (reason) => {
             if (speechSessionId === speechSessionRef.current) {
-              setSpeechError(reason);
+              if (reason !== 'not-allowed' && reason !== 'interrupted' && reason !== 'canceled') {
+                setSpeechError(reason);
+              }
             }
           },
           onPulse: () => {
@@ -1131,578 +642,132 @@ export default function App() {
         options.audioBlob,
       );
 
-      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration + 30000 : 5200);
+      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration : 5200);
     },
-    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput, startSpeechCaption],
-  );
-
-  const finishReplyWithoutSpeech = useCallback(
-    (shouldResumeListening: boolean) => {
-      clearSpeechEndTimer();
-      clearSpeechCaptionTimer();
-      speechOutputActiveRef.current = false;
-      setCurrentSpeechText('');
-      setSpeechError('');
-      setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-
-      if (shouldResumeListening) {
-        window.setTimeout(() => {
-          void micLevelRef.current?.start();
-          voiceControlRef.current?.resume();
-        }, 260);
-      }
-    },
-    [clearSpeechCaptionTimer, clearSpeechEndTimer],
+    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
   );
 
   const submitMessage = useCallback(
-    async (raw: string, options: SubmitMessageOptions = {}) => {
+    async (raw: string) => {
       const text = raw.trim();
 
       if (!text) {
         return;
       }
 
-      if (agentStatus === 'streaming' || agentRequestRef.current) {
+      const now = Date.now();
+      const streamingMessageId = now + 1;
+      const nextUserMessage: Message = { id: now, speaker: 'you', text };
+
+      setMessages((current) => [
+        ...current.slice(-3),
+        nextUserMessage,
+        { id: streamingMessageId, speaker: 'ai', text: 'Processing...' },
+      ]);
+      setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
+      setAgentLiveText(isChineseLanguage(interfaceLanguage) ? '正在等待后端响应...' : 'Waiting for the agent stream...');
+
+      try {
+        const response = await requestAIReply(text, [...messages, nextUserMessage], {
+          onGraphAction: (action) => setLastAction(action),
+          onRecommendedAgents: (agents) => {
+            setLatestRecommendedAgents(agents);
+          },
+          onStreamText: (streamText) => {
+            setAgentLiveText(streamText);
+            setMessages((current) => {
+              const withoutThinking = current.filter((message) => message.text !== 'Processing...');
+              const nextAiMessage: Message = { id: streamingMessageId, speaker: 'ai', text: streamText };
+              const lastMessage = withoutThinking.at(-1);
+
+              if (lastMessage?.id === nextAiMessage.id) {
+                return [...withoutThinking.slice(0, -1), nextAiMessage];
+              }
+
+              return [...withoutThinking.slice(-4), nextAiMessage];
+            });
+          },
+        });
+        setReplySource(response.source);
+        setLastAction(response.actions[0] ?? null);
+        setLatestRecommendedAgents(response.recommendedAgents ?? []);
+        setAgentLiveText(response.text);
+        setMessages((current) => {
+          const withoutThinking = current.filter((message) => message.text !== 'Processing...' && message.id !== streamingMessageId);
+          return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
+        });
+        showAgentDraw(response.recommendedAgents, response.text);
+        speakWithParticleOutput(response.spokenText ?? response.text, { displayText: response.text });
+      } catch {
+        const fallback = 'The reasoning end point is not connected yet, sir. Local operations remain online.';
+        setReplySource('local-mock');
+        setLastAction({ type: 'chat' });
+        setLatestRecommendedAgents([]);
+        setAgentLiveText(fallback);
+        setMessages((current) => {
+          const withoutThinking = current.filter((message) => message.text !== 'Processing...' && message.id !== streamingMessageId);
+          return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: fallback }];
+        });
+        speakWithParticleOutput(fallback);
+      }
+    },
+    [messages, showAgentDraw, speakWithParticleOutput],
+  );
+
+  useEffect(() => {
+    if (!demoRecommendEnabled) {
+      return;
+    }
+
+    const demoTimer = window.setTimeout(() => {
+      setLatestRecommendedAgents(demoRecommendedAgents);
+      showAgentDraw(demoRecommendedAgents, '本地预览：推荐卡片动画已接入，但不会改变主视觉粒子。');
+    }, 900);
+
+    return () => window.clearTimeout(demoTimer);
+  }, [demoRecommendEnabled, showAgentDraw]);
+
+  const sendDraftMessage = useCallback(
+    (event?: FormEvent<HTMLFormElement>) => {
+      event?.preventDefault();
+      const text = draft.trim();
+
+      if (!text) {
         return;
       }
 
-      const shouldResumeListening = options.resumeListening ?? (inputMode === 'voice' && (voiceAwake || manualVoiceSession));
-      const now = Date.now();
-      const nextUserMessage: Message = { id: now, speaker: 'you', text };
-      const turnId = `turn-${now}`;
-      const controller = new AbortController();
-      const history = [...messages, nextUserMessage];
-      agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
-      const conversationIdsForRequest = { ...agentConversationIdsRef.current };
-
-      agentRequestRef.current = controller;
-      voiceControlRef.current?.pause();
-      micLevelRef.current?.stop();
+      unlockSpeechOutput();
       setDraft('');
-      setReplySource('coze-stream');
-      setAgentStatus('streaming');
-      setLastAction(null);
-      setLastHeard('');
-      setRouteDockVisible(false);
-      setRecommendationDockVisible(false);
-      setWorkflowHighlight('none');
-      setAgentTurns((current) => [...current.slice(-9), createAgentTurn(turnId, text)]);
-      setMessages((current) => [
-        ...current.slice(-18),
-        nextUserMessage,
-        { id: now + 1, speaker: 'ai', text: 'Processing...' },
-      ]);
-      setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
-
-      let accumulatedWorkflow = createEmptyAgentWorkflow();
-      let revealState: WorkflowRevealState = { ...createEmptyWorkflowRevealState(), knowledgeAck: true };
-      let cardsCompleted = false;
-      let routeActionReady = false;
-      let committedRouteAction: AgentAction | null = null;
-      let routeKey = '';
-      let hasSeenKnowledgePath = false;
-      let streamError = '';
-      let speechSegmentsClosed = false;
-      const cardReadyWaiters: Array<(ready: boolean) => void> = [];
-      const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
-      const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
-      const speechWaiters = new Map<SpeechSegmentKey, Array<(asset: PreloadedSpeechAsset | null) => void>>();
-      const textOverrides: WorkflowTextOverrides = new Map();
-      let agentRevealCount: number | null = null;
-      const publishVisibleWorkflow = () => {
-        const visibleWorkflow = getVisibleWorkflow(accumulatedWorkflow, revealState, textOverrides, agentRevealCount);
-        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, workflow: visibleWorkflow })));
-      };
-      const commitWorkflow = (workflow: AgentWorkflow) => {
-        accumulatedWorkflow = workflow;
-        publishVisibleWorkflow();
-      };
-      const revealWorkflow = (nextReveal: Partial<WorkflowRevealState>) => {
-        revealState = { ...revealState, ...nextReveal };
-        publishVisibleWorkflow();
-      };
-      const isSpeechSegmentVisible = (segment: SpeechSegmentKey) => {
-        if (segment === 'knowledgeAck') {
-          return revealState.knowledgeAck;
-        }
-
-        if (segment === 'knowledgeExplanation') {
-          return revealState.knowledgeExplanation;
-        }
-
-        if (segment === 'recommendationAck') {
-          return revealState.recommendationAck;
-        }
-
-        return revealState.recommendationSummary;
-      };
-      const replayBufferedText = async (key: WorkflowTextKey, text: string) => {
-        const normalizedText = text.trim();
-
-        if (!normalizedText) {
-          textOverrides.delete(key);
-          publishVisibleWorkflow();
-          return;
-        }
-
-        const chunkSize = normalizedText.length > 140 ? 5 : normalizedText.length > 72 ? 4 : 3;
-
-        for (let index = chunkSize; index < normalizedText.length; index += chunkSize) {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          textOverrides.set(key, normalizedText.slice(0, index));
-          publishVisibleWorkflow();
-          await wait(24);
-        }
-
-        textOverrides.delete(key);
-        publishVisibleWorkflow();
-      };
-      const revealSpeechSegment = (segment: SpeechSegmentKey, text: string) => {
-        const alreadyVisible = isSpeechSegmentVisible(segment);
-        const textKey = getTextKeyForSpeechSegment(segment);
-
-        if (!alreadyVisible) {
-          textOverrides.set(textKey, '');
-        }
-
-        revealWorkflow(getRevealForSpeechSegment(segment));
-
-        if (!alreadyVisible) {
-          void replayBufferedText(textKey, text);
-        }
-      };
-      const commitRouteAction = (routeText: string) => {
-        const routeAction = getActionFromRoute(routeText);
-
-        if (!routeAction || routeAction.type !== 'focus_graph_path') {
-          return;
-        }
-
-        const nextRouteKey = routeAction.route.join('/');
-
-        if (nextRouteKey === routeKey) {
-          return;
-        }
-
-        routeKey = nextRouteKey;
-        routeActionReady = true;
-        committedRouteAction = routeAction;
-        routeActionWaiters.splice(0).forEach((resolve) => resolve(routeAction));
-      };
-      const commitKnowledgePathIfReady = () => {
-        if (!hasSeenKnowledgePath || routeActionReady) {
-          return;
-        }
-
-        commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
-      };
-      const commitTurnError = (error: string) => {
-        streamError = error;
-        setAgentStatus('error');
-        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, error, status: 'error' })));
-      };
-      const preloadSpeechSegment = (segment: SpeechSegmentKey) => {
-        const segmentText = getSpeechTextForSegment(accumulatedWorkflow, segment);
-
-        if (!segmentText) {
-          return;
-        }
-
-        const existing = speechAssets.get(segment);
-        if (existing?.text === segmentText) {
-          return;
-        }
-
-        const asset: PreloadedSpeechAsset = {
-          audioPromise: requestTtsAudio(segmentText),
-          text: segmentText,
-        };
-        speechAssets.set(segment, asset);
-        speechWaiters.get(segment)?.splice(0).forEach((resolve) => resolve(asset));
-      };
-      const waitForSpeechSegment = (segment: SpeechSegmentKey) => {
-        const existing = speechAssets.get(segment);
-
-        if (existing) {
-          return Promise.resolve(existing);
-        }
-
-        if (speechSegmentsClosed) {
-          return Promise.resolve(null);
-        }
-
-        return new Promise<PreloadedSpeechAsset | null>((resolve) => {
-          const timer = window.setTimeout(() => resolve(null), SPEECH_SEGMENT_WAIT_MS);
-          const resolveOnce = (asset: PreloadedSpeechAsset | null) => {
-            window.clearTimeout(timer);
-            resolve(asset);
-          };
-          const waiters = speechWaiters.get(segment) || [];
-          waiters.push(resolveOnce);
-          speechWaiters.set(segment, waiters);
-        });
-      };
-      const closeSpeechSegments = () => {
-        speechSegmentsClosed = true;
-        speechWaiters.forEach((waiters) => waiters.splice(0).forEach((resolve) => resolve(null)));
-      };
-      const playSpeechSegment = async (segment: SpeechSegmentKey) => {
-        const asset = await waitForSpeechSegment(segment);
-        const speechText = asset?.text || getSpeechTextForSegment(accumulatedWorkflow, segment);
-
-        if (!speechText) {
-          return;
-        }
-
-        revealSpeechSegment(segment, speechText);
-
-        const audioBlob = asset
-          ? await asset.audioPromise.catch((error) => {
-              if (!isFallbackableTtsError(error)) {
-                setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
-              }
-              return null;
-            })
-          : undefined;
-
-        await new Promise<void>((resolve) => {
-          speakWithParticleOutput(speechText, {
-            audioBlob: audioBlob ?? undefined,
-            displayText: speechText,
-            minimumVisualDurationMs: 0,
-            onSettled: resolve,
-            resumeListening: false,
-          });
-        });
-      };
-      const waitForRouteAction = () => {
-        if (committedRouteAction) {
-          return Promise.resolve(committedRouteAction);
-        }
-
-        return new Promise<AgentAction | null>((resolve) => {
-          routeActionWaiters.push(resolve);
-        });
-      };
-      const closeRouteAction = () => {
-        if (routeActionWaiters.length === 0) {
-          return;
-        }
-
-        routeActionWaiters.splice(0).forEach((resolve) => resolve(getActionFromRoute(accumulatedWorkflow.knowledgeGraph.KG_PATH)));
-      };
-      const markCardsReady = () => {
-        cardsCompleted = true;
-        cardReadyWaiters.splice(0).forEach((resolve) => resolve(true));
-      };
-      const markCardsReadyIfAvailable = () => {
-        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
-          markCardsReady();
-        }
-      };
-      const closeCardsReady = () => {
-        const hasCards = accumulatedWorkflow.agentRecommendation.agents.length > 0;
-
-        if (hasCards) {
-          cardsCompleted = true;
-        }
-
-        cardReadyWaiters.splice(0).forEach((resolve) => resolve(hasCards));
-      };
-      const waitForCardsReady = () => {
-        if (cardsCompleted || accumulatedWorkflow.agentRecommendation.agents.length > 0) {
-          return Promise.resolve(true);
-        }
-
-        return new Promise<boolean>((resolve) => {
-          const timer = window.setTimeout(() => resolve(false), SPEECH_SEGMENT_WAIT_MS);
-          cardReadyWaiters.push((ready) => {
-            window.clearTimeout(timer);
-            resolve(ready);
-          });
-        });
-      };
-      const activatePathAnimation = async () => {
-        const routeAction = await waitForRouteAction();
-
-        if (!routeAction || routeAction.type !== 'focus_graph_path') {
-          return false;
-        }
-
-        revealWorkflow({ knowledgePath: true });
-        setLastAction(routeAction);
-        setRouteDockVisible(true);
-        setWorkflowHighlight('route');
-        return true;
-      };
-      const runCardAnimation = async () => {
-        const hasCards = await waitForCardsReady();
-
-        if (!hasCards) {
-          return;
-        }
-
-        agentRevealCount = 1;
-        revealWorkflow({ recommendationAgents: true });
-        setRecommendationDockVisible(true);
-        setWorkflowHighlight('agents');
-
-        while (agentRevealCount < accumulatedWorkflow.agentRecommendation.agents.length) {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          await wait(260);
-          agentRevealCount += 1;
-          publishVisibleWorkflow();
-        }
-
-        agentRevealCount = null;
-        publishVisibleWorkflow();
-        await wait(RECOMMENDATION_DOCK_REVEAL_MS);
-      };
-      const revealCompletedWorkflow = () => {
-        revealWorkflow({
-          knowledgeAck: true,
-          knowledgeExplanation: true,
-          knowledgePath: true,
-          recommendationAck: true,
-          recommendationAgents: true,
-          recommendationSummary: true,
-        });
-      };
-      const orchestrationPromise = (async () => {
-        await playSpeechSegment('knowledgeAck');
-        const pathAnimationActive = await activatePathAnimation();
-        if (pathAnimationActive) {
-          await Promise.all([playSpeechSegment('knowledgeExplanation'), wait(PATH_MATCH_ANIMATION_MS)]);
-        } else {
-          await playSpeechSegment('knowledgeExplanation');
-        }
-        setWorkflowHighlight('none');
-        await playSpeechSegment('recommendationAck');
-        await Promise.all([playSpeechSegment('recommendationSummary'), runCardAnimation()]);
-        setWorkflowHighlight('none');
-        revealCompletedWorkflow();
-      })();
-
-      try {
-        await streamAgentChat(text, {
-          autoSaveHistory: true,
-          conversationId: conversationIdsForRequest.route_planner,
-          conversationIds: conversationIdsForRequest,
-          signal: controller.signal,
-          onEvent(event) {
-            rememberConversationIds(event);
-
-            const speechSegment = getCompletedSpeechSegment(event);
-
-            if (speechSegment) {
-              preloadSpeechSegment(speechSegment);
-              return;
-            }
-          },
-          onCompleted(event) {
-            rememberConversationIds(event);
-            commitKnowledgePathIfReady();
-          },
-          onContentDelta(event) {
-            const section = getWorkflowSection(event);
-
-            if (!section) {
-              return;
-            }
-
-            const nextWorkflow = appendWorkflowContent(accumulatedWorkflow, section, event.type, event.content || '');
-            commitWorkflow(nextWorkflow);
-
-            if (event.stage === 'knowledge_graph' && event.type === 'KG_PATH') {
-              hasSeenKnowledgePath = true;
-              return;
-            }
-
-            commitKnowledgePathIfReady();
-          },
-          onGraphPathResolved(event) {
-            const graphPath = {
-              ...event,
-              route: String(event.route || accumulatedWorkflow.knowledgeGraph.KG_PATH || ''),
-            } as AgentGraphPath;
-            const nextWorkflow = setWorkflowGraphPath(accumulatedWorkflow, graphPath);
-            commitWorkflow(nextWorkflow);
-            commitRouteAction(graphPath.route || '');
-          },
-          onRecommendedAgentStarted(event) {
-            commitKnowledgePathIfReady();
-            const agentIndex = typeof event.agent_index === 'number' ? event.agent_index : undefined;
-            const nextWorkflow = upsertRecommendedAgent(
-              accumulatedWorkflow,
-              agentIndex === undefined ? undefined : { agent_index: agentIndex },
-              { streamStatus: 'streaming' },
-            );
-            commitWorkflow(nextWorkflow);
-            markCardsReadyIfAvailable();
-          },
-          onRecommendedAgent(agent, event) {
-            commitKnowledgePathIfReady();
-            const delta = event.delta as { field?: string } | undefined;
-            const nextWorkflow = upsertRecommendedAgent(accumulatedWorkflow, agent, {
-              activeField: typeof delta?.field === 'string' ? delta.field : null,
-              streamStatus: 'streaming',
-            });
-            commitWorkflow(nextWorkflow);
-            markCardsReadyIfAvailable();
-          },
-          onRecommendedAgentCompleted(agent) {
-            commitKnowledgePathIfReady();
-            const nextWorkflow = upsertRecommendedAgent(accumulatedWorkflow, agent, {
-              activeField: null,
-              streamStatus: 'completed',
-            });
-            commitWorkflow(nextWorkflow);
-            markCardsReadyIfAvailable();
-          },
-          onRecommendedAgentsCompleted(agents) {
-            commitKnowledgePathIfReady();
-            commitWorkflow(replaceRecommendedAgents(accumulatedWorkflow, agents));
-            markCardsReady();
-          },
-          onWorkflowError(event) {
-            commitKnowledgePathIfReady();
-            commitTurnError(formatWorkflowError(event));
-          },
-        });
-
-        if (!routeActionReady) {
-          commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
-        }
-        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
-          markCardsReady();
-        } else {
-          closeCardsReady();
-        }
-        closeSpeechSegments();
-        closeRouteAction();
-
-        const finalText = buildAgentReplyText(accumulatedWorkflow, streamError || 'Agent 已完成，但没有返回可展示内容。');
-        const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
-        setMessages((current) => {
-          const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-          return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: finalText }];
-        });
-        setAgentStatus(finalStatus);
-        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
-        void orchestrationPromise.finally(() => {
-          finishReplyWithoutSpeech(shouldResumeListening);
-        });
-      } catch (error) {
-        if (controller.signal.aborted) {
-          closeSpeechSegments();
-          closeRouteAction();
-          closeCardsReady();
-          setWorkflowHighlight('none');
-          return;
-        }
-
-        closeSpeechSegments();
-        closeRouteAction();
-        closeCardsReady();
-        setWorkflowHighlight('none');
-
-        try {
-          const response = await requestAIReply(text, history);
-          setReplySource(response.source);
-          setAgentStatus('completed');
-          setLastAction(response.actions[0] ?? null);
-          setAgentTurns(
-            updateTurnById(turnId, (turn) => ({
-              ...turn,
-              fallbackText: response.text,
-              source: response.source,
-              status: 'completed',
-            })),
-          );
-          setMessages((current) => {
-            const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: response.text }];
-          });
-          const speechText = extractAckSpeechText(response.spokenText ?? response.text);
-          if (speechText) {
-            speakWithParticleOutput(speechText, {
-              displayText: speechText,
-              resumeListening: shouldResumeListening,
-            });
-          } else {
-            finishReplyWithoutSpeech(shouldResumeListening);
-          }
-        } catch {
-          const fallback =
-            error instanceof Error && error.message
-              ? `智能体接口连接失败：${error.message}`
-              : '智能体接口连接失败，本地操作仍保持在线。';
-
-          setReplySource('local-mock');
-          setAgentStatus('error');
-          setLastAction({ type: 'chat' });
-          setAgentTurns(
-            updateTurnById(turnId, (turn) => ({
-              ...turn,
-              error: fallback,
-              fallbackText: fallback,
-              source: 'local-mock',
-              status: 'error',
-            })),
-          );
-          setMessages((current) => {
-            const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: fallback }];
-          });
-          const speechText = extractAckSpeechText(fallback);
-          if (speechText) {
-            speakWithParticleOutput(speechText, { displayText: speechText, resumeListening: shouldResumeListening });
-          } else {
-            finishReplyWithoutSpeech(shouldResumeListening);
-          }
-        }
-      } finally {
-        if (agentRequestRef.current === controller) {
-          agentRequestRef.current = null;
-        }
-      }
+      void submitMessage(text);
     },
-    [
-      agentStatus,
-      finishReplyWithoutSpeech,
-      inputMode,
-      manualVoiceSession,
-      messages,
-      rememberConversationIds,
-      speakWithParticleOutput,
-      voiceAwake,
-    ],
+    [draft, submitMessage],
+  );
+
+  const handleDraftKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== 'Enter' || event.shiftKey) {
+        return;
+      }
+
+      event.preventDefault();
+      sendDraftMessage();
+    },
+    [sendDraftMessage],
   );
 
   const handleVoiceCommand = useCallback(
     (raw: string) => {
       const text = raw.trim();
 
-      if (agentStatus === 'streaming' || agentRequestRef.current) {
-        voiceControlRef.current?.pause();
-        micLevelRef.current?.stop();
-        setLastHeard('');
-        return;
-      }
-
       if (!text || speechOutputActiveRef.current) {
         return;
       }
 
+      if (!manualVoiceSession && !voiceAwake) {
+        return;
+      }
+
       setLastHeard(text);
-      setInputMode('voice');
       const inputLanguage = detectConversationLanguage(text);
       setInterfaceLanguage(inputLanguage);
 
@@ -1713,55 +778,56 @@ export default function App() {
         setLastHeard('');
         voiceControlRef.current?.stop();
         micLevelRef.current?.stop();
-        setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+        speakWithParticleOutput('Standing by, sir.', { resumeListening: false });
         return;
       }
 
-      const wakeCommand = extractWakeCommand(text);
-
-      if (!voiceAwake) {
-        setManualVoiceSession(false);
-        setVoiceAwake(true);
-
-        if (wakeCommand?.command) {
-          void submitMessage(wakeCommand.command, { resumeListening: true });
-          return;
-        }
-
-        if (!wakeCommand) {
-          void submitMessage(text, { resumeListening: true });
-          return;
-        }
-
-        return;
-      }
-
-      void submitMessage(wakeCommand?.command || text, { resumeListening: true });
+      void submitMessage(text);
     },
-    [agentStatus, speakWithParticleOutput, submitMessage, voiceAwake],
+    [manualVoiceSession, speakWithParticleOutput, submitMessage, voiceAwake],
   );
 
   const voice = useVoiceControl(handleVoiceCommand, recognitionLanguage);
   voiceControlRef.current = { pause: voice.pause, resume: voice.resume, stop: voice.stop };
   const micLevel = useMicLevel();
-  micLevelRef.current = { start: micLevel.start, stop: micLevel.stop };
+  micLevelRef.current = { stop: micLevel.stop };
 
   useEffect(() => {
     primeSpeechOutput();
     return () => {
-      agentRequestRef.current?.abort();
       clearSpeechEndTimer();
-      cancelSpeechPlayback();
+      clearDrawSettleTimer();
     };
-  }, [clearSpeechEndTimer]);
+  }, [clearDrawSettleTimer, clearSpeechEndTimer]);
+
+  const statusText = useMemo(() => {
+    if (!voice.supported) {
+      return isChineseLanguage(interfaceLanguage) ? '语音不可用' : 'Speech unavailable';
+    }
+
+    if (voice.listening && (voiceAwake || manualVoiceSession)) {
+      return isChineseLanguage(interfaceLanguage) ? '语音模式已激活' : 'Voice mode active';
+    }
+
+    if (settings.mode === 'thinking') {
+      return isChineseLanguage(interfaceLanguage) ? '思考中' : 'Thinking';
+    }
+
+    if (settings.mode === 'speaking') {
+      return isChineseLanguage(interfaceLanguage) ? '回应中' : 'Speaking';
+    }
+
+    return isChineseLanguage(interfaceLanguage) ? '就绪' : 'Ready';
+  }, [interfaceLanguage, manualVoiceSession, settings.mode, voice.listening, voice.supported, voiceAwake]);
 
   const toggleManualVoiceSession = useCallback(() => {
     if (!voice.supported) {
       return;
     }
 
-    primeSpeechOutput();
     setInputMode('voice');
+    unlockSpeechOutput();
+    primeSpeechOutput();
 
     if (manualVoiceSession || voiceAwake) {
       speechSessionRef.current += 1;
@@ -1785,113 +851,112 @@ export default function App() {
     setVoiceAwake(true);
     setLastAction(null);
     setLastHeard('');
-    voice.stop();
     setSettings((current) => ({ ...current, energy: 0.82, mode: 'listening', pulseSeed: current.pulseSeed + 1 }));
     void micLevel.start();
     voice.start();
 
-  }, [clearSpeechEndTimer, manualVoiceSession, micLevel, voice, voiceAwake]);
+    speakWithParticleOutput(
+      demoGraphEnabled
+        ? 'Graph preview online, sir. Voice link is live.'
+        : 'At your service, sir. Voice mode is online.',
+    );
+  }, [clearSpeechEndTimer, demoGraphEnabled, manualVoiceSession, micLevel, speakWithParticleOutput, voice, voiceAwake]);
 
   const switchInputMode = useCallback(
-    (nextMode: InputMode) => {
-      setInputMode(nextMode);
+    (mode: InputMode) => {
+      setInputMode(mode);
 
-      if (nextMode !== 'text') {
-        return;
+      if (mode === 'text') {
+        speechSessionRef.current += 1;
+        clearSpeechEndTimer();
+        speechOutputActiveRef.current = false;
+        cancelSpeechPlayback();
+        window.speechSynthesis?.cancel();
+        setManualVoiceSession(false);
+        setVoiceAwake(false);
+        setLastHeard('');
+        setCurrentSpeechText('');
+        setAgentLiveText('');
+        setSpeechError('');
+        voice.stop();
+        micLevel.stop();
+        setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
       }
-
-      speechSessionRef.current += 1;
-      clearSpeechEndTimer();
-      speechOutputActiveRef.current = false;
-      cancelSpeechPlayback();
-      window.speechSynthesis?.cancel();
-      setManualVoiceSession(false);
-      setVoiceAwake(false);
-      setLastHeard('');
-      setCurrentSpeechText('');
-      setSpeechError('');
-      voice.stop();
-      micLevel.stop();
-      setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
     },
     [clearSpeechEndTimer, micLevel, voice],
   );
 
-  const sendDraftMessage = useCallback(
-    () => {
-      void submitMessage(draft, { resumeListening: false });
-    },
-    [draft, submitMessage],
-  );
-
-  const handleDraftKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
-        return;
-      }
-
-      event.preventDefault();
-      void submitMessage(draft, { resumeListening: false });
-    },
-    [draft, submitMessage],
-  );
-
-  const latestAgentTurn = agentTurns.at(-1) ?? null;
-  const latestRecommendation = latestAgentTurn?.workflow.agentRecommendation;
-  const recommendedAgents = latestRecommendation?.agents ?? [];
+  const latestAiMessage = [...messages].reverse().find((message) => message.speaker === 'ai' && message.text !== 'Processing...');
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
-  const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
-  const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
+  const agentPanelVisible =
+    agentUiVisible ||
+    latestRecommendedAgents.length > 0 ||
+    graphRoute.length > 0 ||
+    messages.some((message) => message.speaker === 'you');
   const graphFocusKey =
     lastAction?.type === 'focus_graph_path'
-      ? `${lastAction.label}:${lastAction.route.join('/')}`
+      ? `${lastAction.label}:${lastAction.route.join('/')}:${latestAiMessage?.id ?? 0}`
       : '';
   const readoutText =
     settings.mode === 'thinking'
-      ? isChineseLanguage(interfaceLanguage)
-        ? '思考中...'
-        : 'Thinking...'
+      ? agentLiveText || (isChineseLanguage(interfaceLanguage) ? '思考中...' : 'Thinking...')
       : settings.mode === 'speaking'
-        ? currentSpeechText
-        : '';
-  const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
+        ? agentLiveText || currentSpeechText
+        : agentLiveText;
+  const voiceSessionActive = voiceAwake || manualVoiceSession;
   const captionText =
-    voiceCaptionError ||
-    (inputMode === 'text'
-      ? ''
-      : voice.listening
-        ? voiceAwake
-          ? lastHeard
-            ? isChineseLanguage(interfaceLanguage)
-              ? `语音模式已激活。听到：${lastHeard}`
-              : `Voice mode active. Heard: ${lastHeard}`
-            : isChineseLanguage(interfaceLanguage)
-              ? '语音模式已激活，可以直接说。'
-              : 'Voice mode active. Speak naturally.'
-        : isChineseLanguage(interfaceLanguage)
-          ? '说“贾维斯”唤醒语音模式。'
-          : 'Say "Jarvis" to wake voice mode.'
-      : isChineseLanguage(interfaceLanguage)
-        ? '语音待命。'
-        : 'Voice standby.');
+    speechError ||
+    voice.error ||
+    micLevel.error ||
+    (lastAction?.type === 'focus_graph_path'
+      ? isChineseLanguage(interfaceLanguage)
+        ? `本地图谱动作：${lastAction.route.join(' / ')}`
+        : `Local graph action: ${lastAction.route.join(' / ')}`
+      : voice.listening && voiceSessionActive
+        ? lastHeard
+          ? isChineseLanguage(interfaceLanguage)
+            ? `语音模式已激活。听到：${lastHeard}`
+            : `Voice mode active. Heard: ${lastHeard}`
+          : isChineseLanguage(interfaceLanguage)
+            ? '语音模式已激活，可以直接说。'
+            : 'Voice mode active. Speak naturally.'
+        : '');
 
   return (
     <main className="app-shell">
-      <ParticleField
-        audioLevel={micLevel.level}
-        graphFocusKey={graphFocusKey}
-        graphRoute={graphRoute}
-        settings={settings}
-      />
+      <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
       <div className="scene-vignette" />
-      <WorkflowDock
-        active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
-        agents={dockRecommendedAgents}
-        highlight={workflowHighlight}
-        routeSegments={dockRouteSegments}
+      <AgentDrawOverlay
+        active={drawActive}
+        agents={drawAgents}
+        onSettled={() => setDrawActive(false)}
+        pulseKey={drawPulseKey}
+        replyText={drawReplyText}
+      />
+      <AgentDialoguePanel
+        disabled={settings.mode === 'thinking'}
+        draft={draft}
+        graphRoute={graphRoute}
+        messages={messages}
+        onDraftChange={setDraft}
+        onDraftKeyDown={handleDraftKeyDown}
+        onSendDraft={sendDraftMessage}
+        recommendedAgents={latestRecommendedAgents}
+        source={replySource}
+        visible={agentPanelVisible}
       />
 
       <section className="dialogue-stage" aria-label="AI particle dialogue">
+        <div className="title-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            <Bot size={18} />
+          </div>
+          <div>
+            <h1>JARVIS</h1>
+            <p>{statusText}</p>
+          </div>
+        </div>
+
         {captionText ? (
           <div className="orb-caption" data-testid="conversation-state">
             <Sparkles size={16} />
@@ -1899,462 +964,76 @@ export default function App() {
           </div>
         ) : null}
 
+        <ParticleWordmark graphActive={graphRoute.length > 0} mode={settings.mode} />
+
         {readoutText ? (
           <div className="voice-readout" aria-live="polite">
             <span>{readoutText}</span>
           </div>
         ) : null}
 
-      </section>
-
-      <AgentConsole
-        draft={draft}
-        inputMode={inputMode}
-        onDraftKeyDown={handleDraftKeyDown}
-        onModeChange={switchInputMode}
-        onSend={sendDraftMessage}
-        onToggleVoice={toggleManualVoiceSession}
-        setDraft={setDraft}
-        speakingText={currentSpeechText}
-        status={agentStatus}
-        turns={agentTurns}
-        voiceHeardText={lastHeard}
-        voiceAwake={voiceAwake}
-        voiceListening={voice.listening}
-        voiceTranscript={voice.transcript}
-        voiceSupported={voice.supported}
-      />
-    </main>
-  );
-}
-
-function WorkflowDock({
-  active,
-  agents,
-  highlight,
-  routeSegments,
-}: {
-  active: boolean;
-  agents: RecommendedAgent[];
-  highlight: WorkflowHighlight;
-  routeSegments: string[];
-}) {
-  const hasRoute = routeSegments.length > 0;
-  const hasAgents = agents.length > 0;
-  const visibleAgents = agents.slice(0, 4);
-
-  if (!hasRoute && !hasAgents) {
-    return null;
-  }
-
-  return (
-    <aside
-      className="workflow-dock"
-      data-active={active}
-      data-highlight={highlight}
-      aria-label="Agent workflow context"
-    >
-      {hasRoute ? <RouteResult highlighted={highlight === 'route'} routeSegments={routeSegments} /> : null}
-      {hasAgents ? (
-        <section className={`workflow-dock-section workflow-agent-panel ${highlight === 'agents' ? 'is-prism' : ''}`}>
-          <div className="workflow-dock-title">
-            <Sparkles size={14} />
-            <strong>推荐智能体</strong>
-            <span>{agents.length}</span>
-          </div>
-          <div className="workflow-agent-list">
-            {visibleAgents.map((agent, index) => (
-              <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
-            ))}
-          </div>
-          {agents.length > visibleAgents.length ? <em className="workflow-agent-more">+{agents.length - visibleAgents.length} 个待查看</em> : null}
-          <RecommendedAgentLaunchBar agents={agents} />
-        </section>
-      ) : null}
-    </aside>
-  );
-}
-
-type AgentConsoleProps = {
-  draft: string;
-  inputMode: InputMode;
-  onDraftKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
-  onModeChange: (mode: InputMode) => void;
-  onSend: () => void;
-  onToggleVoice: () => void;
-  setDraft: (value: string) => void;
-  speakingText: string;
-  status: AgentStatus;
-  turns: AgentTurn[];
-  voiceAwake: boolean;
-  voiceHeardText: string;
-  voiceListening: boolean;
-  voiceTranscript: string;
-  voiceSupported: boolean;
-};
-
-function AgentConsole({
-  draft,
-  inputMode,
-  onDraftKeyDown,
-  onModeChange,
-  onSend,
-  onToggleVoice,
-  setDraft,
-  speakingText,
-  status,
-  turns,
-  voiceAwake,
-  voiceHeardText,
-  voiceListening,
-  voiceTranscript,
-  voiceSupported,
-}: AgentConsoleProps) {
-  const threadRef = useRef<HTMLDivElement | null>(null);
-  const shouldStickToBottomRef = useRef(true);
-  const isStreaming = status === 'streaming';
-  const visibleVoiceText = voiceHeardText || voiceTranscript;
-  const latestTurn = turns.at(-1) ?? null;
-  const latestTurnId = latestTurn?.id ?? '';
-  const hasTurns = turns.length > 0;
-  const pendingVoiceText = inputMode === 'voice' && !hasTurns ? visibleVoiceText : '';
-
-  const scrollThreadToBottom = useCallback(() => {
-    const thread = threadRef.current;
-
-    if (!thread) {
-      return;
-    }
-
-    thread.scrollTop = thread.scrollHeight;
-  }, []);
-
-  const handleThreadScroll = useCallback(() => {
-    const thread = threadRef.current;
-
-    if (!thread) {
-      return;
-    }
-
-    const distanceToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
-    shouldStickToBottomRef.current = distanceToBottom < 28;
-  }, []);
-
-  useEffect(() => {
-    shouldStickToBottomRef.current = true;
-    scrollThreadToBottom();
-  }, [latestTurnId, scrollThreadToBottom]);
-
-  useLayoutEffect(() => {
-    if (shouldStickToBottomRef.current) {
-      scrollThreadToBottom();
-    }
-  }, [pendingVoiceText, scrollThreadToBottom, status, turns]);
-
-  const handleComposerSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      onSend();
-    },
-    [onSend],
-  );
-
-  return (
-    <aside
-      className="agent-console"
-      data-has-turn={hasTurns}
-      data-input-mode={inputMode}
-      data-status={status}
-      aria-label="Agent response panel"
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      {hasTurns || pendingVoiceText ? (
-        <div className="agent-console-thread" aria-live="polite" onScroll={handleThreadScroll} ref={threadRef}>
-          {hasTurns ? (
-            <>
-              {turns.map((turn) => (
-                <section className="agent-turn" key={turn.id}>
-                  <article className="agent-user-line">
-                    <span aria-hidden="true">
-                      <UserRound size={14} />
-                    </span>
-                    <p>{turn.user}</p>
-                  </article>
-                  <AgentResponse
-                    active={turn.status === 'streaming'}
-                    speakingText={turn.id === latestTurnId ? speakingText : ''}
-                    turn={turn}
-                  />
-                </section>
-              ))}
-            </>
-          ) : (
-            <article className="agent-user-line">
-              <span aria-hidden="true">
-                <UserRound size={14} />
-              </span>
-              <p>{pendingVoiceText}</p>
-            </article>
-          )}
-        </div>
-      ) : null}
-
-      <div className="agent-input-hub">
-        <div className="agent-mode-switch" role="tablist" aria-label="输入模式">
-          <button
-            type="button"
-            aria-selected={inputMode === 'voice'}
-            className={inputMode === 'voice' ? 'active' : ''}
-            onClick={() => onModeChange('voice')}
-            role="tab"
-          >
-            <Mic size={15} />
-            <span>语音</span>
-          </button>
-          <button
-            type="button"
-            aria-selected={inputMode === 'text'}
-            className={inputMode === 'text' ? 'active' : ''}
-            onClick={() => onModeChange('text')}
-            role="tab"
-          >
-            <Keyboard size={15} />
-            <span>打字</span>
-          </button>
-        </div>
-
-        {inputMode === 'voice' ? (
-          <div className="agent-voice-module">
-            <div className="voice-presence" aria-hidden="true" data-active={voiceListening} data-awake={voiceAwake} />
+        <div className="main-input-hub" data-input-mode={inputMode} onPointerDown={(event) => event.stopPropagation()}>
+          <div className="agent-mode-switch" role="tablist" aria-label="Input mode">
             <button
-              aria-label={voiceAwake ? 'Stand down voice mode' : 'Wake voice mode'}
-              aria-pressed={voiceAwake}
-              className="voice-toggle"
-              data-active={voiceAwake}
-              disabled={!voiceSupported || isStreaming}
-              onClick={onToggleVoice}
-              title={voiceAwake ? 'Stand down' : 'Wake voice'}
+              aria-selected={inputMode === 'voice'}
+              className={inputMode === 'voice' ? 'active' : ''}
+              onClick={() => switchInputMode('voice')}
+              role="tab"
               type="button"
             >
-              {voiceAwake ? <MicOff size={17} /> : <Mic size={17} />}
+              <Mic size={15} />
+              <span>语音</span>
             </button>
-            <em>{voiceSupported ? (voiceAwake ? '语音已激活' : '语音待命') : '语音不可用'}</em>
+            <button
+              aria-selected={inputMode === 'text'}
+              className={inputMode === 'text' ? 'active' : ''}
+              onClick={() => switchInputMode('text')}
+              role="tab"
+              type="button"
+            >
+              <Keyboard size={15} />
+              <span>打字</span>
+            </button>
           </div>
-        ) : (
-          <form className="agent-composer" onSubmit={handleComposerSubmit}>
-            <textarea
-              value={draft}
-              disabled={isStreaming}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={onDraftKeyDown}
-              placeholder={isStreaming ? 'Agent 正在生成...' : '问你的 agent...'}
-              rows={1}
-            />
-            <button type="submit" disabled={!draft.trim() || isStreaming} aria-label="发送给 agent">
-              <Send size={16} />
+
+          {inputMode === 'voice' ? (
+            <button
+              aria-label={voiceSessionActive ? 'Stand down voice mode' : 'Wake voice mode'}
+              aria-pressed={voiceSessionActive}
+              className="agent-voice-module"
+              data-active={voiceSessionActive}
+              disabled={!voice.supported || settings.mode === 'thinking'}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleManualVoiceSession();
+              }}
+              title={voiceSessionActive ? 'Stand down' : 'Wake voice'}
+              type="button"
+            >
+              <div className="voice-presence" aria-hidden="true" data-active={voice.listening} data-awake={voiceSessionActive} />
+              <span className="voice-module-center">
+                {voiceSessionActive ? <MicOff size={17} /> : <Mic size={17} />}
+                <em>{voice.supported ? (voiceSessionActive ? '语音已激活' : '语音待命') : '语音不可用'}</em>
+              </span>
             </button>
-          </form>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function AgentResponse({ active, speakingText, turn }: { active: boolean; speakingText: string; turn: AgentTurn }) {
-  const workflow = turn.workflow;
-  const knowledgeGraph = workflow.knowledgeGraph;
-  const recommendation = workflow.agentRecommendation;
-  const routeSegments = splitRouteText(knowledgeGraph.KG_PATH);
-  const showOutput = hasAgentOutput(turn);
-
-  if (!showOutput && active) {
-    return <TypingLine />;
-  }
-
-  return (
-    <article className="agent-response">
-      {renderThinkingText('思考过程', knowledgeGraph.THINKING_PROCESS, active && !knowledgeGraph.ACK)}
-      {renderAgentSubtitle(knowledgeGraph.DIRECT_REPLY, speakingText)}
-      {renderAgentSubtitle(knowledgeGraph.ACK, speakingText)}
-      {renderToolCallDivider('route', routeSegments.length)}
-      {renderAgentSubtitle(knowledgeGraph.EXPLANATION, speakingText)}
-      {renderThinkingText('推荐思考', recommendation.THINKING_PROCESS, active && !recommendation.ACK)}
-      {renderAgentSubtitle(recommendation.ACK, speakingText)}
-      {renderToolCallDivider('agents', recommendation.agents.length)}
-      {renderAgentSubtitle(recommendation.SUMMARY, speakingText)}
-      {renderAgentSubtitle(turn.fallbackText, speakingText)}
-      {turn.error && <p className="agent-error-text">{turn.error}</p>}
-      {active && <TypingLine />}
-    </article>
-  );
-}
-
-function renderToolCallDivider(kind: 'agents' | 'route', count: number) {
-  if (count <= 0) {
-    return null;
-  }
-
-  const isRoute = kind === 'route';
-  const title = isRoute ? '知识路径工具调用' : '智能体推荐工具调用';
-  const detail = isRoute ? `${count} 个路径节点已匹配` : `${count} 个推荐智能体已生成`;
-
-  return (
-    <section className={`agent-tool-call agent-tool-call-${kind}`} aria-label={title}>
-      <span className="agent-tool-call-rail" />
-      <div className="agent-tool-call-core">
-        <span className="agent-tool-call-icon" aria-hidden="true">
-          {isRoute ? <GitBranch size={13} /> : <Sparkles size={13} />}
-        </span>
-        <strong>{title}</strong>
-        <em>{detail}</em>
-      </div>
-      <span className="agent-tool-call-rail" />
-    </section>
-  );
-}
-
-function renderThinkingText(label: string, text: string, active: boolean) {
-  const visibleText = stripSpeechTagSyntax(text);
-
-  if (!visibleText) {
-    return null;
-  }
-
-  return (
-    <section className="agent-thinking-stream" data-active={active} data-collapsed={!active}>
-      <div>
-        <BrainCircuit size={13} />
-        <strong>{label}</strong>
-      </div>
-      <p>{visibleText}</p>
-    </section>
-  );
-}
-
-function renderAgentSubtitle(text: string, speakingText: string) {
-  const visibleText = stripSpeechTagSyntax(text);
-  const normalizedVisibleText = normalizeSubtitleText(visibleText);
-  const normalizedSpeakingText = normalizeSubtitleText(speakingText);
-  const isSpeaking = Boolean(
-    normalizedVisibleText &&
-      normalizedSpeakingText &&
-      (normalizedVisibleText === normalizedSpeakingText ||
-        normalizedVisibleText.startsWith(normalizedSpeakingText) ||
-        normalizedSpeakingText.startsWith(normalizedVisibleText)),
-  );
-
-  return visibleText ? (
-    <section className="agent-subtitle-line" data-speaking={isSpeaking}>
-      <p>{visibleText}</p>
-    </section>
-  ) : null;
-}
-
-function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; routeSegments: string[] }) {
-  return (
-    <section className={`workflow-dock-section workflow-route-panel ${highlighted ? 'is-prism' : ''}`}>
-      <div className="workflow-dock-title">
-        <GitBranch size={14} />
-        <strong>知识路径</strong>
-        <span>{routeSegments.length}</span>
-      </div>
-      <div className="workflow-route-chain">
-        {routeSegments.map((segment, index) => (
-          <span data-current={index === routeSegments.length - 1} key={`${index}-${segment}`}>
-            {segment}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index: number }) {
-  const enrichedAgent = enrichDrawAgent(agent);
-  const active = agent.streamStatus !== 'completed';
-  const name = enrichedAgent.name || getAgentDisplayName(agent);
-  const stage = enrichedAgent.stageLabel || getAgentStage(agent, index);
-  const reason = String(agent.reason || enrichedAgent.fallbackReason || '').trim();
-  const variant = ['cyan', 'gold', 'violet'][index % 3];
-  const canOpen = Boolean(enrichedAgent.launchTarget);
-  const statusLabel = active ? '匹配中' : canOpen ? '可打开' : '已匹配';
-  const cardClassName = `recommended-agent-card recommended-agent-${variant} ${canOpen ? 'is-clickable' : 'is-static'}`;
-  const cardBody = (
-    <>
-      <span className="recommended-agent-index">{String(index + 1).padStart(2, '0')}</span>
-      <span className={`recommended-agent-avatar ${enrichedAgent.avatar ? 'has-avatar' : ''}`} aria-hidden="true">
-        {enrichedAgent.avatar ? <img alt="" loading="lazy" src={enrichedAgent.avatar} /> : <Sparkles size={18} />}
-      </span>
-      <div className="recommended-agent-copy">
-        <div className="recommended-agent-head">
-          <strong title={name}>{name}</strong>
-          <span className="recommended-agent-status">{statusLabel}</span>
+          ) : (
+            <form className="agent-composer" onSubmit={sendDraftMessage}>
+              <textarea
+                aria-label="Type to Jarvis"
+                disabled={settings.mode === 'thinking'}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleDraftKeyDown}
+                placeholder={settings.mode === 'thinking' ? 'Agent 正在生成...' : '问你的 agent...'}
+                rows={1}
+                value={draft}
+              />
+              <button aria-label="Send to agent" disabled={!draft.trim() || settings.mode === 'thinking'} type="submit">
+                <Send size={16} />
+              </button>
+            </form>
+          )}
         </div>
-        <div className="recommended-agent-meta">
-          <em title={stage}>{stage}</em>
-          <span>{enrichedAgent.metaLabel}</span>
-        </div>
-        {reason ? <p>{reason}</p> : null}
-      </div>
-      <span className="recommended-agent-open-hint">
-        {canOpen ? (
-          <>
-            <ExternalLink size={13} />
-            打开
-          </>
-        ) : (
-          '待补链接'
-        )}
-      </span>
-    </>
-  );
-
-  if (canOpen) {
-    return (
-      <a className={cardClassName} data-active={active} href={enrichedAgent.launchTarget} rel="noopener noreferrer" target="_blank">
-        {cardBody}
-      </a>
-    );
-  }
-
-  return (
-    <article aria-disabled="true" aria-label={`${name} 推荐智能体`} className={cardClassName} data-active={active}>
-      {cardBody}
-    </article>
-  );
-}
-
-function RecommendedAgentLaunchBar({ agents }: { agents: RecommendedAgent[] }) {
-  const enrichedAgents = agents.map(enrichDrawAgent);
-  const launchTargets = getAgentLaunchTargets(enrichedAgents);
-  const canOpen = launchTargets.length > 0;
-
-  return (
-    <div className="recommended-agent-package">
-      <div>
-        <span>智能体组合包</span>
-        <strong>{agents.length} 个智能体已生成</strong>
-      </div>
-      <button disabled={!canOpen} onClick={() => openAgentLaunchTargets(launchTargets)} type="button">
-        <PackageOpen size={15} />
-        <span>{canOpen ? '一键打开组合' : '暂无可跳转链接'}</span>
-        {canOpen ? (
-          <em>
-            {launchTargets.length}
-            <ArrowUpRight size={12} />
-          </em>
-        ) : null}
-      </button>
-    </div>
-  );
-}
-
-function TypingLine() {
-  return (
-    <div className="agent-typing-line" aria-label="Agent 正在生成">
-      <span />
-      <span />
-      <span />
-    </div>
+      </section>
+    </main>
   );
 }

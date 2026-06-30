@@ -1,8 +1,9 @@
-import type { AgentAction, Message } from '../types';
+import type { AgentAction, Message, RecommendedAgent } from '../types';
 import { detectConversationLanguage, isChineseLanguage } from './language';
 
 type LocalAgentResponse = {
   actions: AgentAction[];
+  recommendedAgents?: RecommendedAgent[];
   text: string;
 };
 
@@ -133,6 +134,18 @@ function wantsCapabilities(input: string) {
   ].some((keyword) => normalized.includes(keyword));
 }
 
+function wantsAgentRecommendation(input: string) {
+  const normalized = normalize(input);
+
+  if (/\u667a\u80fd\u4f53|\u63a8\u8350|\u7528\u54ea\u4e2a|\u8c03\u54ea\u4e2a|agent/i.test(input)) {
+    return true;
+  }
+
+  return ['recommend agent', 'which agent', 'agent recommendation', 'agent'].some((keyword) =>
+    normalized.includes(keyword),
+  );
+}
+
 function wantsGreeting(input: string) {
   const normalized = normalize(input);
 
@@ -168,6 +181,7 @@ export async function requestLocalMockAgentReply(input: string, history: Message
           type: 'focus_graph_path',
         },
       ],
+      recommendedAgents: wantsAgentRecommendation(input) ? buildLocalRecommendedAgents(label, useChinese) : undefined,
       text: useChinese
         ? [`已选择路径：${label}。`, `我会把图谱聚焦到 ${route.join(' 到 ')}。`, '等真实图谱接入后，这个动作会驱动节点高亮和路径动画。'].join(
             '',
@@ -177,6 +191,18 @@ export async function requestLocalMockAgentReply(input: string, history: Message
             `I would focus the graph through ${route.join(' to ')}.`,
             'Once the graph surface is attached, this local action can drive the same highlight and path animation as the Coze workflow.',
           ].join(' '),
+    };
+  }
+
+  if (wantsAgentRecommendation(input)) {
+    const label = useChinese ? '智能体推荐' : 'agent recommendation';
+
+    return {
+      actions: [{ type: 'chat' }],
+      recommendedAgents: buildLocalRecommendedAgents(label, useChinese),
+      text: useChinese
+        ? '已为你筛出一组可接入当前工作流的智能体。真实 Agent 服务接上后，这里会展示实时推荐结果。'
+        : 'I have selected a compact agent set for this workflow. Once the real agent service is connected, this card draw will use live recommendations.',
     };
   }
 
@@ -214,4 +240,40 @@ export async function requestLocalMockAgentReply(input: string, history: Message
         ? `${pickStableReply(input)} I still have the last topic in context: "${topic}".`
         : pickStableReply(input),
   };
+}
+
+function buildLocalRecommendedAgents(label: string, useChinese: boolean): RecommendedAgent[] {
+  const stagePrefix = useChinese ? '本地预演' : 'local preview';
+
+  return [
+    {
+      agent_index: 0,
+      agent_name: useChinese ? '路径规划智能体' : 'Path Planning Agent',
+      rank: 1,
+      reason: useChinese
+        ? `适合先把“${label}”拆成可执行路线，并输出图谱控制事件。`
+        : `Best for turning "${label}" into an executable route and graph-control event.`,
+      score: 96,
+      stage: stagePrefix,
+      streamStatus: 'completed',
+    },
+    {
+      agent_index: 1,
+      agent_name: useChinese ? '知识图谱导航员' : 'Knowledge Graph Navigator',
+      rank: 2,
+      reason: useChinese ? '负责把路径落到节点、边和局部放大视角。' : 'Maps intent into nodes, edges, and local zoom focus.',
+      score: 92,
+      stage: stagePrefix,
+      streamStatus: 'completed',
+    },
+    {
+      agent_index: 2,
+      agent_name: useChinese ? '业务标签分析师' : 'Business Tag Analyst',
+      rank: 3,
+      reason: useChinese ? '补全标签、语义归类和后续动作建议。' : 'Completes tags, semantic grouping, and suggested next actions.',
+      score: 88,
+      stage: stagePrefix,
+      streamStatus: 'completed',
+    },
+  ];
 }
