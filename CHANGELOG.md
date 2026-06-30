@@ -1,42 +1,29 @@
-# 更新日志
+# Changelog
 
-## v0.0.2 - 2026-06-29
+## 2026-06-30
 
-### 架构
+### Repository
 
-- 移除固定图谱数据包、seed、schema 和构建脚本。
-- 路径规划改为由智能体实时生成动态路线，前端只负责视觉化。
-- 推荐智能体改为从 `source_agents_full.json` 的 60 个智能体中独立选择组合。
+- Consolidated the repository around the JARVIS voice particle interaction project as the single active product line.
+- Archived the former black-gold knowledge graph project from commit `2935abf` to `D:\项目1\archives\agent-workshop-black-gold-knowledge-graph-2935abf-20260630.zip`.
+- Promoted the JARVIS frontend from `frontend/voice-particle-jarvis` to `frontend`.
+- Integrated the remote agent workflow backend updates into the JARVIS line.
+- Updated documentation and local run commands for the new `frontend` path.
 
-## v0.0.1 - 2026-06-18
+### Frontend
 
-首个可用版本，完成智能体知识图谱前端、Coze 双阶段流式后端，以及服务器部署链路。
+- Kept the local JARVIS particle visual baseline as the visual source of truth.
+- Preserved voice/text interaction, agent recommendation cards, graph focus actions, and browser speech fallback.
+- Moved reusable agent avatar assets into the JARVIS frontend source tree.
 
-### 后端
+### Backend
 
-- 接入 Coze 流式聊天接口，支持知识图谱路径规划与智能体推荐两阶段工作流。
-- 增加 SSE 事件转换层，将 Coze 原始标签内容转换为前端可消费的结构化事件。
-- 支持第一阶段无标签普通回复：当路径规划智能体判断用户输入与业务图谱无关时，直接流式返回普通回复，不再调用第二阶段推荐智能体。
-- 修复流式接口异常时浏览器出现 `ERR_INCOMPLETE_CHUNKED_ENCODING` 的问题，后端会返回结构化错误事件。
-- 过滤标签外纯空白内容，避免前端出现大块空白回复区域。
-- 使用 Gunicorn + systemd 部署 Flask 后端，并通过 Nginx 暴露公网 API 路径。
+- Added the unified orchestration workflow prompt and user-state aware workflow support.
+- Updated LongCat defaults and workflow configuration.
+- Kept the local TTS endpoint available for the JARVIS frontend proxy.
 
-### 前端
+## 2026-06-29
 
-- 完成 React + Vite 智能体知识图谱主界面。
-- 支持 PixiJS 图谱渲染、路径聚焦、节点高亮和推荐智能体卡片展示。
-- 接入后端 SSE 流式接口，实时展示知识图谱路径、解释文本和推荐智能体。
-- 增加无关问题的 `DIRECT_REPLY` 普通回复展示。
-- 增加“正在思考”状态：AI 未返回内容时立即提示，收到首段内容后自动消失。
-- 修复无关回复前置空白导致的对话气泡异常撑高。
+### Previous Line
 
-### 数据
-
-- 更新智能体来源数据 `source_agents_full.json`。
-- 调整早期演示数据，支持更完整的路径和推荐组合。
-
-### 部署
-
-- 后端已部署到服务器 `106.52.56.14`。
-- 公网 API 入口为 `http://106.52.56.14/agent-workshop-api`。
-- 前端默认调用远端后端服务，不再依赖本地 Flask API。
+- Earlier black-gold knowledge graph and agent recommendation work is preserved in Git history and the local archive.
