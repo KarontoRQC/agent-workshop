@@ -771,7 +771,7 @@ function splitRouteText(routeText: string) {
     .split(/\s*(?:>|›|→|->|-|—|–|\/|、|，|,)\s*/g)
     .map((part) => part.trim())
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 10);
 }
 
 function cleanStateText(value: unknown) {
@@ -795,7 +795,7 @@ function buildAgentUserStateFromWorkflow(workflow: AgentWorkflow): AgentUserStat
       };
     })
     .filter((agent) => agent.agent_name || agent.name)
-    .slice(0, 6);
+    .slice(0, 10);
   const recommendationSummary = cleanStateText(workflow.agentRecommendation.SUMMARY);
   const userState: AgentUserState = {};
 
@@ -2040,7 +2040,7 @@ function WorkflowDock({
 }) {
   const hasRoute = routeSegments.length > 0;
   const hasAgents = agents.length > 0;
-  const visibleAgents = agents.slice(0, 4);
+  const visibleAgents = agents.slice(0, 10);
 
   if (!hasRoute && !hasAgents) {
     return null;

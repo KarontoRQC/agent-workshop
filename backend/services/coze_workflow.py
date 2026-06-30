@@ -27,7 +27,7 @@ COMPLETION_EVENTS = {"chat.completed", "message.completed", "done"}
 ROUTE_SECTION_TYPES = {"THINKING_PROCESS", "ACK", DIRECT_REPLY_TYPE, "KG_PATH", "EXPLANATION"}
 RECOMMENDATION_SECTION_TYPES = {"RECOMMENDED_AGENTS", "SUMMARY"}
 DEFAULT_RECOMMENDATION_ACK = "接下来我将根据这条路径，为你推荐合适的智能体组合。"
-MAX_USER_STATE_AGENTS = 6
+MAX_USER_STATE_AGENTS = 10
 MAX_USER_STATE_TEXT_LENGTH = 600
 MAX_USER_STATE_SUMMARY_LENGTH = 800
 STAGE_CONVERSATION_KEYS = {
@@ -492,7 +492,8 @@ def build_unified_orchestration_message(original_message, agent_names, user_stat
         "路径只用于前端可视化和业务拆解；智能体推荐必须直接根据用户原始需求、业务阶段、任务目标和可用智能体能力判断。",
         "如果用户没有业务、学习、行业或企业经营相关需求，只输出 THINKING_PROCESS 和 ACK 两个 XML 标签。",
         "如果存在可匹配需求，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
-        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-3 个原始名称，不能改名、不能新增。",
+        "KG_PATH 必须输出 6-10 个节点，节点之间只用半角连字符连接。",
+        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-10 个原始名称，不能改名、不能新增。",
         f"用户原始需求：{original_message}",
     ]
 
@@ -694,7 +695,7 @@ def _normalize_string_list(value):
     if not isinstance(value, list):
         return []
 
-    return [_limit_text(item, 160) for item in value if _normalize_optional_string(item)][:12]
+    return [_limit_text(item, 160) for item in value if _normalize_optional_string(item)][:10]
 
 
 def _split_route_nodes(route):
@@ -702,7 +703,7 @@ def _split_route_nodes(route):
         _limit_text(part, 160)
         for part in re.split(r"\s*(?:->|>|›|→|—|–|-|/|、|，|,)\s*", str(route or ""))
         if _normalize_optional_string(part)
-    ][:12]
+    ][:10]
 
 
 def _limit_text(value, max_length):
