@@ -25,6 +25,16 @@ RECOMMENDER_TAGS = {
     "SUMMARY": ("<SUMMARY>", "</SUMMARY>"),
 }
 
+UNIFIED_WORKFLOW_TAGS = {
+    "THINKING_PROCESS": ("<THINKING_PROCESS>", "</THINKING_PROCESS>"),
+    "ACK": ("<ACK>", "</ACK>"),
+    "KG_PATH": ("<KG_PATH>", "</KG_PATH>"),
+    "EXPLANATION": ("<EXPLANATION>", "</EXPLANATION>"),
+    "EXPLANATION_MISSPELLED": ("<EXPLATION>", "</EXPLATION>"),
+    "RECOMMENDED_AGENTS": ("<RECOMMENDED_AGENTS>", "</RECOMMENDED_AGENTS>"),
+    "SUMMARY": ("<SUMMARY>", "</SUMMARY>"),
+}
+
 
 class TaggedContentParser:
     def __init__(

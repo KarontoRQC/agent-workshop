@@ -1,17 +1,10 @@
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
 from config import get_tts_settings
-
-try:
-    from pypinyin import Style, lazy_pinyin
-except ImportError:
-    Style = None
-    lazy_pinyin = None
 
 
 class TtsConfigurationError(RuntimeError):
@@ -20,28 +13,6 @@ class TtsConfigurationError(RuntimeError):
 
 class TtsSynthesisError(RuntimeError):
     pass
-
-
-CJK_RE = re.compile(r"[\u3400-\u9fff]")
-CHINESE_PUNCTUATION = str.maketrans(
-    {
-        "，": ", ",
-        "。": ". ",
-        "！": "! ",
-        "？": "? ",
-        "；": "; ",
-        "：": ": ",
-        "、": ", ",
-        "（": " ",
-        "）": " ",
-        "“": " ",
-        "”": " ",
-        "‘": " ",
-        "’": " ",
-        "《": " ",
-        "》": " ",
-    }
-)
 
 
 def synthesize_speech(text, mood="neutral"):
@@ -160,7 +131,7 @@ def synthesize_with_piper(text, mood, settings):
 
         result = subprocess.run(
             command,
-            input=prepare_piper_text(text),
+            input=text,
             capture_output=True,
             encoding="utf-8",
             errors="replace",
@@ -186,20 +157,6 @@ def synthesize_with_piper(text, mood, settings):
             os.remove(output_path)
         except OSError:
             pass
-
-
-def prepare_piper_text(text):
-    normalized = text.translate(CHINESE_PUNCTUATION)
-
-    if not CJK_RE.search(normalized):
-        return normalized
-
-    if lazy_pinyin is None or Style is None:
-        return normalized
-
-    tokens = lazy_pinyin(normalized, style=Style.NORMAL, errors=lambda value: list(value))
-    prepared = " ".join(token.strip() for token in tokens if token and token.strip())
-    return prepared or normalized
 
 
 def get_mood_length_scale(mood, base_length_scale):

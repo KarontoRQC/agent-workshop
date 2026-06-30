@@ -37,6 +37,7 @@ class CozeClient:
         bot_id=None,
         conversation_id=None,
         auto_save_history=True,
+        system_context=None,
     ):
         settings = self.settings_factory()
 
@@ -47,6 +48,8 @@ class CozeClient:
                 parameters=parameters,
                 bot_id=bot_id,
                 conversation_id=conversation_id,
+                auto_save_history=auto_save_history,
+                system_context=system_context,
             )
 
         if settings.chat_provider != "coze":
@@ -59,10 +62,11 @@ class CozeClient:
         if not selected_bot_id:
             raise CozeConfigurationError("COZE_BOT_ID is not configured")
 
+        message_for_provider = _prepend_system_context(message, system_context)
         payload = self._build_single_turn_payload(
             settings=settings,
             bot_id=selected_bot_id,
-            message=message,
+            message=message_for_provider,
             parameters=parameters,
             user_id=user_id,
             auto_save_history=auto_save_history,
@@ -99,7 +103,16 @@ class CozeClient:
 
         return upstream
 
-    def _stream_longcat_chat(self, settings, message, parameters=None, bot_id=None, conversation_id=None):
+    def _stream_longcat_chat(
+        self,
+        settings,
+        message,
+        parameters=None,
+        bot_id=None,
+        conversation_id=None,
+        auto_save_history=True,
+        system_context=None,
+    ):
         if not settings.longcat_api_key:
             raise CozeConfigurationError("LONGCAT_API_KEY is not configured")
         if not settings.longcat_model:
@@ -108,13 +121,17 @@ class CozeClient:
         selected_bot_id = bot_id or "longcat"
         selected_conversation_id = _normalize_optional_id(conversation_id) or _new_conversation_id()
         chat_id = _new_chat_id()
-        system_prompt = _read_prompt(_select_longcat_prompt_path(settings, selected_bot_id))
+        system_prompt = _append_system_context(
+            _read_prompt(_select_longcat_prompt_path(settings, selected_bot_id)),
+            system_context,
+        )
         payload = _build_longcat_payload(
             settings=settings,
             system_prompt=system_prompt,
             conversation_id=selected_conversation_id,
             message=message,
             parameters=parameters,
+            include_history=auto_save_history,
         )
 
         try:
@@ -143,6 +160,7 @@ class CozeClient:
             chat_id=chat_id,
             bot_id=selected_bot_id,
             user_message=message,
+            save_history=auto_save_history,
         )
 
     @staticmethod
@@ -165,12 +183,13 @@ class CozeClient:
 
 
 class LongCatStreamAdapter:
-    def __init__(self, upstream, conversation_id, chat_id, bot_id, user_message):
+    def __init__(self, upstream, conversation_id, chat_id, bot_id, user_message, save_history=True):
         self.upstream = upstream
         self.conversation_id = conversation_id
         self.chat_id = chat_id
         self.bot_id = bot_id
         self.user_message = user_message
+        self.save_history = save_history
         self.closed = False
 
     def iter_lines(self, decode_unicode=False):
@@ -210,7 +229,8 @@ class LongCatStreamAdapter:
                 yield self._line("", decode_unicode=decode_unicode)
 
             completed = True
-            _append_longcat_history(self.conversation_id, self.user_message, "".join(assistant_parts))
+            if self.save_history:
+                _append_longcat_history(self.conversation_id, self.user_message, "".join(assistant_parts))
 
             yield self._line(
                 "event: conversation.message.completed",
@@ -276,11 +296,11 @@ _LONGCAT_HISTORY = {}
 _LONGCAT_HISTORY_LIMIT = 12
 
 
-def _build_longcat_payload(settings, system_prompt, conversation_id, message, parameters=None):
+def _build_longcat_payload(settings, system_prompt, conversation_id, message, parameters=None, include_history=True):
     payload = {
         "model": settings.longcat_model,
         "stream": True,
-        "messages": _build_longcat_messages(system_prompt, conversation_id, message),
+        "messages": _build_longcat_messages(system_prompt, conversation_id, message, include_history=include_history),
     }
 
     if settings.longcat_max_tokens > 0:
@@ -295,9 +315,12 @@ def _build_longcat_payload(settings, system_prompt, conversation_id, message, pa
     return payload
 
 
-def _build_longcat_messages(system_prompt, conversation_id, message):
+def _build_longcat_messages(system_prompt, conversation_id, message, include_history=True):
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(_get_longcat_history(conversation_id))
+
+    if include_history:
+        messages.extend(_get_longcat_history(conversation_id))
+
     messages.append({"role": "user", "content": message})
     return messages
 
@@ -323,10 +346,17 @@ def _append_longcat_history(conversation_id, user_message, assistant_message):
 
 
 def _select_longcat_prompt_path(settings, bot_id):
+    if _is_unified_workflow(settings) and bot_id != settings.recommender_bot_id:
+        return settings.unified_orchestrator_prompt_path
+
     if bot_id == settings.recommender_bot_id:
         return settings.recommender_prompt_path
 
     return settings.route_planner_prompt_path
+
+
+def _is_unified_workflow(settings):
+    return str(getattr(settings, "workflow_mode", "")).strip().lower() in {"unified", "single", "single_turn"}
 
 
 def _read_prompt(path):
@@ -337,6 +367,24 @@ def _read_prompt(path):
             return file.read()
     except OSError as exc:
         raise CozeConfigurationError(f"Prompt file was not found: {resolved_path}") from exc
+
+
+def _append_system_context(system_prompt, system_context):
+    context = _normalize_optional_id(system_context)
+
+    if not context:
+        return system_prompt
+
+    return f"{system_prompt.rstrip()}\n\n{context}\n"
+
+
+def _prepend_system_context(message, system_context):
+    context = _normalize_optional_id(system_context)
+
+    if not context:
+        return message
+
+    return f"{context}\n\n# 用户本轮消息\n{message}"
 
 
 def _longcat_chat_url(base_url):
