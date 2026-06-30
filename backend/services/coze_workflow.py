@@ -122,7 +122,6 @@ def _iter_unified_chat_workflow_stream(
     chat_ids = {}
     route_sections = defaultdict(str)
     direct_reply_parts = []
-    recommended_agents = []
     summary = ""
     route_stage_closed = False
     recommendation_stage_started = False
@@ -234,9 +233,6 @@ def _iter_unified_chat_workflow_stream(
             elif event_type == "SUMMARY":
                 summary += event.get("content", "")
 
-        if event.get("event") == "recommended_agents.completed":
-            recommended_agents = event.get("agents") or recommended_agents
-
         if event.get("event") in COMPLETION_EVENTS:
             continue
 
@@ -287,10 +283,6 @@ def _iter_unified_chat_workflow_stream(
         yield from start_recommendation_stage()
 
     if recommendation_stage_started:
-        if not summary.strip() and recommended_agents:
-            summary = _build_recommendation_summary_fallback(recommended_agents)
-            yield from _fixed_text_section_events("SUMMARY", summary, AGENT_RECOMMENDATION_STAGE)
-
         yield _stage_event(
             "workflow.stage.completed",
             AGENT_RECOMMENDATION_STAGE,
@@ -449,7 +441,6 @@ def _iter_chat_workflow_stream(
 
     summary = ""
     recommendation_thinking_process = ""
-    recommended_agents = []
 
     for event in iter_tagged_events(
         recommendation_upstream,
@@ -467,17 +458,10 @@ def _iter_chat_workflow_stream(
             elif event.get("type") == "THINKING_PROCESS":
                 recommendation_thinking_process += event.get("content", "")
 
-        if event.get("event") == "recommended_agents.completed":
-            recommended_agents = event.get("agents") or recommended_agents
-
         if event.get("event") in COMPLETION_EVENTS:
             continue
 
         yield format_sse_event(_with_stage(event, AGENT_RECOMMENDATION_STAGE))
-
-    if not summary.strip() and recommended_agents:
-        summary = _build_recommendation_summary_fallback(recommended_agents)
-        yield from _fixed_text_section_events("SUMMARY", summary, AGENT_RECOMMENDATION_STAGE)
 
     yield _stage_event(
         "workflow.stage.completed",
@@ -519,15 +503,15 @@ def build_unified_orchestration_message(original_message, agent_names, user_stat
         "如果本轮只是修改智能体组合，必须输出 THINKING_PROCESS、ACK、KG_PATH、RECOMMENDED_AGENTS、SUMMARY，KG_PATH 必须沿用当前知识路径；除非用户明确要求说明，否则不要输出 EXPLANATION。",
         "如果当前用户状态为空、没有可沿用的知识路径，或用户提出新的完整需求，必须按以下顺序输出：THINKING_PROCESS、ACK、KG_PATH、EXPLANATION、RECOMMENDED_AGENTS、SUMMARY。",
         "KG_PATH 必须输出 6-10 个节点，节点之间只用半角连字符连接。",
-        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-10 个原始名称，不能改名、不能新增。",
-        "凡输出 RECOMMENDED_AGENTS，必须在其后立即输出 SUMMARY，不能省略。",
+        "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的 1-10 个原始名称，不能改名、不能新增；每个 REASON 控制在 18-45 个中文字符。",
+        "凡输出 RECOMMENDED_AGENTS，必须由模型亲自输出 SUMMARY，不能省略，不能在 </RECOMMENDED_AGENTS> 后结束；包含 RECOMMENDED_AGENTS 的回答最终合法结束标签只能是 </SUMMARY>。",
         f"用户原始需求：{original_message}",
     ]
 
     if state_edit_mode == "path_only":
         parts.append("本轮状态修改类型：只修改知识路径。不要输出 RECOMMENDED_AGENTS 或 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。")
     elif state_edit_mode == "agents_only":
-        parts.append("本轮状态修改类型：只修改智能体组合。KG_PATH 必须沿用当前知识路径，推荐后必须输出 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。")
+        parts.append("本轮状态修改类型：只修改智能体组合。KG_PATH 必须沿用当前知识路径，推荐后必须由模型亲自输出 SUMMARY；除非用户明确要求说明，否则不要输出 EXPLANATION。")
     elif state_edit_mode == "both":
         parts.append("本轮状态修改类型：同时修改知识路径和智能体组合。")
 
@@ -581,6 +565,7 @@ def build_user_state_system_context(user_state):
             "5. 用户只改智能体组合时，KG_PATH 必须原样沿用当前知识路径，即使新组合看起来会影响路径，也不能自行重规划；除非用户明确要求说明，否则不要输出 EXPLANATION。",
             "6. 只有用户明确同时要求修改路径和智能体组合时，才可以同时更新 KG_PATH 与 RECOMMENDED_AGENTS。",
             "7. 如果当前状态为空、没有可沿用的知识路径，或用户提出新的完整需求，就按完整流程正常规划路径和推荐组合。",
+            "8. 凡输出 RECOMMENDED_AGENTS，都必须由模型亲自输出 SUMMARY，不能依赖工具或系统补写。",
         ]
     )
 
@@ -837,30 +822,6 @@ def _fixed_text_section_events(section_type, text, stage):
         )
     )
     yield format_sse_event(_with_stage(content_event("content.completed", {"type": section_type}), stage))
-
-
-def _build_recommendation_summary_fallback(agents):
-    names = []
-
-    for agent in agents or []:
-        if not isinstance(agent, dict):
-            continue
-
-        name = _normalize_optional_string(agent.get("agent_name") or agent.get("name"))
-
-        if name:
-            names.append(name)
-
-    if not names:
-        return "这套智能体组合已经整理完成，你可以继续指定要保留、替换或补充的智能体。"
-
-    visible_names = "、".join(names[:3])
-    extra_count = len(names) - 3
-
-    if extra_count > 0:
-        visible_names = f"{visible_names}等 {len(names)} 个智能体"
-
-    return f"这套组合已整理完成，{visible_names}会分别承接当前需求中的关键环节；你可以继续指定要保留、替换或补充的智能体。"
 
 
 def _mirror_unified_recommendation_conversation(conversation_ids, chat_ids):
