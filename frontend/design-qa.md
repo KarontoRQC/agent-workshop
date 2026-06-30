@@ -4,7 +4,7 @@ Final result: passed
 
 ## Prototype
 
-- App: `frontend/voice-particle-jarvis`
+- App: `frontend`
 - Stack: Vite + React + Three.js
 - Intent: a JARVIS-like 3D particle dialogue surface with voice input, text input, browser speech output, and a placeholder model slot.
 

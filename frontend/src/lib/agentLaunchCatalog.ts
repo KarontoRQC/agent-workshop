@@ -1,4 +1,4 @@
-import sourceAgentsRaw from '../../../../data/source_agents_full.json?raw';
+import sourceAgentsRaw from '../../../data/source_agents_full.json?raw';
 import type { RecommendedAgent } from '../types';
 
 type CatalogAgent = {
@@ -43,7 +43,7 @@ export type EnrichedDrawAgent = RecommendedAgent & {
   stageLabel: string;
 };
 
-const avatarModules = import.meta.glob('../../../src/assets/agent-avatars/*.{png,webp}', {
+const avatarModules = import.meta.glob('../assets/agent-avatars/*.{png,webp}', {
   eager: true,
   import: 'default',
   query: '?url',

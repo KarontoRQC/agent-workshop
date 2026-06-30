@@ -1,28 +1,54 @@
-# Agent Workshop Frontend
+# JARVIS Voice Particle Frontend
 
-目标：做一个智能体工作坊现场演示前端，用动态知识图谱视觉承载“用户问题 -> 路径规划 -> 智能体组合推荐”的体验。
+This is the primary Agent Workshop frontend. It is a Vite + React + TypeScript + Three.js app for a JARVIS-like AI dialogue surface.
 
-要验证的核心假设：路径规划和推荐决策可以解耦。第一阶段只生成本次对话的理解路线，第二阶段根据用户需求从 60 个智能体候选集中独立推荐组合。
+The first screen is the actual product experience: a central particle crystal, orbital particle streams, voice/text input, browser speech output, streaming agent responses, graph focus actions, and agent recommendation cards.
 
-输入：业务问题、行业、当前卡点、目标结果。
+## Run
 
-处理动作：路径规划智能体自由生成路线文本；前端把路线临时渲染成节点、连线、聚焦和点亮动画。
+```powershell
+npm install
+npm run dev -- --host 127.0.0.1 --port 5188
+```
 
-输出物：可运行的 React/Vite 原型，含流式智能体推荐和可替换接口层。
+Open:
 
-成功标准：
-- 首屏有全局规模感，但焦点路径清楚，不是满屏噪音。
-- 输入需求后，能看到实时生成的路径被点亮。
-- 图谱只承担视觉表达，不约束推荐智能体的选择。
-- 推荐结果来自 60 个智能体源数据和用户需求匹配。
-- 智能体跳转逻辑与前端图谱逻辑解耦。
+```text
+http://127.0.0.1:5188/
+```
 
-失败信号：
-- 变成线性流程图。
-- 把路线当成固定节点映射。
-- 一开始展示过多节点导致不可读。
-- 控制面板或标签把图谱主体压垮。
+## Build
 
-下一轮迭代：接入更稳定的语义匹配、推荐解释和一键打开智能体组合。
+```powershell
+npm run build
+```
 
-可能归属子系统：智能体工作坊演示系统，当前仍在创意中心实验区。
+Vite may warn that the Three.js chunk is larger than 500 kB. That is expected for this prototype.
+
+## API Proxy
+
+Development mode uses `vite.config.ts`.
+
+- `/api/tts/*` proxies to `TTS_PROXY_TARGET`, defaulting to `http://127.0.0.1:5000`.
+- Other `/api/*` requests proxy to `API_PROXY_BASE_URL`, `VITE_AGENT_API_BASE_URL`, `VITE_API_BASE_URL`, or the default remote backend.
+
+Useful switches:
+
+```text
+VITE_AGENT_STREAM_ENABLED=false
+VITE_TTS_BROWSER_FALLBACK=auto
+```
+
+## Voice Notes
+
+- Voice recognition depends on browser support and page security.
+- Local development should use `http://127.0.0.1:5188/` or `http://localhost:5188/`.
+- Recommended browsers are Chrome or Edge on desktop.
+- The first voice interaction requires microphone permission.
+- If server TTS fails, the UI falls back to browser `speechSynthesis`.
+
+## Agent Notes
+
+- Streaming integration lives in `src/lib/agentStreamClient.ts` and `src/lib/aiClient.ts`.
+- Recommended-agent card enrichment uses `data/source_agents_full.json` and `src/assets/agent-avatars`.
+- Graph focus actions are treated as visual controls for the JARVIS particle scene, not as a separate black-gold frontend.

@@ -1,7 +1,7 @@
 node_modules/
 dist/
-.npm-cache/
 .vite/
 *.log
 .env
 .env.*
+!.env.example
