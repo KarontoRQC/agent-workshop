@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from services.coze_client import (
@@ -26,6 +27,9 @@ COMPLETION_EVENTS = {"chat.completed", "message.completed", "done"}
 ROUTE_SECTION_TYPES = {"THINKING_PROCESS", "ACK", DIRECT_REPLY_TYPE, "KG_PATH", "EXPLANATION"}
 RECOMMENDATION_SECTION_TYPES = {"RECOMMENDED_AGENTS", "SUMMARY"}
 DEFAULT_RECOMMENDATION_ACK = "接下来我将根据这条路径，为你推荐合适的智能体组合。"
+MAX_USER_STATE_AGENTS = 6
+MAX_USER_STATE_TEXT_LENGTH = 600
+MAX_USER_STATE_SUMMARY_LENGTH = 800
 STAGE_CONVERSATION_KEYS = {
     KNOWLEDGE_GRAPH_STAGE: ROUTE_PLANNER_CONVERSATION_KEY,
     AGENT_RECOMMENDATION_STAGE: RECOMMENDER_CONVERSATION_KEY,
@@ -41,6 +45,7 @@ def start_chat_workflow_stream(
     agent_names=None,
     conversation_ids=None,
     auto_save_history=True,
+    user_state=None,
 ):
     settings = coze_client.settings_factory()
     route_planner_bot_id = settings.route_planner_bot_id
@@ -48,6 +53,8 @@ def start_chat_workflow_stream(
     workflow_mode = getattr(settings, "workflow_mode", "unified")
     selected_agent_names = _normalize_agent_names(agent_names) or settings.agent_names
     selected_conversation_ids = _normalize_conversation_ids(conversation_ids)
+    normalized_user_state = _normalize_user_state(user_state)
+    user_state_system_context = build_user_state_system_context(normalized_user_state)
 
     if not route_planner_bot_id:
         raise CozeConfigurationError("COZE_ROUTE_PLANNER_BOT_ID is not configured")
@@ -58,6 +65,7 @@ def start_chat_workflow_stream(
         unified_message = build_unified_orchestration_message(
             original_message=message,
             agent_names=selected_agent_names,
+            user_state=normalized_user_state,
         )
         route_upstream = coze_client.stream_single_turn_chat(
             message=unified_message,
@@ -66,6 +74,7 @@ def start_chat_workflow_stream(
             bot_id=route_planner_bot_id,
             conversation_id=selected_conversation_ids.get(ROUTE_PLANNER_CONVERSATION_KEY),
             auto_save_history=auto_save_history,
+            system_context=user_state_system_context,
         )
 
         return _iter_unified_chat_workflow_stream(
@@ -82,6 +91,7 @@ def start_chat_workflow_stream(
         bot_id=route_planner_bot_id,
         conversation_id=selected_conversation_ids.get(ROUTE_PLANNER_CONVERSATION_KEY),
         auto_save_history=auto_save_history,
+        system_context=user_state_system_context,
     )
 
     return _iter_chat_workflow_stream(
@@ -94,6 +104,8 @@ def start_chat_workflow_stream(
         agent_names=selected_agent_names,
         conversation_ids=selected_conversation_ids,
         auto_save_history=auto_save_history,
+        user_state=normalized_user_state,
+        user_state_system_context=user_state_system_context,
     )
 
 
@@ -286,6 +298,8 @@ def _iter_chat_workflow_stream(
     agent_names,
     conversation_ids,
     auto_save_history,
+    user_state,
+    user_state_system_context,
 ):
     conversation_ids = dict(conversation_ids or {})
     chat_ids = {}
@@ -388,6 +402,7 @@ def _iter_chat_workflow_stream(
         selected_route=selected_route,
         agent_names=agent_names,
         original_message=original_message,
+        user_state=user_state,
     )
 
     yield _stage_event(
@@ -406,6 +421,7 @@ def _iter_chat_workflow_stream(
             bot_id=recommender_bot_id,
             conversation_id=conversation_ids.get(RECOMMENDER_CONVERSATION_KEY),
             auto_save_history=auto_save_history,
+            system_context=user_state_system_context,
         )
     except (CozeConfigurationError, CozeConnectionError, CozeUpstreamError) as exc:
         yield _error_event(exc, AGENT_RECOMMENDATION_STAGE)
@@ -451,22 +467,27 @@ def _iter_chat_workflow_stream(
     yield _workflow_event("workflow.completed", status="completed", **_conversation_payload(conversation_ids, chat_ids))
 
 
-def build_recommender_message(selected_route, agent_names, original_message):
+def build_recommender_message(selected_route, agent_names, original_message, user_state=None):
     route = selected_route or "未识别到明确路线"
     available_agents = _format_agent_names(agent_names)
+    user_state_text = _format_user_state_for_message(user_state)
 
     parts = [f"已选择的路线：{route}"]
 
     if available_agents:
         parts.append(f"可用智能体合集：{available_agents}")
 
+    if user_state_text:
+        parts.append(f"当前用户状态：\n{user_state_text}")
+
     parts.append(f"可能包含业务需求、学习目标或任务描述：{original_message}")
 
     return "\n".join(parts)
 
 
-def build_unified_orchestration_message(original_message, agent_names):
+def build_unified_orchestration_message(original_message, agent_names, user_state=None):
     available_agents = _format_agent_names(agent_names)
+    user_state_text = _format_user_state_for_message(user_state)
     parts = [
         "请一次完成知识路径规划和智能体组合推荐，不要再把推荐拆成第二轮。",
         "路径只用于前端可视化和业务拆解；智能体推荐必须直接根据用户原始需求、业务阶段、任务目标和可用智能体能力判断。",
@@ -479,7 +500,219 @@ def build_unified_orchestration_message(original_message, agent_names):
     if available_agents:
         parts.append(f"可用智能体集合：{available_agents}")
 
+    if user_state_text:
+        parts.append(f"当前用户状态：\n{user_state_text}")
+
     return "\n".join(parts)
+
+
+def build_user_state_system_context(user_state):
+    state = _normalize_user_state(user_state)
+
+    if not state:
+        return ""
+
+    lines = [
+        "# 当前用户状态（前端实时传入）",
+        "这部分是用户上一轮已经形成的知识路径和智能体组合，是本轮对话必须参考的状态，不是新的用户需求。",
+    ]
+
+    if state.get("knowledge_path"):
+        lines.append(f"- 当前知识路径：{state['knowledge_path']}")
+
+    if state.get("knowledge_path_nodes"):
+        lines.append(f"- 当前路径节点：{' -> '.join(state['knowledge_path_nodes'])}")
+
+    if state.get("recommended_agents"):
+        lines.append("- 当前已推荐智能体组合：")
+        for agent in state["recommended_agents"]:
+            label = agent.get("agent_name") or agent.get("name") or "未命名智能体"
+            stage = agent.get("stage") or "未标注阶段"
+            reason = agent.get("reason") or "未提供理由"
+            rank = agent.get("rank") or ""
+            prefix = f"  {rank}. " if rank else "  - "
+            lines.append(f"{prefix}{label}｜{stage}｜{reason}")
+
+    if state.get("recommendation_summary"):
+        lines.append(f"- 当前组合总结：{state['recommendation_summary']}")
+
+    lines.extend(
+        [
+            "",
+            "# 状态修改规则",
+            "1. 当用户要求修改、调整、替换、增加或删除知识路径时，在 <KG_PATH> 输出修改后的完整路径，不输出补丁或局部片段。",
+            "2. 当用户要求修改、调整、替换、增加或删除智能体组合时，在 <RECOMMENDED_AGENTS> 输出修改后的完整组合，并保持 AGENT_NAME 来自可用智能体集合。",
+            "3. 未被用户要求修改的路径或组合尽量沿用当前状态；如果路径变化导致组合明显不匹配，可以同步更新组合并在 SUMMARY 说明。",
+            "4. 用户只改智能体组合时，KG_PATH 默认沿用当前知识路径；用户只改知识路径时，智能体组合默认沿用当前组合，除非新路径明显要求更新。",
+            "5. 如果当前状态为空，就按新的需求正常规划路径和推荐组合。",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def _format_user_state_for_message(user_state):
+    state = _normalize_user_state(user_state)
+    parts = []
+
+    if state.get("knowledge_path"):
+        parts.append(f"知识路径：{state['knowledge_path']}")
+
+    if state.get("knowledge_path_nodes"):
+        parts.append(f"路径节点：{' -> '.join(state['knowledge_path_nodes'])}")
+
+    if state.get("recommended_agents"):
+        agent_lines = []
+        for agent in state["recommended_agents"]:
+            label = agent.get("agent_name") or agent.get("name") or "未命名智能体"
+            stage = agent.get("stage") or "未标注阶段"
+            reason = agent.get("reason") or "未提供理由"
+            rank = agent.get("rank") or ""
+            prefix = f"{rank}. " if rank else "- "
+            agent_lines.append(f"{prefix}{label}｜{stage}｜{reason}")
+        parts.append("已推荐智能体组合：\n" + "\n".join(agent_lines))
+
+    if state.get("recommendation_summary"):
+        parts.append(f"组合总结：{state['recommendation_summary']}")
+
+    return "\n".join(parts)
+
+
+def _normalize_user_state(user_state):
+    if not isinstance(user_state, dict):
+        return {}
+
+    knowledge_path = _limit_text(
+        _first_present_string(
+            user_state,
+            "knowledge_path",
+            "knowledgePath",
+            "current_knowledge_path",
+            "currentKnowledgePath",
+            "current_path",
+            "currentPath",
+        ),
+        MAX_USER_STATE_TEXT_LENGTH,
+    )
+    raw_nodes = _first_present_value(user_state, "knowledge_path_nodes", "knowledgePathNodes", "path_nodes", "pathNodes")
+    knowledge_path_nodes = _normalize_string_list(raw_nodes)
+
+    if not knowledge_path_nodes and knowledge_path:
+        knowledge_path_nodes = _split_route_nodes(knowledge_path)
+
+    raw_agents = _first_present_value(
+        user_state,
+        "recommended_agents",
+        "recommendedAgents",
+        "agent_combination",
+        "agentCombination",
+        "agents",
+    )
+    recommended_agents = _normalize_state_agents(raw_agents)
+    recommendation_summary = _limit_text(
+        _first_present_string(
+            user_state,
+            "recommendation_summary",
+            "recommendationSummary",
+            "summary",
+            "agent_summary",
+            "agentSummary",
+        ),
+        MAX_USER_STATE_SUMMARY_LENGTH,
+    )
+    normalized = {}
+
+    if knowledge_path:
+        normalized["knowledge_path"] = knowledge_path
+
+    if knowledge_path_nodes:
+        normalized["knowledge_path_nodes"] = knowledge_path_nodes
+
+    if recommended_agents:
+        normalized["recommended_agents"] = recommended_agents
+
+    if recommendation_summary:
+        normalized["recommendation_summary"] = recommendation_summary
+
+    return normalized
+
+
+def _normalize_state_agents(raw_agents):
+    if not isinstance(raw_agents, list):
+        return []
+
+    normalized_agents = []
+
+    for index, raw_agent in enumerate(raw_agents[:MAX_USER_STATE_AGENTS], start=1):
+        if not isinstance(raw_agent, dict):
+            continue
+
+        agent_name = _limit_text(
+            _first_present_string(raw_agent, "agent_name", "agentName", "name", "AGENT_NAME"),
+            120,
+        )
+        name = _limit_text(_first_present_string(raw_agent, "name"), 120)
+        stage = _limit_text(_first_present_string(raw_agent, "stage", "STAGE"), 160)
+        reason = _limit_text(_first_present_string(raw_agent, "reason", "REASON"), MAX_USER_STATE_TEXT_LENGTH)
+        rank = _first_present_string(raw_agent, "rank", "RANK") or str(index)
+
+        if not agent_name and not name:
+            continue
+
+        normalized_agent = {"rank": _limit_text(rank, 40)}
+
+        if agent_name:
+            normalized_agent["agent_name"] = agent_name
+
+        if name and name != agent_name:
+            normalized_agent["name"] = name
+
+        if stage:
+            normalized_agent["stage"] = stage
+
+        if reason:
+            normalized_agent["reason"] = reason
+
+        normalized_agents.append(normalized_agent)
+
+    return normalized_agents
+
+
+def _first_present_value(payload, *keys):
+    for key in keys:
+        if key in payload and payload[key] is not None:
+            return payload[key]
+
+    return None
+
+
+def _first_present_string(payload, *keys):
+    value = _first_present_value(payload, *keys)
+    return _normalize_optional_string(value)
+
+
+def _normalize_string_list(value):
+    if not isinstance(value, list):
+        return []
+
+    return [_limit_text(item, 160) for item in value if _normalize_optional_string(item)][:12]
+
+
+def _split_route_nodes(route):
+    return [
+        _limit_text(part, 160)
+        for part in re.split(r"\s*(?:->|>|›|→|—|–|-|/|、|，|,)\s*", str(route or ""))
+        if _normalize_optional_string(part)
+    ][:12]
+
+
+def _limit_text(value, max_length):
+    text = _normalize_optional_string(value)
+
+    if len(text) <= max_length:
+        return text
+
+    return f"{text[:max_length].rstrip()}..."
 
 
 def _is_unified_workflow_mode(workflow_mode):

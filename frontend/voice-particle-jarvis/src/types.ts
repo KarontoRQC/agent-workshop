@@ -39,6 +39,19 @@ export type RecommendedAgent = {
   [key: string]: unknown;
 };
 
+export type AgentUserState = {
+  knowledge_path?: string;
+  knowledge_path_nodes?: string[];
+  recommended_agents?: Array<{
+    agent_name?: string;
+    name?: string;
+    rank?: number | string;
+    reason?: string;
+    stage?: string;
+  }>;
+  recommendation_summary?: string;
+};
+
 export type AgentGraphPath = {
   edges?: unknown[];
   nodes?: unknown[];

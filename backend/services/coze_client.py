@@ -37,6 +37,7 @@ class CozeClient:
         bot_id=None,
         conversation_id=None,
         auto_save_history=True,
+        system_context=None,
     ):
         settings = self.settings_factory()
 
@@ -47,6 +48,7 @@ class CozeClient:
                 parameters=parameters,
                 bot_id=bot_id,
                 conversation_id=conversation_id,
+                system_context=system_context,
             )
 
         if settings.chat_provider != "coze":
@@ -59,10 +61,11 @@ class CozeClient:
         if not selected_bot_id:
             raise CozeConfigurationError("COZE_BOT_ID is not configured")
 
+        message_for_provider = _prepend_system_context(message, system_context)
         payload = self._build_single_turn_payload(
             settings=settings,
             bot_id=selected_bot_id,
-            message=message,
+            message=message_for_provider,
             parameters=parameters,
             user_id=user_id,
             auto_save_history=auto_save_history,
@@ -99,7 +102,15 @@ class CozeClient:
 
         return upstream
 
-    def _stream_longcat_chat(self, settings, message, parameters=None, bot_id=None, conversation_id=None):
+    def _stream_longcat_chat(
+        self,
+        settings,
+        message,
+        parameters=None,
+        bot_id=None,
+        conversation_id=None,
+        system_context=None,
+    ):
         if not settings.longcat_api_key:
             raise CozeConfigurationError("LONGCAT_API_KEY is not configured")
         if not settings.longcat_model:
@@ -108,7 +119,10 @@ class CozeClient:
         selected_bot_id = bot_id or "longcat"
         selected_conversation_id = _normalize_optional_id(conversation_id) or _new_conversation_id()
         chat_id = _new_chat_id()
-        system_prompt = _read_prompt(_select_longcat_prompt_path(settings, selected_bot_id))
+        system_prompt = _append_system_context(
+            _read_prompt(_select_longcat_prompt_path(settings, selected_bot_id)),
+            system_context,
+        )
         payload = _build_longcat_payload(
             settings=settings,
             system_prompt=system_prompt,
@@ -344,6 +358,24 @@ def _read_prompt(path):
             return file.read()
     except OSError as exc:
         raise CozeConfigurationError(f"Prompt file was not found: {resolved_path}") from exc
+
+
+def _append_system_context(system_prompt, system_context):
+    context = _normalize_optional_id(system_context)
+
+    if not context:
+        return system_prompt
+
+    return f"{system_prompt.rstrip()}\n\n{context}\n"
+
+
+def _prepend_system_context(message, system_context):
+    context = _normalize_optional_id(system_context)
+
+    if not context:
+        return message
+
+    return f"{context}\n\n# 用户本轮消息\n{message}"
 
 
 def _longcat_chat_url(base_url):

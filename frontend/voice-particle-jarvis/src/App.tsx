@@ -24,6 +24,7 @@ import type {
   AgentGraphPath,
   AgentStatus,
   AgentTurn,
+  AgentUserState,
   AgentWorkflow,
   Message,
   ParticleSettings,
@@ -773,6 +774,68 @@ function splitRouteText(routeText: string) {
     .slice(0, 6);
 }
 
+function cleanStateText(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function buildAgentUserStateFromWorkflow(workflow: AgentWorkflow): AgentUserState | null {
+  const knowledgePath = cleanStateText(workflow.knowledgeGraph.KG_PATH);
+  const knowledgePathNodes = splitRouteText(knowledgePath);
+  const recommendedAgents = workflow.agentRecommendation.agents
+    .map((agent, index) => {
+      const agentName = cleanStateText(agent.agent_name || agent.name);
+      const fallbackName = cleanStateText(agent.name || agent.agent_name);
+
+      return {
+        agent_name: agentName,
+        name: fallbackName && fallbackName !== agentName ? fallbackName : undefined,
+        rank: agent.rank ?? index + 1,
+        reason: cleanStateText(agent.reason),
+        stage: cleanStateText(agent.stage),
+      };
+    })
+    .filter((agent) => agent.agent_name || agent.name)
+    .slice(0, 6);
+  const recommendationSummary = cleanStateText(workflow.agentRecommendation.SUMMARY);
+  const userState: AgentUserState = {};
+
+  if (knowledgePath) {
+    userState.knowledge_path = knowledgePath;
+  }
+
+  if (knowledgePathNodes.length > 0) {
+    userState.knowledge_path_nodes = knowledgePathNodes;
+  }
+
+  if (recommendedAgents.length > 0) {
+    userState.recommended_agents = recommendedAgents;
+  }
+
+  if (recommendationSummary) {
+    userState.recommendation_summary = recommendationSummary;
+  }
+
+  return Object.keys(userState).length > 0 ? userState : null;
+}
+
+function getLatestAgentUserState(turns: AgentTurn[]) {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index];
+
+    if (turn.status === 'streaming') {
+      continue;
+    }
+
+    const userState = buildAgentUserStateFromWorkflow(turn.workflow);
+
+    if (userState) {
+      return userState;
+    }
+  }
+
+  return undefined;
+}
+
 function getActionFromRoute(routeText: string): AgentAction | null {
   const route = splitRouteText(routeText);
 
@@ -1175,6 +1238,7 @@ export default function App() {
       const history = [...messages, nextUserMessage];
       agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
       const conversationIdsForRequest = { ...agentConversationIdsRef.current };
+      const userStateForRequest = getLatestAgentUserState(agentTurns);
 
       agentRequestRef.current = controller;
       voiceControlRef.current?.pause();
@@ -1496,6 +1560,7 @@ export default function App() {
           conversationId: conversationIdsForRequest.route_planner,
           conversationIds: conversationIdsForRequest,
           signal: controller.signal,
+          userState: userStateForRequest,
           onEvent(event) {
             rememberConversationIds(event);
 
@@ -1676,6 +1741,7 @@ export default function App() {
     },
     [
       agentStatus,
+      agentTurns,
       finishReplyWithoutSpeech,
       inputMode,
       manualVoiceSession,

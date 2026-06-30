@@ -1,4 +1,4 @@
-import type { RecommendedAgent } from '../types';
+import type { AgentUserState, RecommendedAgent } from '../types';
 
 const DEFAULT_REMOTE_API_BASE_URL = 'http://106.52.56.14/agent-workshop-api';
 
@@ -39,6 +39,7 @@ type StreamAgentHandlers = {
   onRecommendedAgentsCompleted?: (agents: RecommendedAgent[], event: AgentStreamEvent) => void;
   onWorkflowError?: (event: AgentStreamEvent) => void;
   signal?: AbortSignal;
+  userState?: AgentUserState;
 };
 
 function trimTrailingSlash(value: string) {
@@ -68,6 +69,7 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     conversation_ids?: Record<string, string>;
     message: string;
     parameters: Record<string, never>;
+    user_state?: AgentUserState;
   } = {
     message,
     parameters: {},
@@ -87,6 +89,10 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
 
   if (typeof handlers.autoSaveHistory === 'boolean') {
     body.auto_save_history = handlers.autoSaveHistory;
+  }
+
+  if (handlers.userState && Object.keys(handlers.userState).length > 0) {
+    body.user_state = handlers.userState;
   }
 
   const response = await fetch(COZE_CHAT_STREAM_URL, {

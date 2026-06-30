@@ -31,6 +31,7 @@ def stream_chat():
             agent_names=data.get("agent_names"),
             conversation_ids=_get_conversation_ids(data),
             auto_save_history=_get_auto_save_history(data),
+            user_state=_get_user_state(data),
         )
     except CozeConfigurationError as exc:
         return jsonify({"error": str(exc)}), 500
@@ -105,6 +106,11 @@ def _get_auto_save_history(data):
         return value.strip().lower() not in {"0", "false", "no", "off"}
 
     return bool(value)
+
+
+def _get_user_state(data):
+    user_state = data.get("user_state") or data.get("current_user_state") or data.get("current_state")
+    return user_state if isinstance(user_state, dict) else {}
 
 
 def _first_string(*values):
