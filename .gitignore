@@ -3,12 +3,13 @@ frontend/dist/
 frontend/.npm-cache/
 frontend/.vite/
 frontend/*.log
-frontend/.env
-frontend/.env.*
+frontend/.env.local
+frontend/.env.*.local
 !frontend/.env.example
 
 backend/.venv/
 backend/__pycache__/
 backend/*.py[cod]
-backend/.env
+backend/.env.local
 backend/.env.*
+!backend/.env.example

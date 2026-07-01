@@ -30,6 +30,43 @@ DEFAULT_RECOMMENDATION_ACK = "我把本轮智能体组合整理出来，并在�
 MAX_USER_STATE_AGENTS = 10
 MAX_USER_STATE_TEXT_LENGTH = 600
 MAX_USER_STATE_SUMMARY_LENGTH = 800
+LINEUP_IDS = ("core", "growth", "conversion")
+LINEUP_LABELS = {
+    "core": "主力阵容",
+    "growth": "增长阵容",
+    "conversion": "成交阵容",
+}
+LINEUP_ALIASES = {
+    "core": "core",
+    "main": "core",
+    "primary": "core",
+    "default": "core",
+    "主力": "core",
+    "主力阵容": "core",
+    "核心": "core",
+    "核心阵容": "core",
+    "growth": "growth",
+    "grow": "growth",
+    "acquisition": "growth",
+    "增长": "growth",
+    "增长阵容": "growth",
+    "拉新": "growth",
+    "拉新阵容": "growth",
+    "转化": "growth",
+    "conversion": "conversion",
+    "deal": "conversion",
+    "sales": "conversion",
+    "transaction": "conversion",
+    "成交": "conversion",
+    "成交阵容": "conversion",
+    "私域": "conversion",
+    "私域承接": "conversion",
+}
+LINEUP_INTENT_KEYWORDS = (
+    ("growth", ("增长阵容", "增长", "拉新", "获客", "转化增长", "growth", "acquisition")),
+    ("conversion", ("成交阵容", "成交", "私域", "承接", "复购", "deal", "sales", "conversion")),
+    ("core", ("主力阵容", "主力", "核心阵容", "核心", "main", "primary", "core")),
+)
 STAGE_CONVERSATION_KEYS = {
     KNOWLEDGE_GRAPH_STAGE: ROUTE_PLANNER_CONVERSATION_KEY,
     AGENT_RECOMMENDATION_STAGE: RECOMMENDER_CONVERSATION_KEY,
@@ -46,6 +83,7 @@ def start_chat_workflow_stream(
     conversation_ids=None,
     auto_save_history=True,
     user_state=None,
+    lineup_context=None,
 ):
     settings = coze_client.settings_factory()
     route_planner_bot_id = settings.route_planner_bot_id
@@ -54,8 +92,9 @@ def start_chat_workflow_stream(
     selected_agent_names = _normalize_agent_names(agent_names) or settings.agent_names
     selected_conversation_ids = _normalize_conversation_ids(conversation_ids)
     normalized_user_state = _normalize_user_state(user_state)
+    normalized_lineup_context = _normalize_lineup_context(lineup_context, normalized_user_state, message)
     state_edit_mode = _detect_state_edit_mode(message, normalized_user_state)
-    user_state_system_context = build_user_state_system_context(normalized_user_state)
+    user_state_system_context = build_user_state_system_context(normalized_user_state, normalized_lineup_context)
 
     if not route_planner_bot_id:
         raise CozeConfigurationError("COZE_ROUTE_PLANNER_BOT_ID is not configured")
@@ -67,6 +106,7 @@ def start_chat_workflow_stream(
             original_message=message,
             agent_names=selected_agent_names,
             user_state=normalized_user_state,
+            lineup_context=normalized_lineup_context,
             state_edit_mode=state_edit_mode,
         )
         route_upstream = coze_client.stream_single_turn_chat(
@@ -85,6 +125,7 @@ def start_chat_workflow_stream(
             agent_names=selected_agent_names,
             conversation_ids=selected_conversation_ids,
             state_edit_mode=state_edit_mode,
+            lineup_context=normalized_lineup_context,
         )
 
     route_upstream = coze_client.stream_single_turn_chat(
@@ -108,6 +149,7 @@ def start_chat_workflow_stream(
         conversation_ids=selected_conversation_ids,
         auto_save_history=auto_save_history,
         user_state=normalized_user_state,
+        lineup_context=normalized_lineup_context,
         user_state_system_context=user_state_system_context,
     )
 
@@ -118,6 +160,7 @@ def _iter_unified_chat_workflow_stream(
     agent_names,
     conversation_ids,
     state_edit_mode="general",
+    lineup_context=None,
 ):
     conversation_ids = dict(conversation_ids or {})
     chat_ids = {}
@@ -201,6 +244,7 @@ def _iter_unified_chat_workflow_stream(
             AGENT_RECOMMENDATION_STAGE,
             selected_route=selected_route(),
             agent_names=list(agent_names),
+            lineup_context=lineup_context,
             **_stage_conversation_payload(AGENT_RECOMMENDATION_STAGE, conversation_ids, chat_ids),
         )
         yield from _fixed_text_section_events("ACK", DEFAULT_RECOMMENDATION_ACK, AGENT_RECOMMENDATION_STAGE)
@@ -307,6 +351,7 @@ def _iter_chat_workflow_stream(
     conversation_ids,
     auto_save_history,
     user_state,
+    lineup_context,
     user_state_system_context,
 ):
     conversation_ids = dict(conversation_ids or {})
@@ -411,6 +456,7 @@ def _iter_chat_workflow_stream(
         agent_names=agent_names,
         original_message=original_message,
         user_state=user_state,
+        lineup_context=lineup_context,
     )
 
     yield _stage_event(
@@ -418,6 +464,7 @@ def _iter_chat_workflow_stream(
         AGENT_RECOMMENDATION_STAGE,
         selected_route=selected_route,
         agent_names=list(agent_names),
+        lineup_context=lineup_context,
         **_stage_conversation_payload(AGENT_RECOMMENDATION_STAGE, conversation_ids, chat_ids),
     )
 
@@ -475,10 +522,11 @@ def _iter_chat_workflow_stream(
     yield _workflow_event("workflow.completed", status="completed", **_conversation_payload(conversation_ids, chat_ids))
 
 
-def build_recommender_message(selected_route, agent_names, original_message, user_state=None):
+def build_recommender_message(selected_route, agent_names, original_message, user_state=None, lineup_context=None):
     route = selected_route or "未识别到明确路线"
     available_agents = _format_agent_names(agent_names)
     user_state_text = _format_user_state_for_message(user_state)
+    lineup_context_text = _format_lineup_context_for_message(lineup_context)
 
     parts = [f"已选择的路线：{route}"]
 
@@ -488,18 +536,33 @@ def build_recommender_message(selected_route, agent_names, original_message, use
     if user_state_text:
         parts.append(f"当前用户状态：\n{user_state_text}")
 
+    if lineup_context_text:
+        parts.append(lineup_context_text)
+
+    parts.append(
+        "阵容输出要求：每个 <AGENT> 必须按 RANK、AGENT_NAME、LINEUP、STAGE、REASON 输出；"
+        "LINEUP 只能是 core、growth、conversion。"
+    )
     parts.append(f"可能包含业务需求、学习目标或任务描述：{original_message}")
 
     return "\n".join(parts)
 
 
-def build_unified_orchestration_message(original_message, agent_names, user_state=None, state_edit_mode="general"):
+def build_unified_orchestration_message(
+    original_message,
+    agent_names,
+    user_state=None,
+    lineup_context=None,
+    state_edit_mode="general",
+):
     available_agents = _format_agent_names(agent_names)
     user_state_text = _format_user_state_for_message(user_state)
+    lineup_context_text = _format_lineup_context_for_message(lineup_context)
     parts = [
         "请根据系统提示词判断本轮属于 A、B、C 哪一种，并严格按对应 XML 结构输出。",
         "KG_PATH 必须输出 6-10 个节点，节点之间只用半角连字符连接。",
         "RECOMMENDED_AGENTS 中只能推荐可用智能体集合里的原始名称，不能改名、不能新增；默认推荐 3-5 个，复杂需求最多 6 个。",
+        "RECOMMENDED_AGENTS 中每个 AGENT 字段顺序必须是 RANK、AGENT_NAME、LINEUP、STAGE、REASON；LINEUP 只能输出 core、growth、conversion。",
         "只要输出 RECOMMENDED_AGENTS，就必须继续输出 SUMMARY。",
         f"用户原始需求：{original_message}",
     ]
@@ -519,13 +582,16 @@ def build_unified_orchestration_message(original_message, agent_names, user_stat
     if user_state_text:
         parts.append(f"当前用户状态：\n{user_state_text}")
 
+    if lineup_context_text:
+        parts.append(lineup_context_text)
+
     return "\n".join(parts)
 
 
-def build_user_state_system_context(user_state):
+def build_user_state_system_context(user_state, lineup_context=None):
     state = _normalize_user_state(user_state)
 
-    if not state:
+    if not state and not lineup_context:
         return ""
 
     lines = [
@@ -546,11 +612,21 @@ def build_user_state_system_context(user_state):
             stage = agent.get("stage") or "未标注阶段"
             reason = agent.get("reason") or "未提供理由"
             rank = agent.get("rank") or ""
+            lineup = _lineup_label(agent.get("lineup"))
             prefix = f"  {rank}. " if rank else "  - "
-            lines.append(f"{prefix}{label}｜{stage}｜{reason}")
+            lineup_text = f"｜{lineup}" if lineup else ""
+            lines.append(f"{prefix}{label}{lineup_text}｜{stage}｜{reason}")
+
+    if state.get("lineups"):
+        lines.extend(_format_lineup_state_lines(state["lineups"], prefix="- 当前"))
 
     if state.get("recommendation_summary"):
         lines.append(f"- 当前组合总结：{state['recommendation_summary']}")
+
+    lineup_context_text = _format_lineup_context_for_message(lineup_context)
+
+    if lineup_context_text:
+        lines.extend(["", lineup_context_text])
 
     lines.extend(
         [
@@ -564,6 +640,7 @@ def build_user_state_system_context(user_state):
             "6. 只有用户明确同时要求修改路径和智能体组合时，才可以同时更新 KG_PATH 与 RECOMMENDED_AGENTS。",
             "7. 如果当前状态为空、没有可沿用的知识路径，或用户提出新的完整需求，就按完整流程正常规划路径和推荐组合。",
             "8. 凡输出 RECOMMENDED_AGENTS，都必须继续输出 SUMMARY。",
+            "9. 凡输出 RECOMMENDED_AGENTS，每个 AGENT 都必须包含 LINEUP，字段顺序为 RANK、AGENT_NAME、LINEUP、STAGE、REASON。",
         ]
     )
 
@@ -587,9 +664,14 @@ def _format_user_state_for_message(user_state):
             stage = agent.get("stage") or "未标注阶段"
             reason = agent.get("reason") or "未提供理由"
             rank = agent.get("rank") or ""
+            lineup = _lineup_label(agent.get("lineup"))
             prefix = f"{rank}. " if rank else "- "
-            agent_lines.append(f"{prefix}{label}｜{stage}｜{reason}")
+            lineup_text = f"｜{lineup}" if lineup else ""
+            agent_lines.append(f"{prefix}{label}{lineup_text}｜{stage}｜{reason}")
         parts.append("已推荐智能体组合：\n" + "\n".join(agent_lines))
+
+    if state.get("lineups"):
+        parts.append("当前阵容分组：\n" + "\n".join(_format_lineup_state_lines(state["lineups"])))
 
     if state.get("recommendation_summary"):
         parts.append(f"组合总结：{state['recommendation_summary']}")
@@ -628,6 +710,22 @@ def _normalize_user_state(user_state):
         "agents",
     )
     recommended_agents = _normalize_state_agents(raw_agents)
+    raw_lineups = _first_present_value(
+        user_state,
+        "lineups",
+        "lineup_state",
+        "lineupState",
+        "agent_lineups",
+        "agentLineups",
+    )
+    lineups = _normalize_lineups(raw_lineups)
+
+    if not lineups and recommended_agents:
+        lineups = _build_lineups_from_agents(recommended_agents)
+
+    if lineups and not recommended_agents:
+        recommended_agents = _flatten_lineups_to_agents(lineups)
+
     recommendation_summary = _limit_text(
         _first_present_string(
             user_state,
@@ -649,6 +747,9 @@ def _normalize_user_state(user_state):
 
     if recommended_agents:
         normalized["recommended_agents"] = recommended_agents
+
+    if lineups:
+        normalized["lineups"] = lineups
 
     if recommendation_summary:
         normalized["recommendation_summary"] = recommendation_summary
@@ -692,12 +793,12 @@ def _detect_state_edit_mode(message, user_state):
         return "general"
 
     has_path_state = bool(user_state.get("knowledge_path") or user_state.get("knowledge_path_nodes"))
-    has_agent_state = bool(user_state.get("recommended_agents"))
+    has_agent_state = bool(user_state.get("recommended_agents") or user_state.get("lineups"))
     path_signal = has_path_state and any(
         keyword in text for keyword in ("知识路径", "图谱路径", "路径", "图谱", "节点", "路线", "kg_path")
     )
     agent_signal = has_agent_state and any(
-        keyword in text for keyword in ("智能体", "组合", "推荐", "agent", "助手", "工具")
+        keyword in text for keyword in ("智能体", "组合", "推荐", "agent", "助手", "工具", "阵容", "lineup", "主力", "增长", "成交")
     )
 
     if path_signal and agent_signal:
@@ -733,6 +834,9 @@ def _normalize_state_agents(raw_agents):
         stage = _limit_text(_first_present_string(raw_agent, "stage", "STAGE"), 160)
         reason = _limit_text(_first_present_string(raw_agent, "reason", "REASON"), MAX_USER_STATE_TEXT_LENGTH)
         rank = _first_present_string(raw_agent, "rank", "RANK") or str(index)
+        lineup = _normalize_lineup_id(
+            _first_present_string(raw_agent, "lineup", "lineup_id", "lineupId", "LINEUP", "阵容")
+        )
 
         if not agent_name and not name:
             continue
@@ -751,9 +855,215 @@ def _normalize_state_agents(raw_agents):
         if reason:
             normalized_agent["reason"] = reason
 
+        if lineup:
+            normalized_agent["lineup"] = lineup
+
         normalized_agents.append(normalized_agent)
 
     return normalized_agents
+
+
+def _normalize_lineups(raw_lineups):
+    if not isinstance(raw_lineups, dict):
+        return {}
+
+    normalized = {lineup_id: [] for lineup_id in LINEUP_IDS}
+
+    for raw_key, raw_agents in raw_lineups.items():
+        lineup_id = _normalize_lineup_id(raw_key)
+
+        if not lineup_id:
+            continue
+
+        normalized[lineup_id] = _normalize_lineup_agents(raw_agents, lineup_id)
+
+    return {lineup_id: agents for lineup_id, agents in normalized.items() if agents}
+
+
+def _normalize_lineup_agents(raw_agents, lineup_id):
+    if not isinstance(raw_agents, list):
+        return []
+
+    normalized_agents = []
+
+    for index, raw_agent in enumerate(raw_agents[:MAX_USER_STATE_AGENTS], start=1):
+        if isinstance(raw_agent, dict):
+            agent_name = _limit_text(
+                _first_present_string(raw_agent, "agent_name", "agentName", "name", "AGENT_NAME", "key"),
+                120,
+            )
+            name = _limit_text(_first_present_string(raw_agent, "name"), 120)
+            stage = _limit_text(_first_present_string(raw_agent, "stage", "STAGE"), 160)
+            reason = _limit_text(_first_present_string(raw_agent, "reason", "REASON"), MAX_USER_STATE_TEXT_LENGTH)
+            rank = _first_present_string(raw_agent, "rank", "RANK") or str(index)
+        else:
+            agent_name = _limit_text(raw_agent, 120)
+            name = ""
+            stage = ""
+            reason = ""
+            rank = str(index)
+
+        if not agent_name and not name:
+            continue
+
+        normalized_agent = {
+            "lineup": lineup_id,
+            "rank": _limit_text(rank, 40),
+        }
+
+        if agent_name:
+            normalized_agent["agent_name"] = agent_name
+
+        if name and name != agent_name:
+            normalized_agent["name"] = name
+
+        if stage:
+            normalized_agent["stage"] = stage
+
+        if reason:
+            normalized_agent["reason"] = reason
+
+        normalized_agents.append(normalized_agent)
+
+    return normalized_agents
+
+
+def _build_lineups_from_agents(agents):
+    lineups = {lineup_id: [] for lineup_id in LINEUP_IDS}
+
+    for index, agent in enumerate(agents):
+        lineup_id = _normalize_lineup_id(agent.get("lineup")) or ("core" if index < 3 else "growth")
+        lineups[lineup_id].append({**agent, "lineup": lineup_id})
+
+    return {lineup_id: agents for lineup_id, agents in lineups.items() if agents}
+
+
+def _flatten_lineups_to_agents(lineups):
+    agents = []
+
+    for lineup_id in LINEUP_IDS:
+        for agent in lineups.get(lineup_id, []):
+            agents.append({**agent, "lineup": lineup_id})
+
+    return agents[:MAX_USER_STATE_AGENTS]
+
+
+def _normalize_lineup_context(lineup_context, user_state, message=None):
+    raw_context = lineup_context if isinstance(lineup_context, dict) else {}
+    state = _normalize_user_state(user_state)
+    raw_lineups = _first_present_value(
+        raw_context,
+        "lineups",
+        "lineup_state",
+        "lineupState",
+        "agent_lineups",
+        "agentLineups",
+    )
+    context_lineups = _normalize_lineups(raw_lineups)
+
+    if not context_lineups:
+        context_lineups = _normalize_lineups(raw_context)
+
+    requested_lineup = _normalize_lineup_id(
+        _first_present_string(
+            raw_context,
+            "requested_lineup",
+            "requestedLineup",
+            "target_lineup",
+            "targetLineup",
+            "lineup",
+        )
+    )
+    requested_lineup = requested_lineup or _detect_requested_lineup(message)
+
+    normalized = {
+        "available_lineups": [{"id": lineup_id, "label": LINEUP_LABELS[lineup_id]} for lineup_id in LINEUP_IDS],
+        "lineups": context_lineups or state.get("lineups", {}),
+    }
+
+    if requested_lineup:
+        normalized["requested_lineup"] = requested_lineup
+
+    return normalized
+
+
+def _format_lineup_context_for_message(lineup_context):
+    if not isinstance(lineup_context, dict):
+        return ""
+
+    lines = [
+        "阵容参数：",
+        "- 可用阵容：core=主力阵容；growth=增长阵容；conversion=成交阵容。",
+    ]
+    requested_lineup = _normalize_lineup_id(lineup_context.get("requested_lineup"))
+
+    if requested_lineup:
+        lines.append(f"- 本轮目标阵容：{LINEUP_LABELS[requested_lineup]}（{requested_lineup}）。")
+
+    lineups = _normalize_lineups(lineup_context.get("lineups"))
+
+    if lineups:
+        lines.extend(_format_lineup_state_lines(lineups, prefix="- 当前"))
+
+    lines.append("- 推荐智能体时，每个 <AGENT> 必须包含 <LINEUP>core|growth|conversion</LINEUP>，并放在 <AGENT_NAME> 之后。")
+    lines.append("- 如果用户指定某个阵容，只推荐并标记到该阵容；不要把结果混入其他阵容。")
+
+    return "\n".join(lines)
+
+
+def _format_lineup_state_lines(lineups, prefix=""):
+    if not isinstance(lineups, dict):
+        return []
+
+    lines = []
+
+    for lineup_id in LINEUP_IDS:
+        agents = lineups.get(lineup_id) or []
+        names = [
+            agent.get("agent_name") or agent.get("name")
+            for agent in agents
+            if isinstance(agent, dict) and (agent.get("agent_name") or agent.get("name"))
+        ]
+        names_text = "、".join(names[:MAX_USER_STATE_AGENTS]) if names else "空"
+        lines.append(f"{prefix}{LINEUP_LABELS[lineup_id]}：{names_text}")
+
+    return lines
+
+
+def _lineup_label(lineup_id):
+    normalized = _normalize_lineup_id(lineup_id)
+    return LINEUP_LABELS.get(normalized, "")
+
+
+def _normalize_lineup_id(value):
+    text = _normalize_optional_string(value)
+
+    if not text:
+        return ""
+
+    compact = "".join(text.lower().split()).strip("：:")
+
+    if compact in LINEUP_ALIASES:
+        return LINEUP_ALIASES[compact]
+
+    for keyword, lineup_id in LINEUP_ALIASES.items():
+        if keyword and keyword in compact:
+            return lineup_id
+
+    return ""
+
+
+def _detect_requested_lineup(message):
+    text = _normalize_optional_string(message).lower()
+
+    if not text:
+        return ""
+
+    for lineup_id, keywords in LINEUP_INTENT_KEYWORDS:
+        if any(keyword.lower() in text for keyword in keywords):
+            return lineup_id
+
+    return ""
 
 
 def _first_present_value(payload, *keys):

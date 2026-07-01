@@ -148,6 +148,21 @@ export function getAgentLaunchTargets(agents: EnrichedDrawAgent[]): AgentLaunchT
     });
 }
 
+export function getCatalogHeroAgents(): EnrichedDrawAgent[] {
+  return catalogAgents.map((agent, index) =>
+    enrichDrawAgent({
+      ...agent,
+      agent_index: index,
+      agent_key: agent.agentKey,
+      agent_name: agent.name,
+      endpoint: agent.endpoint,
+      reason: agent.role,
+      stage: agent.functionLabel || agent.typeLabel,
+      streamStatus: 'completed',
+    }),
+  );
+}
+
 export function openAgentLaunchTargets(launchTargets: AgentLaunchTarget[]) {
   const targets = normalizeLaunchTargets(launchTargets);
 

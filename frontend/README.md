@@ -1,21 +1,38 @@
-# JARVIS Voice Particle Frontend
+# Voice Particle JARVIS
 
-This is the primary Agent Workshop frontend. It is a Vite + React + TypeScript + Three.js app for a JARVIS-like AI dialogue surface.
+A standalone Vite + React + Three.js prototype for a JARVIS-like AI dialogue surface.
 
-The first screen is the actual product experience: a central particle crystal, orbital particle streams, voice/text input, browser speech output, streaming agent responses, graph focus actions, and agent recommendation cards.
+The first screen is the actual experience: a central 3D particle orb, natural density rings, voice/text input, server/browser speech output, and a placeholder model endpoint for later integration.
+
+## What It Tests
+
+- A stable 3D particle orb that feels like an AI presence instead of a generic visualizer.
+- A natural orbital particle stream where brightness comes from particle density and lighting rather than hard white lines.
+- Voice input through the browser Web Speech API.
+- Microphone energy driving particle pulse, radius, brightness, and point size.
+- Server `/api/tts/speech` output first, with browser `speechSynthesis` fallback tuned toward a mature English male voice when the OS/browser provides a matching voice.
+- A one-click voice preview control in the bottom hint row, useful for testing the current voice profile without waiting for a model reply.
+- A blank AI model slot through `VITE_AI_CHAT_ENDPOINT`, with local English placeholder replies as the fallback.
+- A stable orb that keeps its main form; voice output drives whole-orb breathing, brightness, and particle size instead of ending in a small-sphere recomposition.
 
 ## Run
 
 ```powershell
 npm install
-npm run dev -- --host 127.0.0.1 --port 5188
+npm run dev -- --host 127.0.0.1 --port 5178
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:5188/
+http://127.0.0.1:5178/
 ```
+
+## Runtime Defaults
+
+The committed `.env` is intentional for this private prototype. It keeps Vite proxying `/api` to the shared Agent Workshop API and keeps speech output in `auto` mode, so the app requests `/api/tts/speech` first and falls back to browser `speechSynthesis` or a local comms tone when backend audio is unavailable.
+
+Use `.env.local` for machine-specific overrides. For example, set `VITE_TTS_BROWSER_FALLBACK=browser` only when you want to skip backend audio synthesis entirely.
 
 ## Build
 
@@ -25,30 +42,20 @@ npm run build
 
 Vite may warn that the Three.js chunk is larger than 500 kB. That is expected for this prototype.
 
-## API Proxy
-
-Development mode uses `vite.config.ts`.
-
-- `/api/tts/*` proxies to `TTS_PROXY_TARGET`, defaulting to `http://127.0.0.1:5000`.
-- Other `/api/*` requests proxy to `API_PROXY_BASE_URL`, `VITE_AGENT_API_BASE_URL`, `VITE_API_BASE_URL`, or the default local backend at `http://127.0.0.1:5000`.
-
-Useful switches:
-
-```text
-VITE_AGENT_STREAM_ENABLED=false
-VITE_TTS_BROWSER_FALLBACK=auto
-```
-
 ## Voice Notes
 
-- Voice recognition depends on browser support and page security.
-- Local development should use `http://127.0.0.1:5188/` or `http://localhost:5188/`.
-- Recommended browsers are Chrome or Edge on desktop.
-- The first voice interaction requires microphone permission.
-- If server TTS fails, the UI falls back to browser `speechSynthesis`.
+The app scores available English voices and prefers mature male-leaning candidates such as `Microsoft George`, `Google UK English Male`, `Daniel`, `George`, `Guy`, `David`, `Mark`, `Ryan`, `William`, `Brian`, or `Alex`. It avoids common female voice names when possible, then lowers pitch and slows the speech rate to create a steadier AI-butler feel.
 
-## Agent Notes
+Voice quality still depends on the user's OS and browser voice packs. If no matching voice is available, the app falls back to the browser's default English voice.
 
-- Streaming integration lives in `src/lib/agentStreamClient.ts` and `src/lib/aiClient.ts`.
-- Recommended-agent card enrichment uses `data/source_agents_full.json` and `src/assets/agent-avatars`.
-- Graph focus actions are treated as visual controls for the JARVIS particle scene, not as a separate black-gold frontend.
+Click the bottom `Preview voice profile` control to trigger a short spoken line and confirm the browser is allowing speech output. During speech, the whole particle orb pulses with simulated output energy and speech boundary events.
+
+## Model Endpoint
+
+Leave the model slot empty for local demo mode, or provide an endpoint with:
+
+```text
+VITE_AI_CHAT_ENDPOINT=https://your-endpoint.example/chat
+```
+
+The endpoint integration lives in `src/lib/aiClient.ts`.

@@ -1,15 +1,99 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Bot, Keyboard, Mic, MicOff, Send, Sparkles } from 'lucide-react';
-import AgentDialoguePanel from './components/AgentDialoguePanel';
-import AgentDrawOverlay from './components/AgentDrawOverlay';
-import ParticleWordmark from './components/ParticleWordmark';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { Activity, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
 import ParticleField from './components/ParticleField';
+import { AgentConsole, type InputMode } from './features/agentConsole/AgentConsole';
+import { getRecommendedAgentKey } from './features/agents/agentUtils';
+import { AgentHeroHall } from './features/heroHall/AgentHeroHall';
+import {
+  createHeroHallLineups,
+  createHeroHallLineupsFromAgents,
+  detectRequestedLineupFromText,
+  getCatalogAgentsForLineup,
+  getHeroHallAgentKey,
+  getLineupIntentFromEvent,
+  getRecommendedAgentLineup,
+  mergeHeroHallLineups,
+  type HeroHallLineupId,
+  type HeroHallLineupsState,
+} from './features/heroHall/heroHallModel';
+import {
+  cancelSpeechPlayback,
+  extractWakeCommand,
+  getTtsMode,
+  isFallbackableTtsError,
+  primeSpeechOutput,
+  requestTtsAudio,
+  speak,
+  type SpeechOutputOptions,
+  wantsSleep,
+} from './features/speech/speechOutput';
+import { WorkflowDock } from './features/workflow/WorkflowDock';
+import {
+  PATH_MATCH_ANIMATION_MS,
+  RECOMMENDATION_DOCK_REVEAL_MS,
+  SPEECH_SEGMENT_WAIT_MS,
+  appendWorkflowContent,
+  buildAgentReplyText,
+  buildHeroHallLineupUserState,
+  cleanSpeechText,
+  createAgentTurn,
+  createClientConversationIds,
+  createEmptyAgentWorkflow,
+  createEmptyWorkflowRevealState,
+  ensureClientConversationIds,
+  extractAckSpeechText,
+  formatWorkflowError,
+  getActionFromRoute,
+  getCompletedSpeechSegment,
+  getLatestAgentUserState,
+  getLatestDisplayableRecommendedAgents,
+  getLatestRecommendationSummary,
+  getLatestRouteSegments,
+  getRevealForSpeechSegment,
+  getSpeechTextForSegment,
+  getTextKeyForSpeechSegment,
+  getVisibleWorkflow,
+  getWorkflowSection,
+  mergeAgentUserState,
+  mergeConversationIdsFromEvent,
+  replaceRecommendedAgents,
+  setWorkflowGraphPath,
+  setWorkflowLineupIntent,
+  updateTurnById,
+  upsertRecommendedAgent,
+  wait,
+  type AgentConversationIds,
+  type PreloadedSpeechAsset,
+  type SpeechSegmentKey,
+  type SubmitMessageOptions,
+  type WorkflowHighlight,
+  type WorkflowRevealState,
+  type WorkflowTextKey,
+  type WorkflowTextOverrides,
+} from './features/workflow/workflowModel';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
-import { API_BASE_URL } from './lib/agentStreamClient';
+import { streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
-import type { AgentAction, Message, ParticleSettings, RecommendedAgent, ReplySource } from './types';
+import type {
+  AgentAction,
+  AgentGraphPath,
+  AgentStatus,
+  AgentTurn,
+  AgentWorkflow,
+  Message,
+  ParticleSettings,
+  RecommendedAgent,
+  ReplySource,
+} from './types';
 import './App.css';
 
 const baseSettings: ParticleSettings = {
@@ -18,10 +102,6 @@ const baseSettings: ParticleSettings = {
   pulseSeed: 0,
 };
 
-const TTS_SPEECH_URL = `${API_BASE_URL}/tts/speech`;
-
-type InputMode = 'voice' | 'text';
-
 const demoGraphAction: AgentAction = {
   confidence: 1,
   label: 'knowledge graph preview',
@@ -29,503 +109,158 @@ const demoGraphAction: AgentAction = {
   type: 'focus_graph_path',
 };
 
-const demoRecommendedAgents: RecommendedAgent[] = [
-  {
-    agent_index: 0,
-    agent_name: '路径规划智能体',
-    reason: '把自然语言任务拆成知识图谱路径和控制动作。',
-    score: 96,
-    stage: 'LOCAL PREVIEW',
-    streamStatus: 'completed',
-  },
-  {
-    agent_index: 1,
-    agent_name: '知识图谱导航员',
-    reason: '负责节点聚焦、边高亮和局部放大视角。',
-    score: 92,
-    stage: 'LOCAL PREVIEW',
-    streamStatus: 'completed',
-  },
-  {
-    agent_index: 2,
-    agent_name: '业务标签分析师',
-    reason: '补全标签、语义分类和下一步建议。',
-    score: 88,
-    stage: 'LOCAL PREVIEW',
-    streamStatus: 'completed',
-  },
-];
-
-const preferredVoiceHints = [
-  'microsoft george online natural',
-  'microsoft brian online natural',
-  'microsoft guy online natural',
-  'microsoft ryan online natural',
-  'microsoft andrew online natural',
-  'microsoft george',
-  'google uk english male',
-  'daniel',
-  'george',
-  'microsoft brian',
-  'microsoft guy',
-  'microsoft david',
-  'microsoft mark',
-  'microsoft ryan',
-  'microsoft andrew',
-  'microsoft william',
-  'alex',
-  'english male',
-  'uk english male',
-  'us english male',
-];
-
-const matureMaleVoiceHints = [
-  'male',
-  'guy',
-  'george',
-  'david',
-  'mark',
-  'daniel',
-  'brian',
-  'ryan',
-  'william',
-  'andrew',
-  'roger',
-  'james',
-];
-
-const avoidedVoiceHints = ['zira', 'hazel', 'susan', 'zira desktop', 'female', 'aria', 'jenny', 'emma', 'samantha'];
-const preferredChineseVoiceHints = [
-  'microsoft yunyang',
-  'microsoft yunjian',
-  'microsoft yunxi',
-  'yunyang',
-  'yunjian',
-  'yunxi',
-  'kangkang',
-  'huihui',
-  'chinese',
-];
-type SpeechCallbacks = {
-  onEnd?: () => void;
-  onError?: (reason: string) => void;
-  onPulse?: () => void;
-  onStart?: () => void;
+type HelmetIntelState = {
+  channel: string;
+  copy: string;
+  id: string;
+  metaLeft: string;
+  metaRight: string;
+  tone: 'active' | 'nominal' | 'warning';
 };
 
-type SpeechOutputOptions = {
-  audioBlob?: Blob;
-  displayText?: string;
-  resumeListening?: boolean;
-};
-
-let speechOutputUnlocked = false;
-let activeSpeechAudio: HTMLAudioElement | null = null;
-let activeSpeechObjectUrl = '';
-let serverTtsUnavailable = false;
-
-class TtsRequestError extends Error {
-  fallbackToBrowser: boolean;
-
-  constructor(message: string, fallbackToBrowser = false) {
-    super(message);
-    this.name = 'TtsRequestError';
-    this.fallbackToBrowser = fallbackToBrowser;
-  }
-}
-
-function wantsSleep(raw: string) {
-  const lowered = raw.trim().toLowerCase();
-
-  if (/\u9000\u4e0b|\u5f85\u547d|\u505c\u6b62\u76d1\u542c|\u505c\u4e0b|\u4f11\u7720|\u5173\u95ed\u8bed\u97f3|\u4e0d\u7528\u542c/.test(raw)) {
-    return true;
-  }
-
-  return ['stand by', 'sleep', 'stop listening', '退下', '待命', '停止监听', '休眠'].some((keyword) =>
-    lowered.includes(keyword),
-  );
-}
-
-function voiceScore(voice: SpeechSynthesisVoice, language: ConversationLanguage) {
-  const name = voice.name.toLowerCase();
-  const lang = voice.lang.toLowerCase();
-
-  if (isChineseLanguage(language)) {
-    if (!lang.startsWith('zh') && !name.includes('chinese')) {
-      return -100;
-    }
-
-    const preferredIndex = preferredChineseVoiceHints.findIndex((hint) => name.includes(hint));
-    const preferredScore = preferredIndex >= 0 ? 120 - preferredIndex * 5 : 0;
-    const maleScore = ['yunyang', 'yunjian', 'yunxi', 'kangkang'].some((hint) => name.includes(hint)) ? 34 : 0;
-    const naturalScore = name.includes('natural') ? 20 : name.includes('online') ? 12 : 0;
-    const mandarinScore = lang.includes('cn') || lang.includes('hans') ? 24 : lang.startsWith('zh') ? 12 : 0;
-
-    return preferredScore + maleScore + naturalScore + mandarinScore;
-  }
-
-  if (!lang.startsWith('en')) {
-    return -100;
-  }
-
-  if (avoidedVoiceHints.some((hint) => name.includes(hint))) {
-    return -30;
-  }
-
-  const preferredIndex = preferredVoiceHints.findIndex((hint) => name.includes(hint));
-  const preferredScore = preferredIndex >= 0 ? 120 - preferredIndex * 4 : 0;
-  const maleScore = matureMaleVoiceHints.some((hint) => name.includes(hint)) ? 28 : 0;
-  const naturalScore = name.includes('natural') ? 18 : name.includes('online') ? 10 : 0;
-  const accentScore = lang === 'en-gb' ? 30 : lang.startsWith('en-gb') ? 26 : lang.startsWith('en-us') ? 10 : 4;
-  const localScore = voice.localService ? 3 : 0;
-
-  return preferredScore + maleScore + naturalScore + accentScore + localScore;
-}
-
-function selectVoiceForLanguage(language: ConversationLanguage) {
-  const voices = window.speechSynthesis.getVoices();
-
-  return voices
-    .filter((voice) => voiceScore(voice, language) > 0)
-    .sort((left, right) => voiceScore(right, language) - voiceScore(left, language))[0] ?? null;
-}
-
-function polishSpokenLine(text: string) {
-  return text
-    .replace(/\s+/g, ' ')
-    .replace(/\bAI\b/g, 'A.I.')
-    .replace(/\bendpoint\b/gi, 'end point')
-    .replace(/\bJARVIS\b/g, 'Jarvis')
-    .replace(/([.!?])\s+/g, '$1 ')
-    .trim();
-}
-
-function primeSpeechOutput() {
-  if (!('speechSynthesis' in window)) {
-    return;
-  }
-
-  window.speechSynthesis.getVoices();
-  window.speechSynthesis.resume();
-}
-
-function unlockSpeechOutput() {
-  if (speechOutputUnlocked || !('speechSynthesis' in window)) {
-    return;
-  }
-
-  primeSpeechOutput();
-
-  const utterance = new SpeechSynthesisUtterance(' ');
-  utterance.volume = 0;
-  utterance.rate = 1;
-  utterance.onend = () => {
-    speechOutputUnlocked = true;
-  };
-  utterance.onerror = () => {
-    speechOutputUnlocked = false;
-  };
-
-  speechOutputUnlocked = true;
-  window.speechSynthesis.speak(utterance);
-}
-
-function getTtsMode() {
-  const rawMode = String(import.meta.env.VITE_TTS_BROWSER_FALLBACK ?? 'auto')
-    .trim()
-    .toLowerCase();
-
-  if (['1', 'true', 'browser'].includes(rawMode)) {
-    return 'browser';
-  }
-
-  if (['0', 'false', 'server'].includes(rawMode)) {
-    return 'server';
-  }
-
-  return 'auto';
-}
-
-function isFallbackableTtsError(error: unknown) {
-  if (error instanceof TtsRequestError) {
-    return error.fallbackToBrowser;
-  }
-
-  return getTtsMode() === 'auto' && error instanceof TypeError;
-}
-
-function shouldUseBrowserSpeechOnly() {
-  const ttsMode = getTtsMode();
-  return ttsMode === 'browser' || (ttsMode === 'auto' && serverTtsUnavailable);
-}
-
-function markServerTtsUnavailable(error: unknown) {
-  if (getTtsMode() === 'auto' && isFallbackableTtsError(error)) {
-    serverTtsUnavailable = true;
-  }
-}
-
-function cancelSpeechPlayback() {
-  if (activeSpeechAudio) {
-    activeSpeechAudio.pause();
-    activeSpeechAudio.removeAttribute('src');
-    activeSpeechAudio.load();
-    activeSpeechAudio = null;
-  }
-
-  if (activeSpeechObjectUrl) {
-    URL.revokeObjectURL(activeSpeechObjectUrl);
-    activeSpeechObjectUrl = '';
-  }
-}
-
-async function requestTtsAudio(text: string) {
-  if (shouldUseBrowserSpeechOnly()) {
-    throw new TtsRequestError('Browser speech fallback is active.', true);
-  }
-
-  try {
-    const response = await fetch(TTS_SPEECH_URL, {
-      body: JSON.stringify({ mood: 'neutral', text }),
-      headers: {
-        'content-type': 'application/json',
-      },
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      throw await formatTtsResponseError(response);
-    }
-
-    const audio = await response.blob();
-
-    if (!audio.size) {
-      throw new Error('TTS interface returned empty audio.');
-    }
-
-    return audio;
-  } catch (error) {
-    markServerTtsUnavailable(error);
-    throw error;
-  }
-}
-
-async function formatTtsResponseError(response: Response) {
-  const payload = await response.json().catch(() => null);
-  let message = `TTS interface failed: ${response.status}`;
-
-  if (typeof payload?.detail === 'string') {
-    message = payload.detail;
-  } else if (typeof payload?.error === 'string') {
-    message = payload.error;
-  }
-
-  const normalizedMessage = message.toLowerCase();
-  const fallbackToBrowser =
-    getTtsMode() === 'auto' &&
-    (response.status >= 500 ||
-      normalizedMessage.includes('tts is not configured') ||
-      normalizedMessage.includes('local tts is not configured') ||
-      normalizedMessage.includes('tts_provider'));
-
-  return new TtsRequestError(message, fallbackToBrowser);
-}
-
-async function playTtsSpeech(text: string, callbacks: SpeechCallbacks, preparedAudio?: Blob) {
-  cancelSpeechPlayback();
-
-  let pulseTimer: number | null = null;
-  let started = false;
-  const clearPulseTimer = () => {
-    if (pulseTimer !== null) {
-      window.clearInterval(pulseTimer);
-      pulseTimer = null;
-    }
-  };
-  const finish = () => {
-    clearPulseTimer();
-    cancelSpeechPlayback();
-    callbacks.onEnd?.();
-  };
-
-  try {
-    const audioBlob = preparedAudio || (await requestTtsAudio(text));
-    const objectUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(objectUrl);
-
-    activeSpeechAudio = audio;
-    activeSpeechObjectUrl = objectUrl;
-    audio.preload = 'auto';
-    audio.onplaying = () => {
-      if (started) {
-        return;
-      }
-
-      started = true;
-      callbacks.onStart?.();
-      callbacks.onPulse?.();
-      pulseTimer = window.setInterval(() => callbacks.onPulse?.(), 360);
-    };
-    audio.onended = finish;
-    audio.onerror = () => {
-      clearPulseTimer();
-      cancelSpeechPlayback();
-      callbacks.onError?.('TTS audio playback failed.');
-      callbacks.onEnd?.();
-    };
-
-    await audio.play();
-  } catch (error) {
-    clearPulseTimer();
-    cancelSpeechPlayback();
-
-    if (isFallbackableTtsError(error)) {
-      markServerTtsUnavailable(error);
-      playBrowserSpeech(text, callbacks);
-      return;
-    }
-
-    callbacks.onError?.(error instanceof Error ? error.message : 'TTS interface failed.');
-    callbacks.onEnd?.();
-  }
-}
-
-function speakNow(text: string, callbacks: SpeechCallbacks) {
-  const language = detectConversationLanguage(text);
-  const voice = selectVoiceForLanguage(language);
-  const utterance = new SpeechSynthesisUtterance(polishSpokenLine(text));
-
-  utterance.lang = voice?.lang ?? (isChineseLanguage(language) ? 'zh-CN' : 'en-GB');
-  utterance.rate = isChineseLanguage(language) ? 0.96 : 0.9;
-  utterance.pitch = isChineseLanguage(language) ? 0.56 : 0.42;
-  utterance.volume = 1;
-
-  if (voice) {
-    utterance.voice = voice;
-  }
-
-  let resumeTimer: number | null = null;
-  const stopResumeTimer = () => {
-    if (resumeTimer !== null) {
-      window.clearInterval(resumeTimer);
-      resumeTimer = null;
-    }
-  };
-
-  utterance.onstart = () => callbacks.onStart?.();
-  utterance.onboundary = () => callbacks.onPulse?.();
-  utterance.onend = () => {
-    stopResumeTimer();
-    callbacks.onEnd?.();
-  };
-  utterance.onerror = (event) => {
-    stopResumeTimer();
-    const reason = event.error || 'Speech synthesis failed.';
-    if (reason !== 'not-allowed' && reason !== 'interrupted' && reason !== 'canceled') {
-      console.warn(reason);
-    }
-    callbacks.onError?.(reason);
-    callbacks.onEnd?.();
-  };
-
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.resume();
-  window.speechSynthesis.speak(utterance);
-  window.setTimeout(() => window.speechSynthesis.resume(), 120);
-  resumeTimer = window.setInterval(() => {
-    if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-      stopResumeTimer();
-      return;
-    }
-
-    window.speechSynthesis.resume();
-  }, 300);
-  window.setTimeout(stopResumeTimer, 12000);
-}
-
-function playBrowserSpeech(text: string, callbacks: SpeechCallbacks = {}) {
-  if (!('speechSynthesis' in window)) {
-    callbacks.onError?.('Speech synthesis is not available in this browser.');
-    return false;
-  }
-
-  primeSpeechOutput();
-
-  if (window.speechSynthesis.getVoices().length > 0) {
-    speakNow(text, callbacks);
-    return true;
-  }
-
-  let didSpeak = false;
-  const speakAfterVoicesLoad = () => {
-    if (didSpeak) {
-      return;
-    }
-
-    didSpeak = true;
-    window.speechSynthesis.removeEventListener('voiceschanged', speakAfterVoicesLoad);
-    speakNow(text, callbacks);
-  };
-
-  window.speechSynthesis.addEventListener('voiceschanged', speakAfterVoicesLoad);
-  window.setTimeout(speakAfterVoicesLoad, 700);
-  return true;
-}
-
-function speak(text: string, callbacks: SpeechCallbacks = {}, preparedAudio?: Blob) {
-  const ttsMode = getTtsMode();
-
-  if (ttsMode === 'browser') {
-    return playBrowserSpeech(text, callbacks);
-  }
-
-  void playTtsSpeech(polishSpokenLine(text), callbacks, preparedAudio);
-  return true;
+function buildHelmetIntelStates({
+  graphRoute,
+  recommendedAgents,
+  status,
+  voiceAwake,
+}: {
+  graphRoute: string[];
+  recommendedAgents: RecommendedAgent[];
+  status: AgentStatus;
+  voiceAwake: boolean;
+}): HelmetIntelState[] {
+  const focusNode = graphRoute.at(-1) || '启动舱';
+  const routeTrail = graphRoute.length > 1 ? graphRoute.slice(-3).join(' > ') : '母节点 > 行业环 > 任务外圈';
+  const detectedAgents = recommendedAgents
+    .map((agent) => String(agent.agent_name || agent.name || agent.stage || '').trim())
+    .filter((label) => label.length > 0)
+    .slice(0, 3);
+  const detectedTopic =
+    detectedAgents.length > 0
+      ? `${detectedAgents.join(' / ')} 协同`
+      : graphRoute.length > 0
+        ? graphRoute.slice(-2).join(' / ')
+        : '行业图谱、痛点任务与智能体能力';
+  const agentLine = detectedAgents.length > 0 ? detectedAgents.join('、') : '本地候选智能体';
+  const streamingHint = status === 'streaming' ? '实时推演中' : status === 'completed' ? '推演完成' : '待命';
+
+  return [
+    {
+      channel: 'ORBIT ARRIVAL',
+      copy: `来到了中隐会图谱星球 · ${focusNode}。轨道入口已打开，正在读取母节点、行业环与外圈任务信号。`,
+      id: 'orbit-arrival',
+      metaLeft: 'ZHONGYINHUI ORBIT',
+      metaRight: 'GRAPH PLANET',
+      tone: 'active',
+    },
+    {
+      channel: 'MECH STATUS',
+      copy: `机甲状态：反应堆 97%，头盔 HUD 在线，外骨骼边缘装甲锁定。左下控制台保持低功耗待命。`,
+      id: 'mech-status',
+      metaLeft: 'ARMOR TELEMETRY',
+      metaRight: voiceAwake ? 'PILOT LINKED' : 'STANDBY',
+      tone: voiceAwake ? 'active' : 'nominal',
+    },
+    {
+      channel: 'COSMIC WEATHER',
+      copy: `宇宙信息：蓝金粒子潮汐稳定，图谱星尘密度上升。当前窗口适合展开关系扫描和路径生成。`,
+      id: 'cosmic-weather',
+      metaLeft: 'DEEP SPACE DATA',
+      metaRight: 'PARTICLE TIDE',
+      tone: 'nominal',
+    },
+    {
+      channel: 'GRAPH SCAN',
+      copy: `图谱扫描：${routeTrail}。当前焦点落在「${focusNode}」，正在估计可触发的痛点、任务和智能体能力。`,
+      id: 'graph-scan',
+      metaLeft: 'LOCAL GRAPH',
+      metaRight: graphRoute.length > 0 ? 'PATH LOCK' : 'SEEKING',
+      tone: graphRoute.length > 0 ? 'active' : 'nominal',
+    },
+    {
+      channel: 'SCRIPT RADAR',
+      copy: `话术雷达：检测到 ${detectedTopic} 相关话术。建议优先输出场景切入、痛点确认、方案承接三段式表达。`,
+      id: 'script-radar',
+      metaLeft: 'SCRIPT TRACE',
+      metaRight: streamingHint.toUpperCase(),
+      tone: status === 'streaming' ? 'active' : 'nominal',
+    },
+    {
+      channel: 'COMMS LINK',
+      copy: `通信链路：${voiceAwake ? '语音链路已接入，座舱正在监听驾驶员指令。' : '语音链路待命，可通过 Jarvis 唤醒。'}文本链路保持同步，随时可以进入智能体推荐。`,
+      id: 'comms-link',
+      metaLeft: 'ARMOR COMMS',
+      metaRight: voiceAwake ? 'VOICE READY' : 'LOCAL INTEL',
+      tone: voiceAwake ? 'active' : 'nominal',
+    },
+    {
+      channel: 'AGENT ARRAY',
+      copy: `智能体阵列：${agentLine} 已进入候选序列。系统会根据图谱节点继续匹配增长、成交和主力阵容。`,
+      id: 'agent-array',
+      metaLeft: 'HERO ARRAY',
+      metaRight: recommendedAgents.length > 0 ? `${recommendedAgents.length} AGENTS` : 'SCANNING',
+      tone: recommendedAgents.length > 0 ? 'active' : 'nominal',
+    },
+    {
+      channel: 'RISK RADAR',
+      copy: status === 'error'
+        ? '风险雷达：外部链路异常，已切换本地估计话术和缓存路径。建议重新发送指令或保持当前图谱焦点。'
+        : '风险雷达：未发现阻断信号。当前路径可继续推进，建议保留父级锚点并逐层点亮下一圈节点。',
+      id: 'risk-radar',
+      metaLeft: 'THREAT MODEL',
+      metaRight: status === 'error' ? 'LINK ALERT' : 'CLEAR',
+      tone: status === 'error' ? 'warning' : 'nominal',
+    },
+  ];
 }
 
 export default function App() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const demoGraphEnabled = searchParams.has('demoGraph');
-  const demoRecommendEnabled = searchParams.has('demoRecommend');
-  const demoSpeakingEnabled = searchParams.has('demoSpeaking');
-  const agentUiVisible = searchParams.has('agentUi') || searchParams.has('debugAgent');
+  const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
+  const speechCaptionTimerRef = useRef<number | null>(null);
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
   const speechSessionRef = useRef(0);
-  const drawSettleTimerRef = useRef<number | null>(null);
   const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
-  const micLevelRef = useRef<{ stop: () => void } | null>(null);
+  const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
   const lastSpeechPulseAtRef = useRef(0);
+  const agentRequestRef = useRef<AbortController | null>(null);
+  const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
+  const lastHeroHallAutoKeyRef = useRef('');
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
-  const [replySource, setReplySource] = useState<ReplySource>('local-mock');
+  const [, setReplySource] = useState<ReplySource>('local-mock');
+  const [, setConversationIdsVersion] = useState(0);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+  const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
+  const [heroHallOpen, setHeroHallOpen] = useState(false);
+  const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
+  const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
+  const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
+  const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
+  const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
+  const [draft, setDraft] = useState('');
+  const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [interfaceLanguage, setInterfaceLanguage] = useState<ConversationLanguage>('zh-CN');
   const [lastAction, setLastAction] = useState<AgentAction | null>(demoGraphEnabled ? demoGraphAction : null);
   const [lastHeard, setLastHeard] = useState('');
   const [manualVoiceSession, setManualVoiceSession] = useState(false);
   const recognitionLanguage: ConversationLanguage = 'zh-CN';
   const [currentSpeechText, setCurrentSpeechText] = useState('');
-  const [agentLiveText, setAgentLiveText] = useState('');
-  const [drawActive, setDrawActive] = useState(false);
-  const [drawAgents, setDrawAgents] = useState<RecommendedAgent[]>([]);
-  const [latestRecommendedAgents, setLatestRecommendedAgents] = useState<RecommendedAgent[]>([]);
-  const [drawPulseKey, setDrawPulseKey] = useState(0);
-  const [drawReplyText, setDrawReplyText] = useState('');
-  const [draft, setDraft] = useState('');
-  const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [speechError, setSpeechError] = useState('');
   const [voiceAwake, setVoiceAwake] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
 
-  useEffect(() => {
-    if (!demoSpeakingEnabled) {
+  const rememberConversationIds = useCallback((event: AgentStreamEvent) => {
+    const nextConversationIds = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
+
+    if (nextConversationIds === agentConversationIdsRef.current) {
       return;
     }
 
-    setCurrentSpeechText('Particle voice preview online.');
-    setSettings((current) => ({ ...current, energy: 1, mode: 'speaking', pulseSeed: current.pulseSeed + 1 }));
-  }, [demoSpeakingEnabled]);
+    agentConversationIdsRef.current = nextConversationIds;
+    setConversationIdsVersion((version) => version + 1);
+  }, []);
 
   const clearSpeechEndTimer = useCallback(() => {
     if (speechEndTimerRef.current !== null) {
@@ -534,27 +269,45 @@ export default function App() {
     }
   }, []);
 
-  const clearDrawSettleTimer = useCallback(() => {
-    if (drawSettleTimerRef.current !== null) {
-      window.clearTimeout(drawSettleTimerRef.current);
-      drawSettleTimerRef.current = null;
+  const clearSpeechCaptionTimer = useCallback(() => {
+    if (speechCaptionTimerRef.current !== null) {
+      window.clearTimeout(speechCaptionTimerRef.current);
+      speechCaptionTimerRef.current = null;
     }
   }, []);
 
-  const showAgentDraw = useCallback(
-    (agents: RecommendedAgent[] | undefined, replyText: string) => {
-      if (!agents || agents.length === 0) {
+  const startSpeechCaption = useCallback(
+    (displayText: string, speechSessionId: number) => {
+      clearSpeechCaptionTimer();
+      setCurrentSpeechText('');
+
+      const normalizedDisplayText = displayText.trim();
+
+      if (!normalizedDisplayText) {
         return;
       }
 
-      clearDrawSettleTimer();
-      setDrawAgents(agents);
-      setDrawReplyText(replyText);
-      setDrawActive(true);
-      setDrawPulseKey((current) => current + 1);
-      drawSettleTimerRef.current = window.setTimeout(() => setDrawActive(false), 1200);
+      const chunkSize = normalizedDisplayText.length > 150 ? 5 : normalizedDisplayText.length > 72 ? 4 : 3;
+      let cursor = 0;
+
+      const tick = () => {
+        if (speechSessionId !== speechSessionRef.current) {
+          return;
+        }
+
+        cursor = Math.min(normalizedDisplayText.length, cursor + chunkSize);
+        setCurrentSpeechText(normalizedDisplayText.slice(0, cursor));
+
+        if (cursor < normalizedDisplayText.length) {
+          speechCaptionTimerRef.current = window.setTimeout(tick, 26);
+        } else {
+          speechCaptionTimerRef.current = null;
+        }
+      };
+
+      tick();
     },
-    [clearDrawSettleTimer],
+    [clearSpeechCaptionTimer],
   );
 
   const beginSpeechOutput = useCallback(() => {
@@ -577,10 +330,11 @@ export default function App() {
 
   const finishSpeechOutput = useCallback(() => {
     clearSpeechEndTimer();
+    clearSpeechCaptionTimer();
     speechOutputActiveRef.current = false;
     setCurrentSpeechText('');
     setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
-  }, [clearSpeechEndTimer]);
+  }, [clearSpeechCaptionTimer, clearSpeechEndTimer]);
 
   const speakWithParticleOutput = useCallback(
     (text: string, options: SpeechOutputOptions = {}) => {
@@ -589,7 +343,7 @@ export default function App() {
       speechSessionRef.current = speechSessionId;
 
       setSpeechError('');
-      setCurrentSpeechText(options.displayText ?? text);
+      startSpeechCaption(options.displayText ?? text, speechSessionId);
       voiceControlRef.current?.pause();
       beginSpeechOutput();
 
@@ -602,8 +356,19 @@ export default function App() {
 
         finishSpeechOutput();
         if (shouldResumeListening) {
-          window.setTimeout(() => voiceControlRef.current?.resume(), 260);
+          setSettings((current) => ({
+            ...current,
+            energy: 0.82,
+            mode: 'listening',
+            pulseSeed: current.pulseSeed + 1,
+          }));
+          window.setTimeout(() => {
+            void micLevelRef.current?.start();
+            voiceControlRef.current?.resume();
+          }, 260);
         }
+
+        options.onSettled?.();
       };
       const finishAfterMinimum = () => {
         if (speechSessionId !== speechSessionRef.current) {
@@ -611,7 +376,7 @@ export default function App() {
         }
 
         const elapsed = performance.now() - startedAt;
-        const minimumVisualDuration = Math.min(estimatedDuration, 5200);
+        const minimumVisualDuration = options.minimumVisualDurationMs ?? Math.min(estimatedDuration, 5200);
         const remaining = Math.max(0, minimumVisualDuration - elapsed);
 
         clearSpeechEndTimer();
@@ -623,9 +388,7 @@ export default function App() {
           onEnd: finishAfterMinimum,
           onError: (reason) => {
             if (speechSessionId === speechSessionRef.current) {
-              if (reason !== 'not-allowed' && reason !== 'interrupted' && reason !== 'canceled') {
-                setSpeechError(reason);
-              }
+              setSpeechError(reason);
             }
           },
           onPulse: () => {
@@ -642,132 +405,675 @@ export default function App() {
         options.audioBlob,
       );
 
-      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration : 5200);
+      speechEndTimerRef.current = window.setTimeout(settleSpeechOutput, queued ? estimatedDuration + 30000 : 5200);
     },
-    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput],
+    [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput, startSpeechCaption],
+  );
+
+  const finishReplyWithoutSpeech = useCallback(
+    (shouldResumeListening: boolean) => {
+      clearSpeechEndTimer();
+      clearSpeechCaptionTimer();
+      speechOutputActiveRef.current = false;
+      setCurrentSpeechText('');
+      setSpeechError('');
+      setSettings((current) => ({ ...current, energy: 0.38, mode: 'idle' }));
+
+      if (shouldResumeListening) {
+        window.setTimeout(() => {
+          void micLevelRef.current?.start();
+          voiceControlRef.current?.resume();
+        }, 260);
+      }
+    },
+    [clearSpeechCaptionTimer, clearSpeechEndTimer],
   );
 
   const submitMessage = useCallback(
-    async (raw: string) => {
+    async (raw: string, options: SubmitMessageOptions = {}) => {
       const text = raw.trim();
 
       if (!text) {
         return;
       }
 
-      const now = Date.now();
-      const streamingMessageId = now + 1;
-      const nextUserMessage: Message = { id: now, speaker: 'you', text };
+      if (agentStatus === 'streaming' || agentRequestRef.current) {
+        return;
+      }
 
+      const shouldResumeListening = options.resumeListening ?? (inputMode === 'voice' && (voiceAwake || manualVoiceSession));
+      const now = Date.now();
+      const nextUserMessage: Message = { id: now, speaker: 'you', text };
+      const turnId = `turn-${now}`;
+      const controller = new AbortController();
+      const history = [...messages, nextUserMessage];
+      agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
+      const conversationIdsForRequest = { ...agentConversationIdsRef.current };
+      const latestRecommendedAgentsForState = getLatestDisplayableRecommendedAgents(agentTurns);
+      const recommendedAgentsForLineupState =
+        latestRecommendedAgentsForState.length > 0 ? latestRecommendedAgentsForState : pinnedRecommendedAgents;
+      const lineupStateForRequest = buildHeroHallLineupUserState(heroHallLineupState, recommendedAgentsForLineupState);
+      const userStateForRequest = mergeAgentUserState(getLatestAgentUserState(agentTurns), lineupStateForRequest);
+      const requestedLineupForRequest = detectRequestedLineupFromText(text);
+
+      agentRequestRef.current = controller;
+      voiceControlRef.current?.pause();
+      micLevelRef.current?.stop();
+      setDraft('');
+      setReplySource('coze-stream');
+      setAgentStatus('streaming');
+      setLastHeard('');
+      setWorkflowHighlight('none');
+      setAgentTurns((current) => [...current.slice(-9), createAgentTurn(turnId, text)]);
       setMessages((current) => [
-        ...current.slice(-3),
+        ...current.slice(-18),
         nextUserMessage,
-        { id: streamingMessageId, speaker: 'ai', text: 'Processing...' },
+        { id: now + 1, speaker: 'ai', text: 'Processing...' },
       ]);
       setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
-      setAgentLiveText(isChineseLanguage(interfaceLanguage) ? '正在等待后端响应...' : 'Waiting for the agent stream...');
+
+      let accumulatedWorkflow = setWorkflowLineupIntent(createEmptyAgentWorkflow(), requestedLineupForRequest);
+      let revealState: WorkflowRevealState = { ...createEmptyWorkflowRevealState(), knowledgeAck: true };
+      let cardsCompleted = false;
+      let routeActionReady = false;
+      let committedRouteAction: AgentAction | null = null;
+      let routeKey = '';
+      let hasSeenKnowledgePath = false;
+      let streamError = '';
+      let speechSegmentsClosed = false;
+      let playedSpeechInTurn = false;
+      let requestedLineupForResponse = requestedLineupForRequest;
+      let appliedLineupFallback = false;
+      const cardReadyWaiters: Array<(ready: boolean) => void> = [];
+      const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
+      const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
+      const speechWaiters = new Map<SpeechSegmentKey, Array<(asset: PreloadedSpeechAsset | null) => void>>();
+      const textOverrides: WorkflowTextOverrides = new Map();
+      let agentRevealCount: number | null = null;
+      const publishVisibleWorkflow = () => {
+        const visibleWorkflow = getVisibleWorkflow(accumulatedWorkflow, revealState, textOverrides, agentRevealCount);
+        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, workflow: visibleWorkflow })));
+      };
+      const commitWorkflow = (workflow: AgentWorkflow) => {
+        accumulatedWorkflow = workflow;
+        publishVisibleWorkflow();
+      };
+      const revealWorkflow = (nextReveal: Partial<WorkflowRevealState>) => {
+        revealState = { ...revealState, ...nextReveal };
+        publishVisibleWorkflow();
+      };
+      const isSpeechSegmentVisible = (segment: SpeechSegmentKey) => {
+        if (segment === 'knowledgeAck') {
+          return revealState.knowledgeAck;
+        }
+
+        if (segment === 'knowledgeExplanation') {
+          return revealState.knowledgeExplanation;
+        }
+
+        if (segment === 'recommendationAck') {
+          return revealState.recommendationAck;
+        }
+
+        return revealState.recommendationSummary;
+      };
+      const replayBufferedText = async (key: WorkflowTextKey, text: string) => {
+        const normalizedText = text.trim();
+
+        if (!normalizedText) {
+          textOverrides.delete(key);
+          publishVisibleWorkflow();
+          return;
+        }
+
+        const chunkSize = normalizedText.length > 140 ? 5 : normalizedText.length > 72 ? 4 : 3;
+
+        for (let index = chunkSize; index < normalizedText.length; index += chunkSize) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          textOverrides.set(key, normalizedText.slice(0, index));
+          publishVisibleWorkflow();
+          await wait(24);
+        }
+
+        textOverrides.delete(key);
+        publishVisibleWorkflow();
+      };
+      const revealSpeechSegment = (segment: SpeechSegmentKey, text: string) => {
+        const alreadyVisible = isSpeechSegmentVisible(segment);
+        const textKey = getTextKeyForSpeechSegment(segment);
+
+        if (!alreadyVisible) {
+          textOverrides.set(textKey, '');
+        }
+
+        revealWorkflow(getRevealForSpeechSegment(segment));
+
+        if (!alreadyVisible) {
+          void replayBufferedText(textKey, text);
+        }
+      };
+      const commitRouteAction = (routeText: string) => {
+        const routeAction = getActionFromRoute(routeText);
+
+        if (!routeAction || routeAction.type !== 'focus_graph_path') {
+          return;
+        }
+
+        const nextRouteKey = routeAction.route.join('/');
+
+        if (nextRouteKey === routeKey) {
+          return;
+        }
+
+        routeKey = nextRouteKey;
+        routeActionReady = true;
+        committedRouteAction = routeAction;
+        routeActionWaiters.splice(0).forEach((resolve) => resolve(routeAction));
+      };
+      const commitKnowledgePathIfReady = () => {
+        if (!hasSeenKnowledgePath || routeActionReady) {
+          return;
+        }
+
+        commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
+      };
+      const commitTurnError = (error: string) => {
+        streamError = error;
+        setAgentStatus('error');
+        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, error, status: 'error' })));
+      };
+      const preloadSpeechSegment = (segment: SpeechSegmentKey) => {
+        if (getTtsMode() === 'browser') {
+          return;
+        }
+
+        const segmentText = getSpeechTextForSegment(accumulatedWorkflow, segment);
+
+        if (!segmentText) {
+          return;
+        }
+
+        const existing = speechAssets.get(segment);
+        if (existing?.text === segmentText) {
+          return;
+        }
+
+        const asset: PreloadedSpeechAsset = {
+          audioPromise: requestTtsAudio(segmentText),
+          text: segmentText,
+        };
+        speechAssets.set(segment, asset);
+        speechWaiters.get(segment)?.splice(0).forEach((resolve) => resolve(asset));
+      };
+      const waitForSpeechSegment = (segment: SpeechSegmentKey) => {
+        const existing = speechAssets.get(segment);
+
+        if (existing) {
+          return Promise.resolve(existing);
+        }
+
+        if (speechSegmentsClosed) {
+          return Promise.resolve(null);
+        }
+
+        return new Promise<PreloadedSpeechAsset | null>((resolve) => {
+          const timer = window.setTimeout(() => resolve(null), SPEECH_SEGMENT_WAIT_MS);
+          const resolveOnce = (asset: PreloadedSpeechAsset | null) => {
+            window.clearTimeout(timer);
+            resolve(asset);
+          };
+          const waiters = speechWaiters.get(segment) || [];
+          waiters.push(resolveOnce);
+          speechWaiters.set(segment, waiters);
+        });
+      };
+      const closeSpeechSegments = () => {
+        speechSegmentsClosed = true;
+        speechWaiters.forEach((waiters) => waiters.splice(0).forEach((resolve) => resolve(null)));
+      };
+      const playSpeechSegment = async (segment: SpeechSegmentKey) => {
+        const asset = await waitForSpeechSegment(segment);
+        const speechText = asset?.text || getSpeechTextForSegment(accumulatedWorkflow, segment);
+
+        if (!speechText) {
+          return;
+        }
+
+        playedSpeechInTurn = true;
+        revealSpeechSegment(segment, speechText);
+
+        const audioBlob = asset
+          ? await asset.audioPromise.catch((error) => {
+              if (!isFallbackableTtsError(error)) {
+                setSpeechError(error instanceof Error ? error.message : 'TTS preload failed.');
+              }
+              return null;
+            })
+          : undefined;
+
+        await new Promise<void>((resolve) => {
+          speakWithParticleOutput(speechText, {
+            audioBlob: audioBlob ?? undefined,
+            displayText: speechText,
+            minimumVisualDurationMs: 0,
+            onSettled: resolve,
+            resumeListening: false,
+          });
+        });
+      };
+      const waitForRouteAction = () => {
+        if (committedRouteAction) {
+          return Promise.resolve(committedRouteAction);
+        }
+
+        return new Promise<AgentAction | null>((resolve) => {
+          routeActionWaiters.push(resolve);
+        });
+      };
+      const closeRouteAction = () => {
+        if (routeActionWaiters.length === 0) {
+          return;
+        }
+
+        routeActionWaiters.splice(0).forEach((resolve) => resolve(getActionFromRoute(accumulatedWorkflow.knowledgeGraph.KG_PATH)));
+      };
+      const markCardsReady = () => {
+        cardsCompleted = true;
+        cardReadyWaiters.splice(0).forEach((resolve) => resolve(true));
+      };
+      const markCardsReadyIfAvailable = () => {
+        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          markCardsReady();
+        }
+      };
+      const applyLineupFallbackAgents = (lineupId: HeroHallLineupId) => {
+        if (appliedLineupFallback && requestedLineupForResponse === lineupId) {
+          return;
+        }
+
+        const fallbackAgents = getCatalogAgentsForLineup(lineupId);
+
+        if (fallbackAgents.length === 0) {
+          return;
+        }
+
+        appliedLineupFallback = true;
+        requestedLineupForResponse = lineupId;
+        commitWorkflow(setWorkflowLineupIntent(replaceRecommendedAgents(accumulatedWorkflow, fallbackAgents), lineupId));
+        agentRevealCount = null;
+        revealWorkflow({ recommendationAgents: true });
+        setHeroHallLineupState((current) =>
+          mergeHeroHallLineups(
+            current,
+            createHeroHallLineupsFromAgents(
+              fallbackAgents.map((agent) => ({
+                agent,
+                key: getHeroHallAgentKey(agent),
+              })),
+            ),
+          ),
+        );
+        setHeroHallOpen(true);
+        setRecommendationDockVisible(true);
+        setWorkflowHighlight('agents');
+        markCardsReady();
+      };
+      const closeCardsReady = () => {
+        const hasCards = accumulatedWorkflow.agentRecommendation.agents.length > 0;
+
+        if (hasCards) {
+          cardsCompleted = true;
+        }
+
+        cardReadyWaiters.splice(0).forEach((resolve) => resolve(hasCards));
+      };
+      const waitForCardsReady = () => {
+        if (cardsCompleted || accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          return Promise.resolve(true);
+        }
+
+        return new Promise<boolean>((resolve) => {
+          const timer = window.setTimeout(() => resolve(false), SPEECH_SEGMENT_WAIT_MS);
+          cardReadyWaiters.push((ready) => {
+            window.clearTimeout(timer);
+            resolve(ready);
+          });
+        });
+      };
+      const activatePathAnimation = async () => {
+        const routeAction = await waitForRouteAction();
+
+        if (!routeAction || routeAction.type !== 'focus_graph_path') {
+          return false;
+        }
+
+        revealWorkflow({ knowledgePath: true });
+        setLastAction(routeAction);
+        setRouteDockVisible(true);
+        setWorkflowHighlight('route');
+        return true;
+      };
+      const runCardAnimation = async () => {
+        const hasCards = await waitForCardsReady();
+
+        if (!hasCards) {
+          return;
+        }
+
+        if (revealState.recommendationAgents) {
+          agentRevealCount = null;
+          publishVisibleWorkflow();
+          await wait(RECOMMENDATION_DOCK_REVEAL_MS);
+          return;
+        }
+
+        agentRevealCount = 1;
+        revealWorkflow({ recommendationAgents: true });
+        setRecommendationDockVisible(true);
+        setWorkflowHighlight('agents');
+
+        while (agentRevealCount < accumulatedWorkflow.agentRecommendation.agents.length) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          await wait(260);
+          agentRevealCount += 1;
+          publishVisibleWorkflow();
+        }
+
+        agentRevealCount = null;
+        publishVisibleWorkflow();
+        await wait(RECOMMENDATION_DOCK_REVEAL_MS);
+      };
+      const revealCompletedWorkflow = () => {
+        revealWorkflow({
+          knowledgeAck: true,
+          knowledgeExplanation: true,
+          knowledgePath: true,
+          recommendationAck: true,
+          recommendationAgents: true,
+          recommendationSummary: true,
+        });
+      };
+      const orchestrationPromise = (async () => {
+        await playSpeechSegment('knowledgeAck');
+        const pathAnimationActive = await activatePathAnimation();
+        if (pathAnimationActive) {
+          await Promise.all([playSpeechSegment('knowledgeExplanation'), wait(PATH_MATCH_ANIMATION_MS)]);
+        } else {
+          await playSpeechSegment('knowledgeExplanation');
+        }
+        setWorkflowHighlight('none');
+        await playSpeechSegment('recommendationAck');
+        await Promise.all([playSpeechSegment('recommendationSummary'), runCardAnimation()]);
+        setWorkflowHighlight('none');
+        revealCompletedWorkflow();
+        if (!playedSpeechInTurn) {
+          const fallbackSpeechText = cleanSpeechText(buildAgentReplyText(accumulatedWorkflow, ''));
+
+          if (fallbackSpeechText) {
+            playedSpeechInTurn = true;
+            await new Promise<void>((resolve) => {
+              speakWithParticleOutput(fallbackSpeechText.slice(0, 220), {
+                displayText: fallbackSpeechText,
+                minimumVisualDurationMs: 0,
+                onSettled: resolve,
+                resumeListening: false,
+              });
+            });
+          }
+        }
+      })();
 
       try {
-        const response = await requestAIReply(text, [...messages, nextUserMessage], {
-          onGraphAction: (action) => setLastAction(action),
-          onRecommendedAgents: (agents) => {
-            setLatestRecommendedAgents(agents);
+        await streamAgentChat(text, {
+          autoSaveHistory: true,
+          conversationId: conversationIdsForRequest.route_planner,
+          conversationIds: conversationIdsForRequest,
+          requestedLineup: requestedLineupForRequest,
+          signal: controller.signal,
+          userState: userStateForRequest,
+          onEvent(event) {
+            rememberConversationIds(event);
+
+            const speechSegment = getCompletedSpeechSegment(event);
+
+            if (speechSegment) {
+              preloadSpeechSegment(speechSegment);
+              return;
+            }
           },
-          onStreamText: (streamText) => {
-            setAgentLiveText(streamText);
-            setMessages((current) => {
-              const withoutThinking = current.filter((message) => message.text !== 'Processing...');
-              const nextAiMessage: Message = { id: streamingMessageId, speaker: 'ai', text: streamText };
-              const lastMessage = withoutThinking.at(-1);
+          onCompleted(event) {
+            rememberConversationIds(event);
+            commitKnowledgePathIfReady();
+          },
+          onContentDelta(event) {
+            const lineupIntent = getLineupIntentFromEvent(event);
 
-              if (lastMessage?.id === nextAiMessage.id) {
-                return [...withoutThinking.slice(0, -1), nextAiMessage];
-              }
+            if (lineupIntent) {
+              requestedLineupForResponse = lineupIntent;
+              commitWorkflow(setWorkflowLineupIntent(accumulatedWorkflow, lineupIntent));
+              applyLineupFallbackAgents(lineupIntent);
+            }
 
-              return [...withoutThinking.slice(-4), nextAiMessage];
+            const section = getWorkflowSection(event);
+
+            if (!section) {
+              return;
+            }
+
+            const nextWorkflow = appendWorkflowContent(accumulatedWorkflow, section, event.type, event.content || '');
+            commitWorkflow(nextWorkflow);
+
+            if (event.stage === 'knowledge_graph' && event.type === 'KG_PATH') {
+              hasSeenKnowledgePath = true;
+              return;
+            }
+
+            commitKnowledgePathIfReady();
+          },
+          onGraphPathResolved(event) {
+            const graphPath = {
+              ...event,
+              route: String(event.route || accumulatedWorkflow.knowledgeGraph.KG_PATH || ''),
+            } as AgentGraphPath;
+            const nextWorkflow = setWorkflowGraphPath(accumulatedWorkflow, graphPath);
+            commitWorkflow(nextWorkflow);
+            commitRouteAction(graphPath.route || '');
+          },
+          onRecommendedAgentStarted(event) {
+            commitKnowledgePathIfReady();
+            const agentIndex = typeof event.agent_index === 'number' ? event.agent_index : undefined;
+            const nextWorkflow = upsertRecommendedAgent(
+              accumulatedWorkflow,
+              agentIndex === undefined ? undefined : { agent_index: agentIndex },
+              { streamStatus: 'streaming' },
+            );
+            commitWorkflow(nextWorkflow);
+            markCardsReadyIfAvailable();
+          },
+          onRecommendedAgent(agent, event) {
+            commitKnowledgePathIfReady();
+            const delta = event.delta as { field?: string } | undefined;
+            const nextWorkflow = upsertRecommendedAgent(accumulatedWorkflow, agent, {
+              activeField: typeof delta?.field === 'string' ? delta.field : null,
+              streamStatus: 'streaming',
             });
+            commitWorkflow(nextWorkflow);
+            markCardsReadyIfAvailable();
+          },
+          onRecommendedAgentCompleted(agent) {
+            commitKnowledgePathIfReady();
+            const nextWorkflow = upsertRecommendedAgent(accumulatedWorkflow, agent, {
+              activeField: null,
+              streamStatus: 'completed',
+            });
+            commitWorkflow(nextWorkflow);
+            markCardsReadyIfAvailable();
+          },
+          onRecommendedAgentsCompleted(agents) {
+            commitKnowledgePathIfReady();
+            const normalizedAgents = requestedLineupForResponse
+              ? agents.map((agent) => ({
+                  ...agent,
+                  lineup: getRecommendedAgentLineup(agent) || requestedLineupForResponse,
+                }))
+              : agents;
+
+            if (normalizedAgents.length > 0) {
+              appliedLineupFallback = false;
+            }
+
+            commitWorkflow(
+              setWorkflowLineupIntent(
+                replaceRecommendedAgents(accumulatedWorkflow, normalizedAgents),
+                requestedLineupForResponse,
+              ),
+            );
+            markCardsReady();
+          },
+          onWorkflowError(event) {
+            commitKnowledgePathIfReady();
+            commitTurnError(formatWorkflowError(event));
           },
         });
-        setReplySource(response.source);
-        setLastAction(response.actions[0] ?? null);
-        setLatestRecommendedAgents(response.recommendedAgents ?? []);
-        setAgentLiveText(response.text);
+
+        if (!routeActionReady) {
+          commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
+        }
+        if (accumulatedWorkflow.agentRecommendation.agents.length === 0 && requestedLineupForResponse) {
+          applyLineupFallbackAgents(requestedLineupForResponse);
+        }
+        if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
+          markCardsReady();
+        } else {
+          closeCardsReady();
+        }
+        closeSpeechSegments();
+        closeRouteAction();
+
+        const finalText = buildAgentReplyText(accumulatedWorkflow, streamError || 'Agent 已完成，但没有返回可展示内容。');
+        const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
         setMessages((current) => {
-          const withoutThinking = current.filter((message) => message.text !== 'Processing...' && message.id !== streamingMessageId);
-          return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: response.text }];
+          const withoutThinking = current.filter((message) => message.text !== 'Processing...');
+          return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: finalText }];
         });
-        showAgentDraw(response.recommendedAgents, response.text);
-        speakWithParticleOutput(response.spokenText ?? response.text, { displayText: response.text });
-      } catch {
-        const fallback = 'The reasoning end point is not connected yet, sir. Local operations remain online.';
-        setReplySource('local-mock');
-        setLastAction({ type: 'chat' });
-        setLatestRecommendedAgents([]);
-        setAgentLiveText(fallback);
-        setMessages((current) => {
-          const withoutThinking = current.filter((message) => message.text !== 'Processing...' && message.id !== streamingMessageId);
-          return [...withoutThinking.slice(-4), { id: Date.now(), speaker: 'ai', text: fallback }];
+        setAgentStatus(finalStatus);
+        setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
+        void orchestrationPromise.finally(() => {
+          finishReplyWithoutSpeech(shouldResumeListening);
         });
-        speakWithParticleOutput(fallback);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          closeSpeechSegments();
+          closeRouteAction();
+          closeCardsReady();
+          setWorkflowHighlight('none');
+          return;
+        }
+
+        closeSpeechSegments();
+        closeRouteAction();
+        closeCardsReady();
+        setWorkflowHighlight('none');
+
+        try {
+          const response = await requestAIReply(text, history);
+          setReplySource(response.source);
+          setAgentStatus('completed');
+          setLastAction(response.actions[0] ?? null);
+          setAgentTurns(
+            updateTurnById(turnId, (turn) => ({
+              ...turn,
+              fallbackText: response.text,
+              source: response.source,
+              status: 'completed',
+            })),
+          );
+          setMessages((current) => {
+            const withoutThinking = current.filter((message) => message.text !== 'Processing...');
+            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: response.text }];
+          });
+          const speechText = extractAckSpeechText(response.spokenText ?? response.text);
+          if (speechText) {
+            speakWithParticleOutput(speechText, {
+              displayText: speechText,
+              resumeListening: shouldResumeListening,
+            });
+          } else {
+            finishReplyWithoutSpeech(shouldResumeListening);
+          }
+        } catch {
+          const fallback =
+            error instanceof Error && error.message
+              ? `智能体接口连接失败：${error.message}`
+              : '智能体接口连接失败，本地操作仍保持在线。';
+
+          setReplySource('local-mock');
+          setAgentStatus('error');
+          setLastAction({ type: 'chat' });
+          setAgentTurns(
+            updateTurnById(turnId, (turn) => ({
+              ...turn,
+              error: fallback,
+              fallbackText: fallback,
+              source: 'local-mock',
+              status: 'error',
+            })),
+          );
+          setMessages((current) => {
+            const withoutThinking = current.filter((message) => message.text !== 'Processing...');
+            return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: fallback }];
+          });
+          const speechText = extractAckSpeechText(fallback);
+          if (speechText) {
+            speakWithParticleOutput(speechText, { displayText: speechText, resumeListening: shouldResumeListening });
+          } else {
+            finishReplyWithoutSpeech(shouldResumeListening);
+          }
+        }
+      } finally {
+        if (agentRequestRef.current === controller) {
+          agentRequestRef.current = null;
+        }
       }
     },
-    [messages, showAgentDraw, speakWithParticleOutput],
-  );
-
-  useEffect(() => {
-    if (!demoRecommendEnabled) {
-      return;
-    }
-
-    const demoTimer = window.setTimeout(() => {
-      setLatestRecommendedAgents(demoRecommendedAgents);
-      showAgentDraw(demoRecommendedAgents, '本地预览：推荐卡片动画已接入，但不会改变主视觉粒子。');
-    }, 900);
-
-    return () => window.clearTimeout(demoTimer);
-  }, [demoRecommendEnabled, showAgentDraw]);
-
-  const sendDraftMessage = useCallback(
-    (event?: FormEvent<HTMLFormElement>) => {
-      event?.preventDefault();
-      const text = draft.trim();
-
-      if (!text) {
-        return;
-      }
-
-      unlockSpeechOutput();
-      setDraft('');
-      void submitMessage(text);
-    },
-    [draft, submitMessage],
-  );
-
-  const handleDraftKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== 'Enter' || event.shiftKey) {
-        return;
-      }
-
-      event.preventDefault();
-      sendDraftMessage();
-    },
-    [sendDraftMessage],
+    [
+      agentStatus,
+      agentTurns,
+      finishReplyWithoutSpeech,
+      heroHallLineupState,
+      inputMode,
+      manualVoiceSession,
+      messages,
+      pinnedRecommendedAgents,
+      rememberConversationIds,
+      speakWithParticleOutput,
+      voiceAwake,
+    ],
   );
 
   const handleVoiceCommand = useCallback(
     (raw: string) => {
       const text = raw.trim();
 
+      if (agentStatus === 'streaming' || agentRequestRef.current) {
+        voiceControlRef.current?.pause();
+        micLevelRef.current?.stop();
+        setLastHeard('');
+        return;
+      }
+
       if (!text || speechOutputActiveRef.current) {
         return;
       }
 
-      if (!manualVoiceSession && !voiceAwake) {
-        return;
-      }
-
       setLastHeard(text);
+      setInputMode('voice');
       const inputLanguage = detectConversationLanguage(text);
       setInterfaceLanguage(inputLanguage);
 
@@ -778,56 +1084,55 @@ export default function App() {
         setLastHeard('');
         voiceControlRef.current?.stop();
         micLevelRef.current?.stop();
-        speakWithParticleOutput('Standing by, sir.', { resumeListening: false });
+        setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
         return;
       }
 
-      void submitMessage(text);
+      const wakeCommand = extractWakeCommand(text);
+
+      if (!voiceAwake) {
+        setManualVoiceSession(false);
+        setVoiceAwake(true);
+
+        if (wakeCommand?.command) {
+          void submitMessage(wakeCommand.command, { resumeListening: true });
+          return;
+        }
+
+        if (!wakeCommand) {
+          void submitMessage(text, { resumeListening: true });
+          return;
+        }
+
+        return;
+      }
+
+      void submitMessage(wakeCommand?.command || text, { resumeListening: true });
     },
-    [manualVoiceSession, speakWithParticleOutput, submitMessage, voiceAwake],
+    [agentStatus, speakWithParticleOutput, submitMessage, voiceAwake],
   );
 
   const voice = useVoiceControl(handleVoiceCommand, recognitionLanguage);
   voiceControlRef.current = { pause: voice.pause, resume: voice.resume, stop: voice.stop };
   const micLevel = useMicLevel();
-  micLevelRef.current = { stop: micLevel.stop };
+  micLevelRef.current = { start: micLevel.start, stop: micLevel.stop };
 
   useEffect(() => {
     primeSpeechOutput();
     return () => {
+      agentRequestRef.current?.abort();
       clearSpeechEndTimer();
-      clearDrawSettleTimer();
+      cancelSpeechPlayback();
     };
-  }, [clearDrawSettleTimer, clearSpeechEndTimer]);
-
-  const statusText = useMemo(() => {
-    if (!voice.supported) {
-      return isChineseLanguage(interfaceLanguage) ? '语音不可用' : 'Speech unavailable';
-    }
-
-    if (voice.listening && (voiceAwake || manualVoiceSession)) {
-      return isChineseLanguage(interfaceLanguage) ? '语音模式已激活' : 'Voice mode active';
-    }
-
-    if (settings.mode === 'thinking') {
-      return isChineseLanguage(interfaceLanguage) ? '思考中' : 'Thinking';
-    }
-
-    if (settings.mode === 'speaking') {
-      return isChineseLanguage(interfaceLanguage) ? '回应中' : 'Speaking';
-    }
-
-    return isChineseLanguage(interfaceLanguage) ? '就绪' : 'Ready';
-  }, [interfaceLanguage, manualVoiceSession, settings.mode, voice.listening, voice.supported, voiceAwake]);
+  }, [clearSpeechEndTimer]);
 
   const toggleManualVoiceSession = useCallback(() => {
     if (!voice.supported) {
       return;
     }
 
-    setInputMode('voice');
-    unlockSpeechOutput();
     primeSpeechOutput();
+    setInputMode('voice');
 
     if (manualVoiceSession || voiceAwake) {
       speechSessionRef.current += 1;
@@ -844,6 +1149,11 @@ export default function App() {
       voice.stop();
       micLevel.stop();
       setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+      speakWithParticleOutput('语音链路已关闭，先生。', {
+        displayText: 'Jarvis 语音链路已关闭。',
+        minimumVisualDurationMs: 900,
+        resumeListening: false,
+      });
       return;
     }
 
@@ -851,189 +1161,370 @@ export default function App() {
     setVoiceAwake(true);
     setLastAction(null);
     setLastHeard('');
+    voice.stop();
     setSettings((current) => ({ ...current, energy: 0.82, mode: 'listening', pulseSeed: current.pulseSeed + 1 }));
-    void micLevel.start();
-    voice.start();
+    speakWithParticleOutput('系统上线，先生。语音链路已接入。', {
+      displayText: 'Jarvis 语音链路已接入。',
+      minimumVisualDurationMs: 1200,
+      resumeListening: true,
+    });
 
-    speakWithParticleOutput(
-      demoGraphEnabled
-        ? 'Graph preview online, sir. Voice link is live.'
-        : 'At your service, sir. Voice mode is online.',
-    );
-  }, [clearSpeechEndTimer, demoGraphEnabled, manualVoiceSession, micLevel, speakWithParticleOutput, voice, voiceAwake]);
+  }, [clearSpeechEndTimer, manualVoiceSession, micLevel, speakWithParticleOutput, voice, voiceAwake]);
 
   const switchInputMode = useCallback(
-    (mode: InputMode) => {
-      setInputMode(mode);
+    (nextMode: InputMode) => {
+      setInputMode(nextMode);
 
-      if (mode === 'text') {
-        speechSessionRef.current += 1;
-        clearSpeechEndTimer();
-        speechOutputActiveRef.current = false;
-        cancelSpeechPlayback();
-        window.speechSynthesis?.cancel();
-        setManualVoiceSession(false);
-        setVoiceAwake(false);
-        setLastHeard('');
-        setCurrentSpeechText('');
-        setAgentLiveText('');
-        setSpeechError('');
-        voice.stop();
-        micLevel.stop();
-        setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+      if (nextMode !== 'text') {
+        return;
       }
+
+      speechSessionRef.current += 1;
+      clearSpeechEndTimer();
+      speechOutputActiveRef.current = false;
+      cancelSpeechPlayback();
+      window.speechSynthesis?.cancel();
+      setManualVoiceSession(false);
+      setVoiceAwake(false);
+      setLastHeard('');
+      setCurrentSpeechText('');
+      setSpeechError('');
+      voice.stop();
+      micLevel.stop();
+      setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
     },
     [clearSpeechEndTimer, micLevel, voice],
   );
 
-  const latestAiMessage = [...messages].reverse().find((message) => message.speaker === 'ai' && message.text !== 'Processing...');
-  const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : [];
-  const agentPanelVisible =
-    agentUiVisible ||
-    latestRecommendedAgents.length > 0 ||
-    graphRoute.length > 0 ||
-    messages.some((message) => message.speaker === 'you');
+  const sendDraftMessage = useCallback(
+    () => {
+      void submitMessage(draft, { resumeListening: false });
+    },
+    [draft, submitMessage],
+  );
+
+  const handleDraftKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+        return;
+      }
+
+      event.preventDefault();
+      void submitMessage(draft, { resumeListening: false });
+    },
+    [draft, submitMessage],
+  );
+
+  const latestDisplayableRecommendedAgents = getLatestDisplayableRecommendedAgents(agentTurns);
+  const recommendedAgents =
+    latestDisplayableRecommendedAgents.length > 0 ? latestDisplayableRecommendedAgents : pinnedRecommendedAgents;
+  const fallbackRoute = getLatestRouteSegments(agentTurns);
+  const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
+  const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
+  const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
   const graphFocusKey =
-    lastAction?.type === 'focus_graph_path'
-      ? `${lastAction.label}:${lastAction.route.join('/')}:${latestAiMessage?.id ?? 0}`
+    graphRoute.length > 0
+      ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
       : '';
+  const heroHallSummary = getLatestRecommendationSummary(agentTurns);
+  const heroHallKey = recommendedAgents.map(getRecommendedAgentKey).join('|');
+  const heroHallReady = agentStatus === 'completed' && recommendedAgents.length > 0 && Boolean(heroHallSummary);
   const readoutText =
     settings.mode === 'thinking'
-      ? agentLiveText || (isChineseLanguage(interfaceLanguage) ? '思考中...' : 'Thinking...')
-      : settings.mode === 'speaking'
-        ? agentLiveText || currentSpeechText
-        : agentLiveText;
-  const voiceSessionActive = voiceAwake || manualVoiceSession;
-  const captionText =
-    speechError ||
-    voice.error ||
-    micLevel.error ||
-    (lastAction?.type === 'focus_graph_path'
       ? isChineseLanguage(interfaceLanguage)
-        ? `本地图谱动作：${lastAction.route.join(' / ')}`
-        : `Local graph action: ${lastAction.route.join(' / ')}`
-      : voice.listening && voiceSessionActive
-        ? lastHeard
-          ? isChineseLanguage(interfaceLanguage)
-            ? `语音模式已激活。听到：${lastHeard}`
-            : `Voice mode active. Heard: ${lastHeard}`
-          : isChineseLanguage(interfaceLanguage)
-            ? '语音模式已激活，可以直接说。'
-            : 'Voice mode active. Speak naturally.'
-        : '');
+        ? '思考中...'
+        : 'Thinking...'
+      : settings.mode === 'speaking'
+        ? currentSpeechText
+        : '';
+  const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
+  const captionText =
+    voiceCaptionError ||
+    (inputMode === 'text'
+      ? ''
+      : voice.listening
+        ? voiceAwake
+          ? lastHeard
+            ? isChineseLanguage(interfaceLanguage)
+              ? `语音模式已激活。听到：${lastHeard}`
+              : `Voice mode active. Heard: ${lastHeard}`
+            : isChineseLanguage(interfaceLanguage)
+              ? '语音模式已激活，可以直接说。'
+              : 'Voice mode active. Speak naturally.'
+        : isChineseLanguage(interfaceLanguage)
+          ? '说“贾维斯”唤醒语音模式。'
+          : 'Say "Jarvis" to wake voice mode.'
+      : isChineseLanguage(interfaceLanguage)
+        ? '语音待命。'
+        : 'Voice standby.');
+
+  useEffect(() => {
+    if (latestDisplayableRecommendedAgents.length > 0) {
+      setPinnedRecommendedAgents(latestDisplayableRecommendedAgents);
+    }
+  }, [latestDisplayableRecommendedAgents]);
+
+  useEffect(() => {
+    if (!heroHallReady || !heroHallKey || lastHeroHallAutoKeyRef.current === heroHallKey) {
+      return undefined;
+    }
+
+    lastHeroHallAutoKeyRef.current = heroHallKey;
+    const timer = window.setTimeout(() => setHeroHallOpen(true), 620);
+
+    return () => window.clearTimeout(timer);
+  }, [heroHallKey, heroHallReady]);
 
   return (
-    <main className="app-shell">
-      <ParticleField audioLevel={micLevel.level} graphFocusKey={graphFocusKey} graphRoute={graphRoute} settings={settings} />
+    <main className="app-shell" data-hero-hall={heroHallOpen}>
+      {!heroHallOpen ? (
+        <ParticleField
+          audioLevel={micLevel.level}
+          graphFocusKey={graphFocusKey}
+          graphRoute={graphRoute}
+          settings={settings}
+        />
+      ) : null}
       <div className="scene-vignette" />
-      <AgentDrawOverlay
-        active={drawActive}
-        agents={drawAgents}
-        onSettled={() => setDrawActive(false)}
-        pulseKey={drawPulseKey}
-        replyText={drawReplyText}
+      {!heroHallOpen ? (
+        <JarvisHelmetHud
+          inputMode={inputMode}
+          status={agentStatus}
+          voiceAwake={voiceAwake}
+          voiceListening={voice.listening}
+        />
+      ) : null}
+      {!heroHallOpen ? (
+        <HelmetTypewriterIntel
+          graphRoute={graphRoute}
+          recommendedAgents={recommendedAgents}
+          status={agentStatus}
+          voiceAwake={voiceAwake}
+        />
+      ) : null}
+      <WorkflowDock
+        active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
+        agents={dockRecommendedAgents}
+        highlight={workflowHighlight}
+        onOpenHeroHall={() => setHeroHallOpen(true)}
+        routeSegments={dockRouteSegments}
       />
-      <AgentDialoguePanel
-        disabled={settings.mode === 'thinking'}
-        draft={draft}
-        graphRoute={graphRoute}
-        messages={messages}
-        onDraftChange={setDraft}
-        onDraftKeyDown={handleDraftKeyDown}
-        onSendDraft={sendDraftMessage}
-        recommendedAgents={latestRecommendedAgents}
-        source={replySource}
-        visible={agentPanelVisible}
+      <AgentHeroHall
+        agents={recommendedAgents}
+        open={heroHallOpen}
+        onClose={() => setHeroHallOpen(false)}
+        onLineupsChange={setHeroHallLineupState}
       />
 
-      <section className="dialogue-stage" aria-label="AI particle dialogue">
-        <div className="title-lockup">
-          <div className="brand-mark" aria-hidden="true">
-            <Bot size={18} />
-          </div>
-          <div>
-            <h1>JARVIS</h1>
-            <p>{statusText}</p>
-          </div>
-        </div>
-
-        {captionText ? (
-          <div className="orb-caption" data-testid="conversation-state">
-            <Sparkles size={16} />
-            <span>{captionText}</span>
-          </div>
-        ) : null}
-
-        <ParticleWordmark graphActive={graphRoute.length > 0} mode={settings.mode} />
-
-        {readoutText ? (
-          <div className="voice-readout" aria-live="polite">
-            <span>{readoutText}</span>
-          </div>
-        ) : null}
-
-        <div className="main-input-hub" data-input-mode={inputMode} onPointerDown={(event) => event.stopPropagation()}>
-          <div className="agent-mode-switch" role="tablist" aria-label="Input mode">
-            <button
-              aria-selected={inputMode === 'voice'}
-              className={inputMode === 'voice' ? 'active' : ''}
-              onClick={() => switchInputMode('voice')}
-              role="tab"
-              type="button"
-            >
-              <Mic size={15} />
-              <span>语音</span>
-            </button>
-            <button
-              aria-selected={inputMode === 'text'}
-              className={inputMode === 'text' ? 'active' : ''}
-              onClick={() => switchInputMode('text')}
-              role="tab"
-              type="button"
-            >
-              <Keyboard size={15} />
-              <span>打字</span>
-            </button>
-          </div>
-
-          {inputMode === 'voice' ? (
-            <button
-              aria-label={voiceSessionActive ? 'Stand down voice mode' : 'Wake voice mode'}
-              aria-pressed={voiceSessionActive}
-              className="agent-voice-module"
-              data-active={voiceSessionActive}
-              disabled={!voice.supported || settings.mode === 'thinking'}
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleManualVoiceSession();
-              }}
-              title={voiceSessionActive ? 'Stand down' : 'Wake voice'}
-              type="button"
-            >
-              <div className="voice-presence" aria-hidden="true" data-active={voice.listening} data-awake={voiceSessionActive} />
-              <span className="voice-module-center">
-                {voiceSessionActive ? <MicOff size={17} /> : <Mic size={17} />}
-                <em>{voice.supported ? (voiceSessionActive ? '语音已激活' : '语音待命') : '语音不可用'}</em>
+      {!heroHallOpen ? (
+        <section className="dialogue-stage" aria-label="AI particle dialogue">
+          {captionText ? (
+            <div className="orb-caption" data-testid="conversation-state">
+              <Sparkles size={16} />
+              <span className="assistant-subtitle-wave" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
               </span>
-            </button>
-          ) : (
-            <form className="agent-composer" onSubmit={sendDraftMessage}>
-              <textarea
-                aria-label="Type to Jarvis"
-                disabled={settings.mode === 'thinking'}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleDraftKeyDown}
-                placeholder={settings.mode === 'thinking' ? 'Agent 正在生成...' : '问你的 agent...'}
-                rows={1}
-                value={draft}
-              />
-              <button aria-label="Send to agent" disabled={!draft.trim() || settings.mode === 'thinking'} type="submit">
-                <Send size={16} />
-              </button>
-            </form>
-          )}
-        </div>
-      </section>
+              <span>{captionText}</span>
+            </div>
+          ) : null}
+
+          {readoutText ? (
+            <div className="voice-readout" aria-live="polite">
+              <span className="assistant-subtitle">
+                <span className="assistant-subtitle-wave" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span>{readoutText}</span>
+              </span>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <AgentConsole
+        draft={draft}
+        helmetVoice={!heroHallOpen}
+        inputMode={inputMode}
+        onDraftKeyDown={handleDraftKeyDown}
+        onModeChange={switchInputMode}
+        onSend={sendDraftMessage}
+        onToggleVoice={toggleManualVoiceSession}
+        setDraft={setDraft}
+        speakingText={currentSpeechText}
+        status={agentStatus}
+        turns={agentTurns}
+        voiceHeardText={lastHeard}
+        voiceAwake={voiceAwake}
+        voiceListening={voice.listening}
+        voiceTranscript={voice.transcript}
+        voiceSupported={voice.supported}
+      />
     </main>
   );
 }
+
+function HelmetTypewriterIntel({
+  graphRoute,
+  recommendedAgents,
+  status,
+  voiceAwake,
+}: {
+  graphRoute: string[];
+  recommendedAgents: RecommendedAgent[];
+  status: AgentStatus;
+  voiceAwake: boolean;
+}) {
+  const routeSignal = graphRoute.join('|');
+  const agentSignal = recommendedAgents
+    .map((agent) => `${agent.agent_index || agent.rank || ''}:${agent.agent_name || agent.name || agent.stage || ''}`)
+    .join('|');
+  const stateMachineKey = `${routeSignal}:${agentSignal}:${status}:${voiceAwake}`;
+  const states = useMemo(
+    () => buildHelmetIntelStates({ graphRoute, recommendedAgents, status, voiceAwake }),
+    [agentSignal, routeSignal, status, voiceAwake],
+  );
+  const [stateIndex, setStateIndex] = useState(0);
+  const currentState = states[stateIndex % states.length] || states[0];
+  const [typedCopy, setTypedCopy] = useState(currentState.copy);
+
+  useEffect(() => {
+    setStateIndex(0);
+  }, [stateMachineKey]);
+
+  useEffect(() => {
+    if (states.length <= 1) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      setStateIndex((index) => (index + 1) % states.length);
+    }, 5600);
+
+    return () => window.clearInterval(interval);
+  }, [stateMachineKey, states.length]);
+
+  useEffect(() => {
+    let index = 0;
+    setTypedCopy('');
+
+    const interval = window.setInterval(() => {
+      index += 1;
+      setTypedCopy(currentState.copy.slice(0, index));
+
+      if (index >= currentState.copy.length) {
+        window.clearInterval(interval);
+      }
+    }, 24);
+
+    return () => window.clearInterval(interval);
+  }, [currentState.copy]);
+
+  return (
+    <aside className="helmet-typewriter-intel" data-status={status} data-tone={currentState.tone} aria-live="polite">
+      <div className="helmet-typewriter-kicker">
+        <ScanLine size={13} />
+        <span>{currentState.channel}</span>
+        <i />
+      </div>
+      <p>
+        <span>{typedCopy}</span>
+        <b aria-hidden="true" />
+      </p>
+      <div className="helmet-typewriter-meta" aria-hidden="true">
+        <span>{currentState.metaLeft}</span>
+        <span>{currentState.metaRight}</span>
+      </div>
+    </aside>
+  );
+}
+
+function JarvisHelmetHud({
+  inputMode,
+  status,
+  voiceAwake,
+  voiceListening,
+}: {
+  inputMode: InputMode;
+  status: AgentStatus;
+  voiceAwake: boolean;
+  voiceListening: boolean;
+}) {
+  const linkState = status === 'streaming' ? 'AI STREAM' : voiceAwake ? 'VOICE LINK' : 'STANDBY';
+  const neuralState = status === 'streaming' ? 'SYNCING' : voiceListening ? 'LISTENING' : 'ONLINE';
+
+  return (
+    <div className="jarvis-helmet-hud" data-awake={voiceAwake} data-status={status} aria-hidden="true">
+      <div className="helmet-visor-shell helmet-visor-shell-left" />
+      <div className="helmet-visor-shell helmet-visor-shell-right" />
+      <div className="helmet-visor-shell helmet-visor-shell-top" />
+      <div className="helmet-visor-shell helmet-visor-shell-bottom" />
+      <div className="helmet-armor-corner helmet-armor-corner-tl" />
+      <div className="helmet-armor-corner helmet-armor-corner-tr" />
+      <div className="helmet-armor-corner helmet-armor-corner-bl" />
+      <div className="helmet-armor-corner helmet-armor-corner-br" />
+
+      <div className="helmet-hud-topline">
+        <div className="helmet-hud-brand">
+          <ShieldCheck size={16} />
+          <span>JARVIS HELM</span>
+        </div>
+        <div className="helmet-hud-data">
+          <span>{linkState}</span>
+          <span>CORE 97%</span>
+          <span>{inputMode.toUpperCase()}</span>
+        </div>
+      </div>
+
+      <div className="helmet-hud-reticle">
+        <span className="helmet-reticle-ring helmet-reticle-ring-outer" />
+        <span className="helmet-reticle-ring helmet-reticle-ring-mid" />
+        <span className="helmet-reticle-ring helmet-reticle-ring-inner" />
+        <span className="helmet-reticle-cross helmet-reticle-cross-x" />
+        <span className="helmet-reticle-cross helmet-reticle-cross-y" />
+        <span className="helmet-reticle-scan" />
+      </div>
+
+      <div className="helmet-hud-stack helmet-hud-stack-left">
+        <div>
+          <Cpu size={14} />
+          <span>{neuralState}</span>
+        </div>
+        <i />
+        <i />
+        <i />
+      </div>
+
+      <div className="helmet-hud-stack helmet-hud-stack-right">
+        <div>
+          <Radar size={14} />
+          <span>TARGET LOCK</span>
+        </div>
+        <i />
+        <i />
+        <i />
+      </div>
+
+      <div className="helmet-hud-bottomline">
+        <span>
+          <Activity size={14} />
+          REACTOR STABLE
+        </span>
+        <span>
+          <ScanLine size={14} />
+          VISOR ACTIVE
+        </span>
+      </div>
+    </div>
+  );
+}
+

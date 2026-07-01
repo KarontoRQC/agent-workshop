@@ -4,6 +4,8 @@ export type ReplySource = 'coze-stream' | 'endpoint' | 'local-mock';
 
 export type AgentStatus = 'idle' | 'streaming' | 'completed' | 'error';
 
+export type AgentLineupId = 'core' | 'growth' | 'conversion';
+
 export type AgentAction =
   | {
       type: 'chat';
@@ -30,20 +32,50 @@ export type Message = {
 export type RecommendedAgent = {
   activeField?: string | null;
   agent_index?: number;
-  agent_key?: string;
   agent_name?: string;
   endpoint?: string;
   id?: string;
   jump_url?: string;
+  lineup?: AgentLineupId | string;
+  lineup_id?: AgentLineupId | string;
+  lineupId?: AgentLineupId | string;
   link?: string;
   name?: string;
   rank?: number | string;
   reason?: string;
-  score?: number | string;
   stage?: string;
-  streamStatus?: 'completed' | 'streaming';
+  streamStatus?: 'streaming' | 'completed';
+  score?: number | string;
   url?: string;
   [key: string]: unknown;
+};
+
+export type AgentUserState = {
+  knowledge_path?: string;
+  knowledge_path_nodes?: string[];
+  lineups?: Partial<
+    Record<
+      AgentLineupId,
+      Array<{
+        agent_name?: string;
+        key?: string;
+        lineup?: AgentLineupId | string;
+        name?: string;
+        rank?: number | string;
+        reason?: string;
+        stage?: string;
+      }>
+    >
+  >;
+  recommended_agents?: Array<{
+    agent_name?: string;
+    lineup?: AgentLineupId | string;
+    name?: string;
+    rank?: number | string;
+    reason?: string;
+    stage?: string;
+  }>;
+  recommendation_summary?: string;
 };
 
 export type AgentGraphPath = {
@@ -51,19 +83,6 @@ export type AgentGraphPath = {
   nodes?: Array<{ label?: string; [key: string]: unknown }>;
   route?: string;
   [key: string]: unknown;
-};
-
-export type AgentUserState = {
-  knowledge_path?: string;
-  knowledge_path_nodes?: string[];
-  recommended_agents?: Array<{
-    agent_name?: string;
-    name?: string;
-    rank?: number | string;
-    reason?: string;
-    stage?: string;
-  }>;
-  recommendation_summary?: string;
 };
 
 export type AgentWorkflow = {
@@ -80,6 +99,7 @@ export type AgentWorkflow = {
     SUMMARY: string;
     THINKING_PROCESS: string;
     agents: RecommendedAgent[];
+    lineupIntent?: AgentLineupId | string;
   };
 };
 

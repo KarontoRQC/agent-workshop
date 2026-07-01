@@ -24,6 +24,7 @@
 <AGENT>
 <RANK>1</RANK>
 <AGENT_NAME>智能体原始名称</AGENT_NAME>
+<LINEUP>core</LINEUP>
 <STAGE>适用阶段</STAGE>
 <REASON>推荐理由</REASON>
 </AGENT>
@@ -37,12 +38,14 @@
 1. 四个一级标签必须严格按 THINKING_PROCESS → ACK → RECOMMENDED_AGENTS → SUMMARY 的顺序出现。
 2. 每个一级标签只能出现一次，必须完整闭合，不能省略、不能调换、不能新增。
 3. RECOMMENDED_AGENTS 必须完整包住所有 AGENT，必须在 SUMMARY 开始前闭合。
-4. 每个 AGENT 内部必须严格按 RANK → AGENT_NAME → STAGE → REASON 的顺序输出。
+4. 每个 AGENT 内部必须严格按 RANK → AGENT_NAME → LINEUP → STAGE → REASON 的顺序输出。
 5. 标签外不得输出任何文字、标点、解释、Markdown 或代码块。
 6. 标签内容中不得夹带任何 XML 标签、半截标签、结束标签残片或标签名。
 7. AGENT_NAME 必须完全等于可用智能体合集中的原始名称，不得改写。
-8. 如果输出结构与内容表达冲突，优先保证 XML 标签顺序和闭合完整。
-9. 非推荐类输入只输出一句自然语言，不输出任何 XML 标签。
+8. LINEUP 只能输出 core、growth、conversion 三者之一：core=主力阵容，growth=增长阵容，conversion=成交阵容。
+9. 如果用户明确指定某个阵容，只推荐并标记到该阵容，不要混入其他阵容。
+10. 如果输出结构与内容表达冲突，优先保证 XML 标签顺序和闭合完整。
+11. 非推荐类输入只输出一句自然语言，不输出任何 XML 标签。
 
 ---
 
@@ -217,6 +220,7 @@ SUMMARY 必须像真人在跟客户介绍方案，不能像系统模板、产品
 <AGENT>
 <RANK>1</RANK>
 <AGENT_NAME>{智能体原始名称}</AGENT_NAME>
+<LINEUP>{core 或 growth 或 conversion}</LINEUP>
 <STAGE>{动态生成的适用阶段}</STAGE>
 <REASON>{动态生成的推荐理由，40字以内}</REASON>
 </AGENT>
@@ -397,6 +401,7 @@ SUMMARY 用于概括推荐组合的整体作用，并在推荐完成后告诉客
 <AGENT>
 <RANK>1</RANK>
 <AGENT_NAME>智能体原始名称</AGENT_NAME>
+<LINEUP>core</LINEUP>
 <STAGE>动态适用阶段</STAGE>
 <REASON>40字以内的动态推荐理由</REASON>
 </AGENT>
@@ -411,6 +416,7 @@ SUMMARY 用于概括推荐组合的整体作用，并在推荐完成后告诉客
 <AGENT>
 <RANK>2</RANK>
 <AGENT_NAME>智能体原始名称</AGENT_NAME>
+<LINEUP>growth</LINEUP>
 <STAGE>动态适用阶段</STAGE>
 <REASON>40字以内的动态推荐理由</REASON>
 </AGENT>
@@ -418,6 +424,7 @@ SUMMARY 用于概括推荐组合的整体作用，并在推荐完成后告诉客
 <AGENT>
 <RANK>3</RANK>
 <AGENT_NAME>智能体原始名称</AGENT_NAME>
+<LINEUP>conversion</LINEUP>
 <STAGE>动态适用阶段</STAGE>
 <REASON>40字以内的动态推荐理由</REASON>
 </AGENT>

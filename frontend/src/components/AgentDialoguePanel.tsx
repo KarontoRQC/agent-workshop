@@ -16,7 +16,7 @@ type AgentDialoguePanelProps = {
 };
 
 function getAgentName(agent: RecommendedAgent, index: number) {
-  return agent.agent_name || agent.name || agent.agent_key || agent.id || `Agent ${index + 1}`;
+  return String(agent.agent_name || agent.name || agent.agent_key || agent.id || `Agent ${index + 1}`);
 }
 
 function getAgentMeta(agent: RecommendedAgent) {
