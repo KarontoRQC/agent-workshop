@@ -216,6 +216,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       color: 0x8bdcff,
       depthTest: false,
       depthWrite: false,
+      linewidth: width < 720 ? 2.2 : 2.6,
       opacity: 0,
       transparent: true,
     });
@@ -320,9 +321,13 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
           labelProjection.y < 1.18;
         const screenX = (labelProjection.x * 0.5 + 0.5) * hostWidth;
         const screenY = (-labelProjection.y * 0.5 + 0.5) * hostHeight;
+        const labelWidth = label.offsetWidth || 120;
+        const labelHeight = label.offsetHeight || 30;
+        const safeX = clamp(screenX, labelWidth * 0.5 + 8, hostWidth - labelWidth * 0.5 - 8);
+        const safeY = clamp(screenY, labelHeight * 1.5 + 8, hostHeight - labelHeight * 0.5 - 8);
 
         label.style.opacity = isVisible ? String(labelOpacity) : '0';
-        label.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -150%)`;
+        label.style.transform = `translate3d(${safeX}px, ${safeY}px, 0) translate(-50%, -150%)`;
       });
     };
 
@@ -415,9 +420,9 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       );
 
       const isCompact = width < 720;
-      const pathWidth = routeCount <= 2 ? (isCompact ? 0.68 : 0.96) : isCompact ? 1.08 : 1.56;
-      const pathHeight = isCompact ? 0.32 : 0.46;
-      const depthSpread = isCompact ? 0.12 : 0.2;
+      const pathWidth = routeCount <= 2 ? (isCompact ? 0.82 : 1.15) : isCompact ? 1.28 : 1.86;
+      const pathHeight = isCompact ? 0.4 : 0.56;
+      const depthSpread = isCompact ? 0.15 : 0.24;
       const routeTilt = seededSigned(routeHash + 53) * (isCompact ? 0.11 : 0.18);
       const routeWaveCount = 1.35 + seededUnit(routeHash + 71) * 1.2;
       const horizontalJitter = isCompact ? 0.08 : 0.13;
@@ -454,7 +459,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         };
       });
 
-      const minNodeDistance = isCompact ? 0.24 : 0.32;
+      const minNodeDistance = isCompact ? 0.29 : 0.38;
       lockedGraphNodes.forEach((node, nodeIndex) => {
         for (let previousIndex = 0; previousIndex < nodeIndex; previousIndex += 1) {
           const previousNode = lockedGraphNodes[previousIndex];
@@ -480,7 +485,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
       lockedGraphEdges = lockedGraphNodes.slice(1).map((_, index) => [index, index + 1]);
       lockedParticleTargets = new Map();
       syncGraphLabels(lockedGraphNodes.map((node) => node.label));
-      const particlePathScale = isCompact ? 0.46 : 0.56;
+      const particlePathScale = isCompact ? 0.52 : 0.64;
 
       lockedGraphNodes.forEach((node) => {
         lockedParticleTargets.set(node.particleIndex, {
@@ -1092,7 +1097,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
 
       lockLineGeometry.attributes.position.needsUpdate = true;
       lockPointGeometry.attributes.position.needsUpdate = true;
-      lockLineMaterial.opacity += (lineAlpha * 0.78 - lockLineMaterial.opacity) * 0.08;
+      lockLineMaterial.opacity += (lineAlpha * 0.94 - lockLineMaterial.opacity) * 0.08;
       lockPointMaterial.opacity += (pointAlpha * 1 - lockPointMaterial.opacity) * 0.1;
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.color.needsUpdate = true;
@@ -1113,7 +1118,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
           ? 0.03 + voiceEnergy * 0.075 + voiceBeat * 0.04
           : voiceEnergy * 0.018;
       points.scale.setScalar(baseScale * (1 + outputScale + pulsePower * 0.018));
-      const focusLayerScale = (width < 720 ? 1.38 : 1.54) * STAR_SCALE_BOOST;
+      const focusLayerScale = (width < 720 ? 1.58 : 1.76) * STAR_SCALE_BOOST;
       lockLines.scale.setScalar(focusLayerScale);
       lockPoints.scale.setScalar(focusLayerScale);
       const sceneLift = (width < 720 ? 0.62 : 0.42) + graphBlend * (width < 720 ? 0.08 : 0.12);
@@ -1128,7 +1133,7 @@ export default function ParticleField({ audioLevel, graphFocusKey = '', graphRou
         (currentSettings.mode === 'speaking' ? voiceBeat * 0.012 : 0) +
         pulsePower * 0.004;
       material.size += (targetSize - material.size) * 0.1;
-      const lockPointTargetSize = (width < 720 ? 0.11 : 0.096) + localGraphReveal * (width < 720 ? 0.07 : 0.058);
+      const lockPointTargetSize = (width < 720 ? 0.14 : 0.122) + localGraphReveal * (width < 720 ? 0.1 : 0.084);
       lockPointMaterial.size += (lockPointTargetSize - lockPointMaterial.size) * 0.12;
       const cameraGraphDrift = graphBlend * (1 - localGraphReveal * 0.94);
       const cameraX = pointer.x * 0.28 + cameraGraphDrift * graphFocus.x * 0.16;

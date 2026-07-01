@@ -3,5 +3,6 @@ dist/
 .npm-cache/
 .vite/
 *.log
-.env
-.env.*
+.env.local
+.env.*.local
+!.env.example

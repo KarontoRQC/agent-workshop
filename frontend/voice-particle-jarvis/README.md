@@ -28,6 +28,12 @@ Open:
 http://127.0.0.1:5178/
 ```
 
+## Runtime Defaults
+
+The committed `.env` is intentional for this private prototype. It keeps Vite proxying `/api` to the shared Agent Workshop API and keeps speech output on browser `speechSynthesis` by default, so a fresh checkout does not need local TTS setup and will not call `/api/tts/speech`.
+
+Use `.env.local` for machine-specific overrides. For example, set `VITE_TTS_BROWSER_FALLBACK=auto` only when you want to test backend audio synthesis.
+
 ## Build
 
 ```powershell

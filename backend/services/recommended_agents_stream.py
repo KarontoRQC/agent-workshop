@@ -5,8 +5,36 @@ AGENT_TAG = "AGENT"
 FIELD_TAGS = {
     "RANK": "rank",
     "AGENT_NAME": "agent_name",
+    "LINEUP": "lineup",
     "STAGE": "stage",
     "REASON": "reason",
+}
+
+LINEUP_ALIASES = {
+    "core": "core",
+    "main": "core",
+    "primary": "core",
+    "default": "core",
+    "主力": "core",
+    "主力阵容": "core",
+    "核心": "core",
+    "核心阵容": "core",
+    "growth": "growth",
+    "grow": "growth",
+    "acquisition": "growth",
+    "增长": "growth",
+    "增长阵容": "growth",
+    "拉新": "growth",
+    "拉新阵容": "growth",
+    "转化": "growth",
+    "conversion": "conversion",
+    "deal": "conversion",
+    "sales": "conversion",
+    "transaction": "conversion",
+    "成交": "conversion",
+    "成交阵容": "conversion",
+    "私域": "conversion",
+    "私域承接": "conversion",
 }
 
 
@@ -200,6 +228,9 @@ class RecommendedAgentsStreamEmitter:
 def _normalize_field_value(field_name, value):
     value = str(value or "").strip() if field_name != "reason" else str(value or "")
 
+    if field_name == "lineup":
+        return _normalize_lineup_value(value) or value
+
     if field_name != "rank":
         return value
 
@@ -207,6 +238,24 @@ def _normalize_field_value(field_name, value):
         return int(value)
     except ValueError:
         return value
+
+
+def _normalize_lineup_value(value):
+    text = str(value or "").strip()
+
+    if not text:
+        return ""
+
+    compact = "".join(text.lower().split()).strip("：:")
+
+    if compact in LINEUP_ALIASES:
+        return LINEUP_ALIASES[compact]
+
+    for keyword, lineup in LINEUP_ALIASES.items():
+        if keyword and keyword in compact:
+            return lineup
+
+    return ""
 
 
 def _strip_nested_tags(value):

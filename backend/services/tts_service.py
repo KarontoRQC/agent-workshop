@@ -19,7 +19,10 @@ def synthesize_speech(text, mood="neutral"):
     settings = get_tts_settings()
     provider = settings.provider
 
-    if provider in {"auto", "browser", "edge"}:
+    if provider == "browser":
+        raise TtsConfigurationError("TTS_PROVIDER=browser disables server-side synthesis; use browser speech fallback.")
+
+    if provider in {"auto", "edge"}:
         return synthesize_with_edge_tts(text, mood, settings), "audio/mpeg"
 
     if provider != "piper":

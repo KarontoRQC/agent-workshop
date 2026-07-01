@@ -24,6 +24,7 @@ DEFAULT_UNIFIED_ORCHESTRATOR_PROMPT_PATH = os.path.join(PROMPTS_DIR, "unified_or
 
 if load_dotenv:
     load_dotenv(os.path.join(BASE_DIR, ".env"))
+    load_dotenv(os.path.join(BASE_DIR, ".env.local"), override=True)
 
 
 def get_frontend_origins():
