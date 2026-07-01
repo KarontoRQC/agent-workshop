@@ -1,23 +1,42 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type SetStateAction,
+} from 'react';
 import {
   ArrowUpRight,
   BrainCircuit,
+  Crown,
   ExternalLink,
   GitBranch,
+  GripVertical,
   Keyboard,
   Mic,
   MicOff,
   PackageOpen,
+  Plus,
+  RotateCcw,
   Send,
   Sparkles,
+  Trophy,
   UserRound,
+  X,
 } from 'lucide-react';
 import ParticleField from './components/ParticleField';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
 import { API_BASE_URL, streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
-import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from './lib/agentLaunchCatalog';
+import { enrichDrawAgent, getAgentLaunchTargets, getCatalogHeroAgents, openAgentLaunchTargets } from './lib/agentLaunchCatalog';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
 import type {
   AgentAction,
@@ -38,6 +57,243 @@ const baseSettings: ParticleSettings = {
   mode: 'idle',
   pulseSeed: 0,
 };
+
+type HeroHallLineupId = 'core' | 'growth' | 'conversion';
+type HeroHallLineupsState = Record<HeroHallLineupId, string[]>;
+type AgentUserStateLineupAgent = NonNullable<NonNullable<AgentUserState['lineups']>[HeroHallLineupId]>[number];
+
+const fallbackLineupLimit = 5;
+
+const heroHallLineups: Array<{ accent: 'cyan' | 'gold' | 'rose'; id: HeroHallLineupId; label: string; tagline: string }> = [
+  { accent: 'gold', id: 'core', label: '主力阵容', tagline: '优先启用' },
+  { accent: 'cyan', id: 'growth', label: '增长阵容', tagline: '拉新转化' },
+  { accent: 'rose', id: 'conversion', label: '成交阵容', tagline: '私域承接' },
+];
+
+function createHeroHallLineups(): HeroHallLineupsState {
+  return {
+    conversion: [],
+    core: [],
+    growth: [],
+  };
+}
+
+const heroHallLineupAliases: Record<string, HeroHallLineupId> = {
+  acquisition: 'growth',
+  conversion: 'conversion',
+  core: 'core',
+  deal: 'conversion',
+  growth: 'growth',
+  main: 'core',
+  primary: 'core',
+  sales: 'conversion',
+  transaction: 'conversion',
+  主力: 'core',
+  主力阵容: 'core',
+  核心: 'core',
+  核心阵容: 'core',
+  增长: 'growth',
+  增长阵容: 'growth',
+  拉新: 'growth',
+  拉新阵容: 'growth',
+  转化: 'growth',
+  成交: 'conversion',
+  成交阵容: 'conversion',
+  私域: 'conversion',
+  私域承接: 'conversion',
+};
+
+function normalizeHeroHallLineupId(value: unknown, fallback?: HeroHallLineupId): HeroHallLineupId | undefined {
+  const text = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[:：]+$/g, '');
+
+  if (!text) {
+    return fallback;
+  }
+
+  if (heroHallLineupAliases[text]) {
+    return heroHallLineupAliases[text];
+  }
+
+  const matchedAlias = Object.entries(heroHallLineupAliases).find(([alias]) => alias && text.includes(alias.toLowerCase()));
+  return matchedAlias?.[1] ?? fallback;
+}
+
+function detectRequestedLineupFromText(value: unknown): HeroHallLineupId | undefined {
+  const text = String(value ?? '').trim();
+  const normalized = text.toLowerCase();
+
+  if (!text) {
+    return undefined;
+  }
+
+  const asksForLineup =
+    /lineup|\u9635\u5bb9/.test(normalized) ||
+    /\u63a8\u8350.*(\u6210\u4ea4|\u79c1\u57df|\u9500\u552e|\u589e\u957f|\u4e3b\u529b|\u6838\u5fc3)/.test(normalized);
+
+  if (!asksForLineup) {
+    return undefined;
+  }
+
+  if (/deal|sales|conversion|\u6210\u4ea4|\u79c1\u57df|\u590d\u8d2d/.test(normalized)) {
+    return 'conversion';
+  }
+
+  if (/growth|acquisition|\u589e\u957f|\u62c9\u65b0|\u83b7\u5ba2/.test(normalized)) {
+    return 'growth';
+  }
+
+  if (/core|main|primary|\u4e3b\u529b|\u6838\u5fc3/.test(normalized)) {
+    return 'core';
+  }
+
+  return normalizeHeroHallLineupId(text);
+}
+
+function getLineupIntentFromEvent(event: AgentStreamEvent): HeroHallLineupId | undefined {
+  if (event.stage !== 'agent_recommendation') {
+    return undefined;
+  }
+
+  const type = String(event.type || '').trim().toUpperCase();
+  const typeIntent: Record<string, HeroHallLineupId> = {
+    ACQUISITION_LINEUP: 'growth',
+    CORE_LINEUP: 'core',
+    DEAL_LINEUP: 'conversion',
+    GROWTH_LINEUP: 'growth',
+    MAIN_LINEUP: 'core',
+    PRIMARY_LINEUP: 'core',
+    SALES_LINEUP: 'conversion',
+  };
+
+  if (typeIntent[type]) {
+    return typeIntent[type];
+  }
+
+  if (type === 'LINEUP' || type.endsWith('_LINEUP')) {
+    return detectRequestedLineupFromText(event.content);
+  }
+
+  return undefined;
+}
+
+function getHeroHallLineupLabel(lineupId: HeroHallLineupId | string | undefined) {
+  const normalizedLineup = normalizeHeroHallLineupId(lineupId);
+  return heroHallLineups.find((lineup) => lineup.id === normalizedLineup)?.label || '\u9635\u5bb9';
+}
+
+function getCatalogAgentsForLineup(lineupId: HeroHallLineupId, limit = fallbackLineupLimit): RecommendedAgent[] {
+  const scoredAgents = getCatalogHeroAgents()
+    .map((agent, index) => {
+      const haystack = [agent.name, agent.stageLabel, agent.metaLabel, agent.fallbackReason].filter(Boolean).join(' ');
+
+      return {
+        agent,
+        index,
+        score: getLineupCatalogScore(lineupId, haystack),
+      };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .slice(0, limit);
+
+  return scoredAgents.map(({ agent }, index) => ({
+    ...agent,
+    agent_index: index,
+    agent_name: agent.name,
+    lineup: lineupId,
+    rank: index + 1,
+    reason: getLineupFallbackReason(lineupId, agent),
+    stage: getLineupFallbackStage(lineupId, agent),
+    streamStatus: 'completed' as const,
+  }));
+}
+
+function getLineupCatalogScore(lineupId: HeroHallLineupId, haystack: string) {
+  const weights: Record<HeroHallLineupId, Array<[RegExp, number]>> = {
+    conversion: [
+      [/\u9500\u552e/i, 34],
+      [/\u79c1\u57df/i, 34],
+      [/\u6210\u4ea4/i, 30],
+      [/\u670b\u53cb\u5708/i, 24],
+      [/\u590d\u8d2d/i, 18],
+      [/\u8f6c\u5316/i, 14],
+      [/\u5ba2\u6237/i, 10],
+      [/CRM/i, 10],
+    ],
+    core: [
+      [/\u884c\u4e1a/i, 28],
+      [/\u6218\u7565/i, 24],
+      [/\u7528\u6237\u753b\u50cf/i, 24],
+      [/\u5b9a\u4f4d/i, 18],
+      [/\u7ba1\u7406/i, 12],
+    ],
+    growth: [
+      [/\u589e\u957f/i, 30],
+      [/\u83b7\u5ba2/i, 28],
+      [/\u5f15\u6d41/i, 24],
+      [/\u5c0f\u7ea2\u4e66/i, 22],
+      [/\u79cd\u8349/i, 20],
+      [/\u5185\u5bb9/i, 14],
+      [/\u8bc4\u8bba\u533a/i, 14],
+    ],
+  };
+
+  return weights[lineupId].reduce((score, [pattern, weight]) => score + (pattern.test(haystack) ? weight : 0), 0);
+}
+
+function getLineupFallbackStage(lineupId: HeroHallLineupId, agent: RecommendedAgent) {
+  if (lineupId === 'conversion') {
+    return '\u6210\u4ea4\u8f6c\u5316';
+  }
+
+  if (lineupId === 'growth') {
+    return '\u589e\u957f\u83b7\u5ba2';
+  }
+
+  return String(agent.stage || '\u4e3b\u529b\u7b56\u7565');
+}
+
+function getLineupFallbackReason(lineupId: HeroHallLineupId, agent: RecommendedAgent) {
+  if (lineupId === 'conversion') {
+    return '\u627f\u63a5\u5f53\u524d\u7ebf\u7d22\uff0c\u5f3a\u5316\u79c1\u57df\u8ddf\u8fdb\u4e0e\u6210\u4ea4\u8f6c\u5316\u3002';
+  }
+
+  if (lineupId === 'growth') {
+    return '\u56f4\u7ed5\u5185\u5bb9\u4e0e\u516c\u57df\u6d41\u91cf\uff0c\u8865\u5f3a\u62c9\u65b0\u83b7\u5ba2\u3002';
+  }
+
+  return String(agent.reason || '\u627f\u63a5\u5f53\u524d\u4e1a\u52a1\u8def\u5f84\uff0c\u4f5c\u4e3a\u4e3b\u529b\u63a8\u8fdb\u8282\u70b9\u3002');
+}
+
+function getRecommendedAgentLineup(agent: RecommendedAgent, fallbackIndex?: number): HeroHallLineupId | undefined {
+  const explicitLineup = normalizeHeroHallLineupId(agent.lineup ?? agent.lineup_id ?? agent.lineupId ?? agent.LINEUP);
+
+  if (explicitLineup) {
+    return explicitLineup;
+  }
+
+  if (fallbackIndex === undefined) {
+    return undefined;
+  }
+
+  return fallbackIndex < 3 ? 'core' : 'growth';
+}
+
+function getHeroHallAgentKey(agent: RecommendedAgent, enrichedAgent = enrichDrawAgent(agent)) {
+  return String(
+    enrichedAgent.id ||
+      enrichedAgent.agentKey ||
+      enrichedAgent.launchTarget ||
+      agent.agent_key ||
+      agent.agentKey ||
+      agent.id ||
+      getRecommendedAgentKey(agent),
+  );
+}
 
 const demoGraphAction: AgentAction = {
   confidence: 1,
@@ -562,6 +818,9 @@ function getVisibleWorkflow(
       SUMMARY: reveal.recommendationSummary ? getText('agentRecommendation.SUMMARY', workflow.agentRecommendation.SUMMARY) : '',
       THINKING_PROCESS: reveal.recommendationAck ? workflow.agentRecommendation.THINKING_PROCESS : '',
       agents: reveal.recommendationAgents ? visibleAgents : [],
+      ...(reveal.recommendationAgents && workflow.agentRecommendation.lineupIntent
+        ? { lineupIntent: workflow.agentRecommendation.lineupIntent }
+        : {}),
     },
     knowledgeGraph: {
       ACK: reveal.knowledgeAck ? getText('knowledgeGraph.ACK', workflow.knowledgeGraph.ACK) : '',
@@ -675,6 +934,20 @@ function setWorkflowGraphPath(workflow: AgentWorkflow, graphPath: AgentGraphPath
   };
 }
 
+function setWorkflowLineupIntent(workflow: AgentWorkflow, lineupId: HeroHallLineupId | undefined): AgentWorkflow {
+  if (!lineupId) {
+    return workflow;
+  }
+
+  return {
+    ...workflow,
+    agentRecommendation: {
+      ...workflow.agentRecommendation,
+      lineupIntent: lineupId,
+    },
+  };
+}
+
 function upsertRecommendedAgent(workflow: AgentWorkflow, agent: RecommendedAgent | undefined, options: Partial<RecommendedAgent> = {}) {
   if (!agent) {
     return workflow;
@@ -778,22 +1051,126 @@ function cleanStateText(value: unknown) {
   return String(value ?? '').trim();
 }
 
+function buildAgentStateItem(agent: RecommendedAgent, index: number, lineup?: HeroHallLineupId, key?: string) {
+  const agentName = cleanStateText(agent.agent_name || agent.name);
+  const fallbackName = cleanStateText(agent.name || agent.agent_name);
+
+  return {
+    agent_name: agentName,
+    key,
+    lineup: lineup ?? getRecommendedAgentLineup(agent, index),
+    name: fallbackName && fallbackName !== agentName ? fallbackName : undefined,
+    rank: agent.rank ?? index + 1,
+    reason: cleanStateText(agent.reason),
+    stage: cleanStateText(agent.stage),
+  };
+}
+
+function buildLineupsFromStateAgents(agents: NonNullable<AgentUserState['recommended_agents']>) {
+  const lineups: NonNullable<AgentUserState['lineups']> = {
+    conversion: [],
+    core: [],
+    growth: [],
+  };
+
+  agents.forEach((agent, index) => {
+    const lineupId = normalizeHeroHallLineupId(agent.lineup, index < 3 ? 'core' : 'growth') ?? 'core';
+    lineups[lineupId]?.push({ ...agent, lineup: lineupId });
+  });
+
+  return lineups;
+}
+
+function buildHeroHallLineupUserState(lineups: HeroHallLineupsState, agents: RecommendedAgent[]): AgentUserState {
+  const visibleAgents = agents.filter(hasDisplayableRecommendedAgent).map((agent, index) => {
+    const enrichedAgent = enrichDrawAgent(agent);
+
+    return {
+      agent,
+      key: getHeroHallAgentKey(agent, enrichedAgent),
+      stateItem: buildAgentStateItem(agent, index, getRecommendedAgentLineup(agent, index)),
+    };
+  });
+  const agentByKey = new Map(visibleAgents.map((agent) => [agent.key, agent]));
+  const lineupState: NonNullable<AgentUserState['lineups']> = {
+    conversion: [],
+    core: [],
+    growth: [],
+  };
+
+  heroHallLineups.forEach((lineup) => {
+    lineups[lineup.id].forEach((agentKey, index) => {
+      const agent = agentByKey.get(agentKey);
+
+      if (!agent) {
+        lineupState[lineup.id]?.push({
+          agent_name: agentKey,
+          key: agentKey,
+          lineup: lineup.id,
+          rank: index + 1,
+        });
+        return;
+      }
+
+      lineupState[lineup.id]?.push({
+        ...agent.stateItem,
+        key: agent.key,
+        lineup: lineup.id,
+        rank: agent.stateItem.rank ?? index + 1,
+      });
+    });
+  });
+
+  return { lineups: lineupState };
+}
+
+function mergeAgentUserState(baseState: AgentUserState | undefined, lineupState: AgentUserState): AgentUserState | undefined {
+  const merged: AgentUserState = {
+    ...(baseState || {}),
+  };
+
+  if (lineupState.lineups) {
+    merged.lineups = lineupState.lineups;
+  }
+
+  const lineupAgents = Object.values(lineupState.lineups || {})
+    .flat()
+    .filter(Boolean) as AgentUserStateLineupAgent[];
+
+  if (lineupAgents.length > 0) {
+    const lineupEntries = lineupAgents
+      .map((agent): [string, AgentUserStateLineupAgent] => [cleanStateText(agent.agent_name || agent.name || agent.key), agent])
+      .filter(([key]) => Boolean(key));
+    const lineupByName = new Map<string, AgentUserStateLineupAgent>(
+      lineupEntries,
+    );
+
+    merged.recommended_agents =
+      merged.recommended_agents && merged.recommended_agents.length > 0
+        ? merged.recommended_agents.map((agent) => {
+            const key = cleanStateText(agent.agent_name || agent.name);
+            const lineupAgent = lineupByName.get(key);
+
+            return lineupAgent ? { ...agent, lineup: lineupAgent.lineup } : agent;
+          })
+        : lineupAgents.map((agent) => ({
+            agent_name: agent.agent_name,
+            lineup: agent.lineup,
+            name: agent.name,
+            rank: agent.rank,
+            reason: agent.reason,
+            stage: agent.stage,
+          }));
+  }
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 function buildAgentUserStateFromWorkflow(workflow: AgentWorkflow): AgentUserState | null {
   const knowledgePath = cleanStateText(workflow.knowledgeGraph.KG_PATH);
   const knowledgePathNodes = splitRouteText(knowledgePath);
   const recommendedAgents = workflow.agentRecommendation.agents
-    .map((agent, index) => {
-      const agentName = cleanStateText(agent.agent_name || agent.name);
-      const fallbackName = cleanStateText(agent.name || agent.agent_name);
-
-      return {
-        agent_name: agentName,
-        name: fallbackName && fallbackName !== agentName ? fallbackName : undefined,
-        rank: agent.rank ?? index + 1,
-        reason: cleanStateText(agent.reason),
-        stage: cleanStateText(agent.stage),
-      };
-    })
+    .map((agent, index) => buildAgentStateItem(agent, index))
     .filter((agent) => agent.agent_name || agent.name)
     .slice(0, 10);
   const recommendationSummary = cleanStateText(workflow.agentRecommendation.SUMMARY);
@@ -809,6 +1186,7 @@ function buildAgentUserStateFromWorkflow(workflow: AgentWorkflow): AgentUserStat
 
   if (recommendedAgents.length > 0) {
     userState.recommended_agents = recommendedAgents;
+    userState.lineups = buildLineupsFromStateAgents(recommendedAgents);
   }
 
   if (recommendationSummary) {
@@ -862,6 +1240,18 @@ function getLatestRouteSegments(turns: AgentTurn[]) {
   }
 
   return [];
+}
+
+function getLatestRecommendationSummary(turns: AgentTurn[]) {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const summary = cleanStateText(turns[index].workflow.agentRecommendation.SUMMARY);
+
+    if (summary) {
+      return summary;
+    }
+  }
+
+  return '';
 }
 
 function getActionFromRoute(routeText: string): AgentAction | null {
@@ -983,6 +1373,7 @@ function hasAgentOutput(turn: AgentTurn | null) {
       workflow.agentRecommendation.THINKING_PROCESS ||
       workflow.agentRecommendation.ACK ||
       workflow.agentRecommendation.SUMMARY ||
+      workflow.agentRecommendation.lineupIntent ||
       workflow.agentRecommendation.agents.length,
   );
 }
@@ -1052,11 +1443,14 @@ export default function App() {
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
   const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
+  const lastHeroHallAutoKeyRef = useRef('');
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
+  const [heroHallOpen, setHeroHallOpen] = useState(false);
+  const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
   const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
   const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
@@ -1267,7 +1661,12 @@ export default function App() {
       const history = [...messages, nextUserMessage];
       agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
       const conversationIdsForRequest = { ...agentConversationIdsRef.current };
-      const userStateForRequest = getLatestAgentUserState(agentTurns);
+      const latestRecommendedAgentsForState = getLatestDisplayableRecommendedAgents(agentTurns);
+      const recommendedAgentsForLineupState =
+        latestRecommendedAgentsForState.length > 0 ? latestRecommendedAgentsForState : pinnedRecommendedAgents;
+      const lineupStateForRequest = buildHeroHallLineupUserState(heroHallLineupState, recommendedAgentsForLineupState);
+      const userStateForRequest = mergeAgentUserState(getLatestAgentUserState(agentTurns), lineupStateForRequest);
+      const requestedLineupForRequest = detectRequestedLineupFromText(text);
 
       agentRequestRef.current = controller;
       voiceControlRef.current?.pause();
@@ -1285,7 +1684,7 @@ export default function App() {
       ]);
       setSettings((current) => ({ ...current, energy: 0.82, mode: 'thinking', pulseSeed: current.pulseSeed + 1 }));
 
-      let accumulatedWorkflow = createEmptyAgentWorkflow();
+      let accumulatedWorkflow = setWorkflowLineupIntent(createEmptyAgentWorkflow(), requestedLineupForRequest);
       let revealState: WorkflowRevealState = { ...createEmptyWorkflowRevealState(), knowledgeAck: true };
       let cardsCompleted = false;
       let routeActionReady = false;
@@ -1294,6 +1693,8 @@ export default function App() {
       let hasSeenKnowledgePath = false;
       let streamError = '';
       let speechSegmentsClosed = false;
+      let requestedLineupForResponse = requestedLineupForRequest;
+      let appliedLineupFallback = false;
       const cardReadyWaiters: Array<(ready: boolean) => void> = [];
       const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
       const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
@@ -1494,6 +1895,38 @@ export default function App() {
           markCardsReady();
         }
       };
+      const applyLineupFallbackAgents = (lineupId: HeroHallLineupId) => {
+        if (appliedLineupFallback && requestedLineupForResponse === lineupId) {
+          return;
+        }
+
+        const fallbackAgents = getCatalogAgentsForLineup(lineupId);
+
+        if (fallbackAgents.length === 0) {
+          return;
+        }
+
+        appliedLineupFallback = true;
+        requestedLineupForResponse = lineupId;
+        commitWorkflow(setWorkflowLineupIntent(replaceRecommendedAgents(accumulatedWorkflow, fallbackAgents), lineupId));
+        agentRevealCount = null;
+        revealWorkflow({ recommendationAgents: true });
+        setHeroHallLineupState((current) =>
+          mergeHeroHallLineups(
+            current,
+            createHeroHallLineupsFromAgents(
+              fallbackAgents.map((agent) => ({
+                agent,
+                key: getHeroHallAgentKey(agent),
+              })),
+            ),
+          ),
+        );
+        setHeroHallOpen(true);
+        setRecommendationDockVisible(true);
+        setWorkflowHighlight('agents');
+        markCardsReady();
+      };
       const closeCardsReady = () => {
         const hasCards = accumulatedWorkflow.agentRecommendation.agents.length > 0;
 
@@ -1533,6 +1966,13 @@ export default function App() {
         const hasCards = await waitForCardsReady();
 
         if (!hasCards) {
+          return;
+        }
+
+        if (revealState.recommendationAgents) {
+          agentRevealCount = null;
+          publishVisibleWorkflow();
+          await wait(RECOMMENDATION_DOCK_REVEAL_MS);
           return;
         }
 
@@ -1585,6 +2025,7 @@ export default function App() {
           autoSaveHistory: true,
           conversationId: conversationIdsForRequest.route_planner,
           conversationIds: conversationIdsForRequest,
+          requestedLineup: requestedLineupForRequest,
           signal: controller.signal,
           userState: userStateForRequest,
           onEvent(event) {
@@ -1602,6 +2043,14 @@ export default function App() {
             commitKnowledgePathIfReady();
           },
           onContentDelta(event) {
+            const lineupIntent = getLineupIntentFromEvent(event);
+
+            if (lineupIntent) {
+              requestedLineupForResponse = lineupIntent;
+              commitWorkflow(setWorkflowLineupIntent(accumulatedWorkflow, lineupIntent));
+              applyLineupFallbackAgents(lineupIntent);
+            }
+
             const section = getWorkflowSection(event);
 
             if (!section) {
@@ -1659,7 +2108,23 @@ export default function App() {
           },
           onRecommendedAgentsCompleted(agents) {
             commitKnowledgePathIfReady();
-            commitWorkflow(replaceRecommendedAgents(accumulatedWorkflow, agents));
+            const normalizedAgents = requestedLineupForResponse
+              ? agents.map((agent) => ({
+                  ...agent,
+                  lineup: getRecommendedAgentLineup(agent) || requestedLineupForResponse,
+                }))
+              : agents;
+
+            if (normalizedAgents.length > 0) {
+              appliedLineupFallback = false;
+            }
+
+            commitWorkflow(
+              setWorkflowLineupIntent(
+                replaceRecommendedAgents(accumulatedWorkflow, normalizedAgents),
+                requestedLineupForResponse,
+              ),
+            );
             markCardsReady();
           },
           onWorkflowError(event) {
@@ -1670,6 +2135,9 @@ export default function App() {
 
         if (!routeActionReady) {
           commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
+        }
+        if (accumulatedWorkflow.agentRecommendation.agents.length === 0 && requestedLineupForResponse) {
+          applyLineupFallbackAgents(requestedLineupForResponse);
         }
         if (accumulatedWorkflow.agentRecommendation.agents.length > 0) {
           markCardsReady();
@@ -1769,9 +2237,11 @@ export default function App() {
       agentStatus,
       agentTurns,
       finishReplyWithoutSpeech,
+      heroHallLineupState,
       inputMode,
       manualVoiceSession,
       messages,
+      pinnedRecommendedAgents,
       rememberConversationIds,
       speakWithParticleOutput,
       voiceAwake,
@@ -1939,6 +2409,9 @@ export default function App() {
     graphRoute.length > 0
       ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
       : '';
+  const heroHallSummary = getLatestRecommendationSummary(agentTurns);
+  const heroHallKey = recommendedAgents.map(getRecommendedAgentKey).join('|');
+  const heroHallReady = agentStatus === 'completed' && recommendedAgents.length > 0 && Boolean(heroHallSummary);
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
@@ -1974,8 +2447,19 @@ export default function App() {
     }
   }, [latestDisplayableRecommendedAgents]);
 
+  useEffect(() => {
+    if (!heroHallReady || !heroHallKey || lastHeroHallAutoKeyRef.current === heroHallKey) {
+      return undefined;
+    }
+
+    lastHeroHallAutoKeyRef.current = heroHallKey;
+    const timer = window.setTimeout(() => setHeroHallOpen(true), 620);
+
+    return () => window.clearTimeout(timer);
+  }, [heroHallKey, heroHallReady]);
+
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-hero-hall={heroHallOpen}>
       <ParticleField
         audioLevel={micLevel.level}
         graphFocusKey={graphFocusKey}
@@ -1987,24 +2471,33 @@ export default function App() {
         active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
         agents={dockRecommendedAgents}
         highlight={workflowHighlight}
+        onOpenHeroHall={() => setHeroHallOpen(true)}
         routeSegments={dockRouteSegments}
       />
+      <AgentHeroHall
+        agents={recommendedAgents}
+        open={heroHallOpen}
+        onClose={() => setHeroHallOpen(false)}
+        onLineupsChange={setHeroHallLineupState}
+        routeSegments={graphRoute}
+      />
 
-      <section className="dialogue-stage" aria-label="AI particle dialogue">
-        {captionText ? (
-          <div className="orb-caption" data-testid="conversation-state">
-            <Sparkles size={16} />
-            <span>{captionText}</span>
-          </div>
-        ) : null}
+      {!heroHallOpen ? (
+        <section className="dialogue-stage" aria-label="AI particle dialogue">
+          {captionText ? (
+            <div className="orb-caption" data-testid="conversation-state">
+              <Sparkles size={16} />
+              <span>{captionText}</span>
+            </div>
+          ) : null}
 
-        {readoutText ? (
-          <div className="voice-readout" aria-live="polite">
-            <span>{readoutText}</span>
-          </div>
-        ) : null}
-
-      </section>
+          {readoutText ? (
+            <div className="voice-readout" aria-live="polite">
+              <span>{readoutText}</span>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <AgentConsole
         draft={draft}
@@ -2031,16 +2524,28 @@ function WorkflowDock({
   active,
   agents,
   highlight,
+  onOpenHeroHall,
   routeSegments,
 }: {
   active: boolean;
   agents: RecommendedAgent[];
   highlight: WorkflowHighlight;
+  onOpenHeroHall: () => void;
   routeSegments: string[];
 }) {
   const hasRoute = routeSegments.length > 0;
   const hasAgents = agents.length > 0;
-  const visibleAgents = agents.slice(0, 10);
+  const visibleAgents = agents;
+  const agentListRef = useRef<HTMLDivElement>(null);
+  const agentListKey = visibleAgents.map(getRecommendedAgentKey).join('|');
+
+  useEffect(() => {
+    const list = agentListRef.current;
+
+    if (list) {
+      list.scrollTop = 0;
+    }
+  }, [agentListKey]);
 
   if (!hasRoute && !hasAgents) {
     return null;
@@ -2061,13 +2566,12 @@ function WorkflowDock({
             <strong>推荐智能体</strong>
             <span>{agents.length}</span>
           </div>
-          <div className="workflow-agent-list">
+          <div className="workflow-agent-list" ref={agentListRef}>
             {visibleAgents.map((agent, index) => (
               <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
             ))}
           </div>
-          {agents.length > visibleAgents.length ? <em className="workflow-agent-more">+{agents.length - visibleAgents.length} 个待查看</em> : null}
-          <RecommendedAgentLaunchBar agents={agents} />
+          <RecommendedAgentLaunchBar agents={agents} onOpenHeroHall={onOpenHeroHall} />
         </section>
       ) : null}
     </aside>
@@ -2264,6 +2768,11 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
   const knowledgeGraph = workflow.knowledgeGraph;
   const recommendation = workflow.agentRecommendation;
   const routeSegments = splitRouteText(knowledgeGraph.KG_PATH);
+  const lineupIntent = normalizeHeroHallLineupId(recommendation.lineupIntent);
+  const lineupAgentCount = lineupIntent
+    ? recommendation.agents.filter((agent) => getRecommendedAgentLineup(agent) === lineupIntent).length ||
+      recommendation.agents.length
+    : 0;
   const showOutput = hasAgentOutput(turn);
 
   if (!showOutput && active) {
@@ -2279,6 +2788,7 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
       {renderAgentSubtitle(knowledgeGraph.EXPLANATION, speakingText)}
       {renderThinkingText('推荐思考', recommendation.THINKING_PROCESS, active && !recommendation.ACK)}
       {renderAgentSubtitle(recommendation.ACK, speakingText)}
+      {renderToolCallDivider('lineup', lineupAgentCount, lineupIntent)}
       {renderToolCallDivider('agents', recommendation.agents.length)}
       {renderAgentSubtitle(recommendation.SUMMARY, speakingText)}
       {renderAgentSubtitle(turn.fallbackText, speakingText)}
@@ -2288,21 +2798,33 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
   );
 }
 
-function renderToolCallDivider(kind: 'agents' | 'route', count: number) {
-  if (count <= 0) {
+function renderToolCallDivider(kind: 'agents' | 'lineup' | 'route', count: number, lineupId?: HeroHallLineupId) {
+  if (kind === 'lineup' && !lineupId) {
+    return null;
+  }
+
+  if (count <= 0 && kind !== 'lineup') {
     return null;
   }
 
   const isRoute = kind === 'route';
-  const title = isRoute ? '知识路径工具调用' : '智能体推荐工具调用';
-  const detail = isRoute ? `${count} 个路径节点已匹配` : `${count} 个推荐智能体已生成`;
+  const isLineup = kind === 'lineup';
+  const lineupLabel = getHeroHallLineupLabel(lineupId);
+  const title = isRoute ? '知识路径工具调用' : isLineup ? `${lineupLabel}工具调用` : '智能体推荐工具调用';
+  const detail = isRoute
+    ? `${count} 个路径节点已匹配`
+    : isLineup
+      ? count > 0
+        ? `${count} 个${lineupLabel}智能体已匹配`
+        : `正在匹配${lineupLabel}智能体`
+      : `${count} 个推荐智能体已生成`;
 
   return (
     <section className={`agent-tool-call agent-tool-call-${kind}`} aria-label={title}>
       <span className="agent-tool-call-rail" />
       <div className="agent-tool-call-core">
         <span className="agent-tool-call-icon" aria-hidden="true">
-          {isRoute ? <GitBranch size={13} /> : <Sparkles size={13} />}
+          {isRoute ? <GitBranch size={13} /> : isLineup ? <Trophy size={13} /> : <Sparkles size={13} />}
         </span>
         <strong>{title}</strong>
         <em>{detail}</em>
@@ -2423,7 +2945,7 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
   );
 }
 
-function RecommendedAgentLaunchBar({ agents }: { agents: RecommendedAgent[] }) {
+function RecommendedAgentLaunchBar({ agents, onOpenHeroHall }: { agents: RecommendedAgent[]; onOpenHeroHall: () => void }) {
   const enrichedAgents = agents.map(enrichDrawAgent);
   const launchTargets = getAgentLaunchTargets(enrichedAgents);
   const canOpen = launchTargets.length > 0;
@@ -2434,17 +2956,379 @@ function RecommendedAgentLaunchBar({ agents }: { agents: RecommendedAgent[] }) {
         <span>智能体组合包</span>
         <strong>{agents.length} 个智能体已生成</strong>
       </div>
-      <button disabled={!canOpen} onClick={() => openAgentLaunchTargets(launchTargets)} type="button">
-        <PackageOpen size={15} />
-        <span>{canOpen ? '一键打开组合' : '暂无可跳转链接'}</span>
-        {canOpen ? (
-          <em>
-            {launchTargets.length}
-            <ArrowUpRight size={12} />
-          </em>
-        ) : null}
-      </button>
+      <div className="recommended-agent-package-actions">
+        <button aria-label="进入智能体英雄殿堂" className="recommended-agent-package-hall" onClick={onOpenHeroHall} type="button">
+          <Crown size={14} />
+          <span>殿堂</span>
+        </button>
+        <button disabled={!canOpen} onClick={() => openAgentLaunchTargets(launchTargets)} type="button">
+          <PackageOpen size={15} />
+          <span>{canOpen ? '打开组合' : '暂无链接'}</span>
+          {canOpen ? (
+            <em>
+              {launchTargets.length}
+              <ArrowUpRight size={12} />
+            </em>
+          ) : null}
+        </button>
+      </div>
     </div>
+  );
+}
+
+function createHeroHallLineupsFromAgents(agents: Array<{ agent: RecommendedAgent; key: string }>): HeroHallLineupsState {
+  const explicitLineups = createHeroHallLineups();
+
+  agents.forEach((agent) => {
+    const lineupId = normalizeHeroHallLineupId(agent.agent.lineup ?? agent.agent.lineup_id ?? agent.agent.lineupId ?? agent.agent.LINEUP);
+
+    if (!lineupId) {
+      return;
+    }
+
+    explicitLineups[lineupId].push(agent.key);
+  });
+
+  return explicitLineups;
+}
+
+function mergeHeroHallLineups(current: HeroHallLineupsState, incoming: HeroHallLineupsState): HeroHallLineupsState {
+  return heroHallLineups.reduce<HeroHallLineupsState>((nextLineups, lineup) => {
+    const incomingKeys = Array.from(new Set(incoming[lineup.id]));
+
+    if (incomingKeys.length > 0) {
+      nextLineups[lineup.id] = incomingKeys;
+    }
+
+    return nextLineups;
+  }, { ...current });
+}
+
+function safeParseDragPayload(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as { agentKey?: unknown; sourceIndex?: unknown };
+    const agentKey = typeof parsed.agentKey === 'string' ? parsed.agentKey : '';
+    const sourceIndex = typeof parsed.sourceIndex === 'number' ? parsed.sourceIndex : undefined;
+
+    return agentKey ? { agentKey, sourceIndex } : null;
+  } catch {
+    return null;
+  }
+}
+
+function AgentHeroHall({
+  agents,
+  onClose,
+  onLineupsChange,
+  open,
+  routeSegments,
+}: {
+  agents: RecommendedAgent[];
+  onClose: () => void;
+  onLineupsChange: Dispatch<SetStateAction<HeroHallLineupsState>>;
+  open: boolean;
+  routeSegments: string[];
+}) {
+  const catalogHeroAgents = useMemo(
+    () =>
+      getCatalogHeroAgents().map((enrichedAgent, index) => ({
+        agent: enrichedAgent,
+        enrichedAgent,
+        key: getHeroHallAgentKey(enrichedAgent, enrichedAgent),
+        name: enrichedAgent.name || getAgentDisplayName(enrichedAgent),
+        reason: String(enrichedAgent.fallbackReason || '').trim(),
+        stage: enrichedAgent.stageLabel || getAgentStage(enrichedAgent, index),
+      })),
+    [],
+  );
+  const recommendedHeroAgents = useMemo(
+    () =>
+      agents.filter(hasDisplayableRecommendedAgent).map((agent, index) => {
+        const enrichedAgent = enrichDrawAgent(agent);
+        const name = enrichedAgent.name || getAgentDisplayName(agent);
+        const stage = enrichedAgent.stageLabel || getAgentStage(agent, index);
+        const reason = String(agent.reason || enrichedAgent.fallbackReason || '').trim();
+        const key = getHeroHallAgentKey(agent, enrichedAgent);
+
+        return {
+          agent,
+          enrichedAgent,
+          key,
+          name,
+          reason,
+          stage,
+        };
+      }),
+    [agents],
+  );
+  const heroAgents = catalogHeroAgents;
+  const lineupAgents = useMemo(() => {
+    const seen = new Set<string>();
+
+    return [...recommendedHeroAgents, ...catalogHeroAgents].filter((agent) => {
+      if (seen.has(agent.key)) {
+        return false;
+      }
+
+      seen.add(agent.key);
+      return true;
+    });
+  }, [catalogHeroAgents, recommendedHeroAgents]);
+  const agentByKey = useMemo(() => new Map(lineupAgents.map((agent) => [agent.key, agent])), [lineupAgents]);
+  const recommendationKey = recommendedHeroAgents
+    .map((agent) => `${agent.key}:${normalizeHeroHallLineupId(agent.agent.lineup ?? agent.agent.lineup_id ?? agent.agent.lineupId ?? agent.agent.LINEUP) || ''}`)
+    .join('|');
+  const [recommendationOverrides, setRecommendationOverrides] = useState<Record<number, string>>({});
+  const displayedRecommendedHeroAgents = useMemo(
+    () => recommendedHeroAgents.map((agent, index) => agentByKey.get(recommendationOverrides[index]) || agent),
+    [agentByKey, recommendationOverrides, recommendedHeroAgents],
+  );
+  const recommendedLaunchTargets = useMemo(
+    () => getAgentLaunchTargets(displayedRecommendedHeroAgents.map((agent) => agent.enrichedAgent)),
+    [displayedRecommendedHeroAgents],
+  );
+  const heroGridRef = useRef<HTMLDivElement | null>(null);
+  const [draggingKey, setDraggingKey] = useState('');
+  const [pointerDrag, setPointerDrag] = useState<{ agentKey: string; sourceIndex?: number; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const incomingLineups = createHeroHallLineupsFromAgents(recommendedHeroAgents);
+    onLineupsChange((current) => mergeHeroHallLineups(current, incomingLineups));
+
+    setDraggingKey('');
+    setPointerDrag(null);
+    setRecommendationOverrides({});
+  }, [onLineupsChange, recommendationKey, recommendedHeroAgents]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    heroGridRef.current?.scrollTo({ left: 0, top: 0 });
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, open]);
+
+  const resetRecommendationCards = useCallback(() => {
+    setRecommendationOverrides({});
+  }, []);
+
+  const replaceRecommendationCard = useCallback(
+    (targetIndex: number, agentKey: string, sourceIndex?: number) => {
+      if (!agentByKey.has(agentKey) || targetIndex < 0 || targetIndex >= recommendedHeroAgents.length) {
+        return;
+      }
+
+      setRecommendationOverrides((current) => {
+        const nextKeys = recommendedHeroAgents.map((agent, index) => current[index] || agent.key);
+
+        if (sourceIndex !== undefined && sourceIndex >= 0 && sourceIndex < nextKeys.length) {
+          const sourceKey = nextKeys[sourceIndex];
+          nextKeys[sourceIndex] = nextKeys[targetIndex];
+          nextKeys[targetIndex] = sourceKey;
+        } else {
+          nextKeys[targetIndex] = agentKey;
+        }
+
+        return nextKeys.reduce<Record<number, string>>((next, key, index) => {
+          if (key !== recommendedHeroAgents[index]?.key) {
+            next[index] = key;
+          }
+
+          return next;
+        }, {});
+      });
+    },
+    [agentByKey, recommendedHeroAgents],
+  );
+
+  const handleDragStart = (event: DragEvent<HTMLElement>, agentKey: string, sourceIndex?: number) => {
+    setDraggingKey(agentKey);
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/x-hero-agent', JSON.stringify({ agentKey, sourceIndex }));
+    event.dataTransfer.setData('text/plain', agentKey);
+  };
+
+  useEffect(() => {
+    if (!pointerDrag) {
+      return undefined;
+    }
+
+    const agentKey = pointerDrag.agentKey;
+    const handlePointerMove = (event: PointerEvent) => {
+      setPointerDrag((current) => (current?.agentKey === agentKey ? { ...current, x: event.clientX, y: event.clientY } : current));
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      const dropTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('.hero-recommendation-card[data-recommendation-index]');
+      const targetIndex = Number(dropTarget?.dataset.recommendationIndex);
+
+      if (Number.isFinite(targetIndex)) {
+        replaceRecommendationCard(targetIndex, agentKey, pointerDrag.sourceIndex);
+      }
+
+      setPointerDrag(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [pointerDrag, replaceRecommendationCard]);
+
+  const handlePointerDragStart = (event: ReactPointerEvent<HTMLElement>, agentKey: string, sourceIndex?: number) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button, a')) {
+      return;
+    }
+
+    setPointerDrag({ agentKey, sourceIndex, x: event.clientX, y: event.clientY });
+  };
+
+  const handleRecommendationDrop = (event: DragEvent<HTMLElement>, targetIndex: number) => {
+    event.preventDefault();
+    const transferPayload = event.dataTransfer.getData('application/x-hero-agent');
+    const parsedPayload = safeParseDragPayload(transferPayload);
+    const agentKey = parsedPayload?.agentKey || event.dataTransfer.getData('text/plain') || draggingKey;
+
+    replaceRecommendationCard(targetIndex, agentKey, parsedPayload?.sourceIndex);
+    setDraggingKey('');
+  };
+
+  const pointerDragAgent = pointerDrag ? agentByKey.get(pointerDrag.agentKey) : null;
+  const activeRoute = routeSegments.at(-1) || '推荐完成';
+  const canOpenRecommended = recommendedLaunchTargets.length > 0;
+
+  if (!open || heroAgents.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="agent-hero-hall" aria-label="智能体英雄殿堂">
+      <div className="hero-hall-shell">
+        <header className="hero-hall-header">
+          <div className="hero-hall-title">
+            <span>
+              <Crown size={16} />
+              智能体英雄殿堂
+            </span>
+            <h1>智能体英雄殿堂</h1>
+          </div>
+          <div className="hero-hall-header-actions">
+            <button disabled={!canOpenRecommended} onClick={() => openAgentLaunchTargets(recommendedLaunchTargets)} type="button">
+              <PackageOpen size={16} />
+              <span>打开推荐</span>
+            </button>
+            <button onClick={resetRecommendationCards} type="button">
+              <RotateCcw size={16} />
+              <span>重置卡牌</span>
+            </button>
+            <button aria-label="关闭智能体英雄殿堂" className="hero-hall-icon-button" onClick={onClose} type="button">
+              <X size={18} />
+            </button>
+          </div>
+        </header>
+
+        <div className="hero-hall-body">
+          <section className="hero-hall-roster" aria-label="智能体英雄墙">
+            <div className="hero-hall-section-title">
+              <Sparkles size={15} />
+              <strong>智能体英雄墙</strong>
+              <span>{heroAgents.length}</span>
+            </div>
+            <div className="hero-hall-card-grid" ref={heroGridRef}>
+              {heroAgents.map((agent, index) => (
+                <article
+                  aria-label={agent.stage ? `${agent.name} ${agent.stage}` : agent.name}
+                  className="hero-agent-card"
+                  draggable
+                  key={agent.key}
+                  onDragEnd={() => setDraggingKey('')}
+                  onDragStart={(event) => handleDragStart(event, agent.key)}
+                  onPointerDown={(event) => handlePointerDragStart(event, agent.key)}
+                >
+                  <span className="hero-agent-rank">{String(index + 1).padStart(2, '0')}</span>
+                  <span className={`hero-agent-avatar ${agent.enrichedAgent.avatar ? 'has-avatar' : ''}`} aria-hidden="true">
+                    {agent.enrichedAgent.avatar ? <img alt="" loading="lazy" src={agent.enrichedAgent.avatar} /> : <Sparkles size={24} />}
+                  </span>
+                  <strong title={agent.name}>{agent.name}</strong>
+                  <em title={agent.stage}>{agent.stage}</em>
+                  <button aria-label={`用${agent.name}替换第一张推荐卡牌`} disabled={recommendedHeroAgents.length === 0} onClick={() => replaceRecommendationCard(0, agent.key)} type="button">
+                    <Plus size={14} />
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="hero-hall-ranking hero-hall-recommendations" aria-label="智能体推荐卡牌">
+            <div className="hero-hall-section-title">
+              <GripVertical size={15} />
+              <strong>智能体推荐卡牌</strong>
+              <span>{activeRoute}</span>
+            </div>
+            <ol className="hero-recommendation-deck">
+              {displayedRecommendedHeroAgents.map((agent, index) => (
+                <li
+                  className="hero-recommendation-card"
+                  data-recommendation-index={index}
+                  draggable
+                  key={agent.key}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDragEnd={() => setDraggingKey('')}
+                  onDragStart={(event) => handleDragStart(event, agent.key, index)}
+                  onDrop={(event) => handleRecommendationDrop(event, index)}
+                  onPointerDown={(event) => handlePointerDragStart(event, agent.key, index)}
+                >
+                  <span className="hero-ranking-number">{String(index + 1).padStart(2, '0')}</span>
+                  <span className={`hero-ranking-avatar ${agent.enrichedAgent.avatar ? 'has-avatar' : ''}`} aria-hidden="true">
+                    {agent.enrichedAgent.avatar ? <img alt="" loading="lazy" src={agent.enrichedAgent.avatar} /> : <Sparkles size={15} />}
+                  </span>
+                  <div>
+                    <strong title={agent.name}>{agent.name}</strong>
+                    <em title={agent.stage}>{agent.stage}</em>
+                    {agent.reason ? <p>{agent.reason}</p> : null}
+                  </div>
+                  {agent.enrichedAgent.launchTarget ? (
+                    <a aria-label={`打开${agent.name}`} href={agent.enrichedAgent.launchTarget} rel="noopener noreferrer" target="_blank">
+                      <ExternalLink size={14} />
+                    </a>
+                  ) : (
+                    <button aria-label={`替换${agent.name}`} type="button">
+                      <Plus size={14} />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+        {pointerDrag && pointerDragAgent ? (
+          <div className="hero-drag-ghost" style={{ left: pointerDrag.x, top: pointerDrag.y }}>
+            <span className={`hero-drag-ghost-avatar ${pointerDragAgent.enrichedAgent.avatar ? 'has-avatar' : ''}`} aria-hidden="true">
+              {pointerDragAgent.enrichedAgent.avatar ? <img alt="" src={pointerDragAgent.enrichedAgent.avatar} /> : <Sparkles size={14} />}
+            </span>
+            <strong>{pointerDragAgent.name}</strong>
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

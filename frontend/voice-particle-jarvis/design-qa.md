@@ -1,28 +1,41 @@
-# Design QA
+**Source Visual Truth**
+- `C:/Users/中隐会-56/AppData/Local/Temp/codex-clipboard-266c1959-450e-4b0a-88d3-0948cd355b13.png`
 
-Final result: passed
+**Implementation Evidence**
+- Desktop screenshot: `C:/Users/中隐会-56/Documents/agent开发/agent-workshop-add-voice-particle-jarvis/frontend/voice-particle-jarvis/outputs/hero-hall-desktop.png`
+- Mobile screenshot: `C:/Users/中隐会-56/Documents/agent开发/agent-workshop-add-voice-particle-jarvis/frontend/voice-particle-jarvis/outputs/hero-hall-mobile.png`
+- Full-view comparison: `C:/Users/中隐会-56/Documents/agent开发/agent-workshop-add-voice-particle-jarvis/frontend/voice-particle-jarvis/outputs/hero-hall-comparison.png`
 
-## Prototype
+**Viewport**
+- Desktop: 1800 x 1010.
+- Mobile: 390 x 844.
 
-- App: `frontend/voice-particle-jarvis`
-- Stack: Vite + React + Three.js
-- Intent: a JARVIS-like 3D particle dialogue surface with voice input, text input, browser speech output, and a placeholder model slot.
+**State**
+- Hero hall open after recommendation completion.
+- Hero wall contains 60 catalog agents.
+- Recommendation ranking contains the current 5 recommended agents.
+- Lineup defaults distribute recommended agents as 3 / 2 / 0.
 
-## Checks
+**Full-View Comparison Evidence**
+- The implementation now follows the source structure: large dark crown banner, gold primary action, blue reset/close controls, left hero wall, lower recommendation list, and right lineup composition panel.
+- Panel borders, glass backgrounds, gold ranking badges, card density, and dark navy/gold palette are visually aligned with the source.
 
-| Check | Result | Notes |
-| --- | --- | --- |
-| 3D particle orb | passed | The central field renders as a stable 3D particle sphere with natural density rings and restrained motion. |
-| Voice output tone | passed | Browser speech output is tuned toward a mature English male voice when a matching system voice is available. |
-| Voice preview | passed | The bottom voice hint is a click target that primes speech output and plays a short mature AI-butler line. |
-| Audio response path | passed | Microphone energy can drive particle pulse, radius, brightness, and point size after browser permission is granted. |
-| Model slot | passed | The AI endpoint remains configurable through `VITE_AI_CHAT_ENDPOINT`; local English placeholder replies keep the demo flow alive. |
-| Voice-output motion | passed | The small-sphere recomposition was removed; voice output now drives whole-orb breathing, brightness, particle size, and speech-boundary pulses. |
-| Responsive layout | passed | Desktop and 390px mobile viewport checks keep the orb, dialogue cards, and input controls visible. |
-| Build | passed | `npm run build` completes; Vite reports only the expected Three.js chunk-size warning. |
+**Focused Region Comparison Evidence**
+- Header: generated crown-hall raster is used as the center banner asset, with title and action controls positioned like the reference.
+- Hero cards: rank badge, avatar/image area, name, stage chip, and plus button match the expected hierarchy.
+- Lineups: default grouping and count badges match the reference behavior, including empty conversion lineup.
+- Mobile: top banner and two-column hero cards remain readable and scroll vertically without overlapping controls.
 
-## Notes
+**Findings**
+- No actionable P0/P1/P2 issues remain.
 
-- Automated QA did not accept the microphone permission prompt; live microphone input should be checked manually in Chrome or Edge.
-- Speech voice availability depends on the user's browser and OS voice pack. If no preferred English male voice exists, the app falls back to the browser's default English voice.
-- This directory intentionally excludes `node_modules` and generated `dist` output.
+**Follow-Up Polish**
+- P3: The generated crown banner is not pixel-identical to the reference, but it preserves the same premium hall/crown direction and is acceptable without a source asset.
+
+**Patches Made Since QA Start**
+- Added generated `assets/hero-hall-bg.png`.
+- Restyled the hero hall banner, panels, hero cards, ranking rows, lineup chips, and mobile layout.
+- Changed default lineup distribution from only top 3 to 3 / remaining recommendations / empty.
+
+**Final Result**
+- final result: passed

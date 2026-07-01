@@ -1,4 +1,4 @@
-import type { AgentUserState, RecommendedAgent } from '../types';
+import type { AgentLineupId, AgentUserState, RecommendedAgent } from '../types';
 
 const DEFAULT_REMOTE_API_BASE_URL = 'http://106.52.56.14/agent-workshop-api';
 
@@ -38,6 +38,7 @@ type StreamAgentHandlers = {
   onRecommendedAgentStarted?: (event: AgentStreamEvent) => void;
   onRecommendedAgentsCompleted?: (agents: RecommendedAgent[], event: AgentStreamEvent) => void;
   onWorkflowError?: (event: AgentStreamEvent) => void;
+  requestedLineup?: AgentLineupId | string;
   signal?: AbortSignal;
   userState?: AgentUserState;
 };
@@ -67,8 +68,10 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     auto_save_history?: boolean;
     conversation_id?: string;
     conversation_ids?: Record<string, string>;
+    lineups?: AgentUserState['lineups'];
     message: string;
     parameters: Record<string, never>;
+    requested_lineup?: AgentLineupId | string;
     user_state?: AgentUserState;
   } = {
     message,
@@ -91,8 +94,16 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     body.auto_save_history = handlers.autoSaveHistory;
   }
 
+  if (handlers.requestedLineup) {
+    body.requested_lineup = handlers.requestedLineup;
+  }
+
   if (handlers.userState && Object.keys(handlers.userState).length > 0) {
     body.user_state = handlers.userState;
+
+    if (handlers.userState.lineups) {
+      body.lineups = handlers.userState.lineups;
+    }
   }
 
   const response = await fetch(COZE_CHAT_STREAM_URL, {
