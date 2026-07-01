@@ -601,8 +601,11 @@ export default function App() {
           return;
         }
 
+        const audioPromise = requestTtsAudio(segmentText);
+        audioPromise.catch(() => null);
+
         const asset: PreloadedSpeechAsset = {
-          audioPromise: requestTtsAudio(segmentText),
+          audioPromise,
           text: segmentText,
         };
         speechAssets.set(segment, asset);

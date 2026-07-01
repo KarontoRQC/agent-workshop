@@ -15,8 +15,8 @@ function resolveProxyApi(value: string) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const apiBaseUrl = env.API_PROXY_BASE_URL || env.VITE_AGENT_API_BASE_URL || env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
-  const ttsProxyTarget = env.TTS_PROXY_TARGET || 'http://127.0.0.1:5000';
   const api = resolveProxyApi(apiBaseUrl);
+  const tts = resolveProxyApi(env.TTS_PROXY_TARGET || apiBaseUrl);
 
   return {
     plugins: [react()],
@@ -25,7 +25,8 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api/tts': {
           changeOrigin: true,
-          target: ttsProxyTarget,
+          rewrite: (path) => (tts.prefix ? path.replace(/^\/api/, tts.prefix) : path),
+          target: tts.target,
         },
         '/api': {
           changeOrigin: true,
