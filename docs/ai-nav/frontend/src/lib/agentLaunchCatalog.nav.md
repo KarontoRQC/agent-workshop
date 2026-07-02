@@ -36,4 +36,3 @@ agentLaunchCatalog.ts
 ← 引入: data/source_agents_full.json, src/assets/agent-avatars
 → 被引用: AgentDrawOverlay, WorkflowDock, AgentHeroHall, heroHallModel
 ```
-

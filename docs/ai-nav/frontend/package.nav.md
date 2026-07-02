@@ -29,4 +29,3 @@
 
 - **新增依赖**: 同步更新 `frontend/package-lock.json`，并在最终说明中写明原因。
 - **新增脚本**: 同步根级 `AGENTS.md` 的命令区。
-

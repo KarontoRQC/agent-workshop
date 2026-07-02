@@ -27,4 +27,3 @@
 - **新增 feature 样式**: 优先写入对应 feature 的 `.css`，不要继续扩大 `App.css`。
 - **改 Hero Hall 外壳**: 保持 `frontend/AGENTS.md` 中「作为主页 cockpit HUD 模块弹出」的约束。
 - **改移动端**: 检查文本是否溢出按钮、面板和卡片。
-

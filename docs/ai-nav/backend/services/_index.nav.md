@@ -24,4 +24,3 @@
 - **改标签协议**: 先改 prompt，再改 `coze_stream_transformer.py` 和 `recommended_agents_stream.py`，最后改前端消费。
 - **改会话状态**: 同时检查 `coze_client.py` 的上游会话 ID 和 `coze_workflow.py` 的 `conversation.updated` 输出。
 - **改 TTS**: 保持 `tts_service.py` 抛出明确的配置错误和合成错误，路由层负责映射状态码。
-

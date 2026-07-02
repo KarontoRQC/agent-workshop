@@ -22,4 +22,3 @@ Hero Hall 模块负责推荐战队弹层、英雄池、拖拽替换、阵容状�
 - **改推荐战队卡牌**: 优先修改 `HeroTeamCarousel.tsx` 和 `HeroTeamCarousel.css`。
 - **改英雄池/拖拽替换**: 修改 `AgentHeroHall.tsx`，保持自定义 pointer drag 和 drop target glow。
 - **改阵容推断**: 修改 `heroHallModel.ts`，同步后端 `LINEUP_ALIASES`。
-

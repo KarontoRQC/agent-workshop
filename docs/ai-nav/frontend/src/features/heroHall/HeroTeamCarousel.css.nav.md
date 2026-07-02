@@ -24,4 +24,3 @@
 
 - **改卡牌尺寸**: 同步检查 `AgentHeroHall.tsx` 的容器空间和移动端布局。
 - **改动画**: 避免引入大面积无限 blur/shimmer，遵守 Hero Hall 性能预算。
-

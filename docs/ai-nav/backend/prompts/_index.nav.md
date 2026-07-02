@@ -19,4 +19,3 @@
 
 - **改标签名或顺序**: 同步改 `backend/services/coze_stream_transformer.py`、`backend/services/recommended_agents_stream.py` 和前端流式消费。
 - **改阵容规则**: 同步检查 `core/growth/conversion` 在后端和前端模型中的映射。
-

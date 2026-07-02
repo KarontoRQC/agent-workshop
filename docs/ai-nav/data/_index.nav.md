@@ -16,4 +16,3 @@
 
 - **新增智能体**: 保持 `智能体名称` 字段非空；如有可打开入口，填入 `智能体链接`。
 - **改字段名**: 同步检查 `backend/config.py` 和 `frontend/src/lib/agentLaunchCatalog.ts`。
-

@@ -28,4 +28,3 @@
 
 - **新增字段**: 同步 `FIELD_TAGS`、前端 `RecommendedAgent` 和 Hero Hall 展示。
 - **修改候选名称规则**: 同步 `data/source_agents_full.json` 字段读取逻辑。
-

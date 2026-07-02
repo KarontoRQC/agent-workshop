@@ -19,4 +19,3 @@ Workflow 模块维护后端 SSE 事件到前端展示状态的转换，包括知
 
 - **改 SSE 事件处理**: 先改 `workflowModel.ts`，再检查 `App.tsx` 的回调调用。
 - **改展示布局**: 修改 `WorkflowDock.tsx` 和 colocated CSS，保持主页 HUD 位置稳定。
-

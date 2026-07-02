@@ -23,4 +23,3 @@
 - **改后端事件字段**: 先改 `agentStreamClient.ts` 类型和分发，再改 `workflowModel.ts`。
 - **改本地 fallback**: 保持 `localMockAgent.ts` 只用于 demo，不要掩盖真实后端错误。
 - **改智能体目录**: 同步检查 `data/source_agents_full.json`。
-

@@ -27,4 +27,3 @@
 - **改可见体验**: 先读 `frontend/AGENTS.md`，再读对应 `src/` 模块导航。
 - **改代理或环境变量**: 修改 `vite.config.ts` 后同步检查 `frontend/README.md` 和根级 `README.md`。
 - **改依赖**: 修改 `package.json` 后才允许更新 `package-lock.json`。
-

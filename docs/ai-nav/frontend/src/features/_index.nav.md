@@ -19,4 +19,3 @@
 
 - **改跨模块状态**: 优先从 `workflow/workflowModel.ts` 和 `heroHall/heroHallModel.ts` 判断数据边界。
 - **改 UI 组件**: 保持组件和样式 colocated，不要把模块样式塞回 `App.css`。
-

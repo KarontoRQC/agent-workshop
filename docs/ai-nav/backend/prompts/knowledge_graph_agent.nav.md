@@ -25,4 +25,3 @@
 
 - **修改输出协议**: 必须同步后端 parser 和 `docs/coze-chat-stream-api.md`。
 - **修改路径节点数量**: 同步前端展示密度和后端 `GraphPathResolver` 预期。
-

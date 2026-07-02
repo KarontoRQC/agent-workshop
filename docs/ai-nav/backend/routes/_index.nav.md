@@ -20,4 +20,3 @@
 
 - **添加请求字段**: 在对应路由中归一化字段，再传入 service；不要让前端字段名散落到 service 多处。
 - **新增 SSE 错误**: 通过 `content_event` 和 `format_sse_event` 输出结构化事件。
-

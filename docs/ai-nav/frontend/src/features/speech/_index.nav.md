@@ -16,4 +16,3 @@ Speech 模块统一处理唤醒词、睡眠指令、服务端 TTS 请求、浏�
 
 - **改语音播放**: 保持 server → browser/local fallback 的 auto 模式。
 - **改唤醒词**: 同步检查 `App.tsx` 中 voice awake 状态。
-

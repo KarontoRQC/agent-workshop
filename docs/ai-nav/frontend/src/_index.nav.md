@@ -30,4 +30,3 @@
 - **改应用主状态**: 从 `App.tsx` 进入，再下钻到 `features/workflow/` 或 `features/heroHall/`。
 - **改共享数据结构**: 优先更新 `types.ts`，再检查所有导入方。
 - **改大块样式**: 优先使用 feature colocated CSS；只有全局 HUD/主页外壳才改 `App.css`。
-
