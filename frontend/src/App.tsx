@@ -4,12 +4,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from 'react';
-import { Activity, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
+import { Activity, BrainCircuit, CircuitBoard, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
 import ParticleField from './components/ParticleField';
+import { ZhongyinIntro } from './components/ZhongyinIntro';
 import { AgentConsole, type InputMode } from './features/agentConsole/AgentConsole';
-import { getRecommendedAgentKey } from './features/agents/agentUtils';
+import { getAgentDisplayName, getRecommendedAgentKey } from './features/agents/agentUtils';
 import { AgentHeroHall } from './features/heroHall/AgentHeroHall';
 import {
   createHeroHallLineups,
@@ -118,6 +120,28 @@ type HelmetIntelState = {
   tone: 'active' | 'nominal' | 'warning';
 };
 
+type HelmetTelemetrySnapshot = {
+  ai: number;
+  cpu: number;
+  gpu: number;
+};
+
+const HELMET_TELEMETRY_REFRESH_MS = 3200;
+
+function randomTelemetryValue(min: number, max: number) {
+  return Math.round(min + Math.random() * (max - min));
+}
+
+function createHelmetTelemetrySnapshot(status: AgentStatus, voiceAwake: boolean, voiceListening: boolean): HelmetTelemetrySnapshot {
+  const active = status === 'streaming';
+
+  return {
+    ai: active ? 100 : randomTelemetryValue(voiceListening ? 8 : voiceAwake ? 6 : 3, voiceListening ? 24 : voiceAwake ? 18 : 14),
+    cpu: randomTelemetryValue(active ? 34 : voiceListening ? 18 : 4, active ? 80 : voiceListening ? 72 : 58),
+    gpu: randomTelemetryValue(active ? 38 : voiceListening ? 20 : 6, active ? 80 : voiceListening ? 76 : 64),
+  };
+}
+
 function buildHelmetIntelStates({
   graphRoute,
   recommendedAgents,
@@ -215,7 +239,9 @@ function buildHelmetIntelStates({
 }
 
 export default function App() {
-  const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
+  const searchParams = new URLSearchParams(window.location.search);
+  const demoGraphEnabled = searchParams.has('demoGraph');
+  const introBypassed = demoGraphEnabled || searchParams.has('skipIntro');
   const speechCaptionTimerRef = useRef<number | null>(null);
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
@@ -225,11 +251,14 @@ export default function App() {
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
   const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
+  const introBootFlashTimerRef = useRef<number | null>(null);
   const lastHeroHallAutoKeyRef = useRef('');
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+  const [introOpen, setIntroOpen] = useState(!introBypassed);
+  const [introBootFlash, setIntroBootFlash] = useState(false);
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
   const [heroHallOpen, setHeroHallOpen] = useState(false);
   const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
@@ -1124,10 +1153,27 @@ export default function App() {
     primeSpeechOutput();
     return () => {
       agentRequestRef.current?.abort();
+      if (introBootFlashTimerRef.current !== null) {
+        window.clearTimeout(introBootFlashTimerRef.current);
+      }
       clearSpeechEndTimer();
       cancelSpeechPlayback();
     };
   }, [clearSpeechEndTimer]);
+
+  const closeIntro = useCallback(() => {
+    setIntroOpen(false);
+    setIntroBootFlash(true);
+
+    if (introBootFlashTimerRef.current !== null) {
+      window.clearTimeout(introBootFlashTimerRef.current);
+    }
+
+    introBootFlashTimerRef.current = window.setTimeout(() => {
+      setIntroBootFlash(false);
+      introBootFlashTimerRef.current = null;
+    }, 1900);
+  }, []);
 
   const toggleManualVoiceSession = useCallback(() => {
     if (!voice.supported) {
@@ -1225,9 +1271,16 @@ export default function App() {
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
   const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
+  const recommendedAgentFocusNodes =
+    recommendationDockVisible && recommendedAgents.length > 0
+      ? recommendedAgents.map((agent) => getAgentDisplayName(agent)).filter(Boolean).slice(0, 7)
+      : [];
+  const particleFocusNodes = recommendedAgentFocusNodes.length > 0 ? recommendedAgentFocusNodes : graphRoute;
   const graphFocusKey =
-    graphRoute.length > 0
-      ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
+    particleFocusNodes.length > 0
+      ? recommendedAgentFocusNodes.length > 0
+        ? `agents:${recommendedAgentFocusNodes.join('/')}`
+        : `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
       : '';
   const heroHallSummary = getLatestRecommendationSummary(agentTurns);
   const heroHallKey = recommendedAgents.map(getRecommendedAgentKey).join('|');
@@ -1279,32 +1332,33 @@ export default function App() {
   }, [heroHallKey, heroHallReady]);
 
   return (
-    <main className="app-shell" data-hero-hall={heroHallOpen}>
-      {!heroHallOpen ? (
-        <ParticleField
-          audioLevel={micLevel.level}
-          graphFocusKey={graphFocusKey}
-          graphRoute={graphRoute}
-          settings={settings}
-        />
-      ) : null}
+    <main
+      className="app-shell"
+      data-boot-flash={introBootFlash}
+      data-hero-hall="false"
+      data-hero-modal-open={heroHallOpen}
+      data-intro={introOpen}
+    >
+      <div className="space-cruise-backdrop" aria-hidden="true" />
+      <ParticleField
+        audioLevel={micLevel.level}
+        graphFocusKey={graphFocusKey}
+        graphRoute={particleFocusNodes}
+        settings={settings}
+      />
       <div className="scene-vignette" />
-      {!heroHallOpen ? (
-        <JarvisHelmetHud
-          inputMode={inputMode}
-          status={agentStatus}
-          voiceAwake={voiceAwake}
-          voiceListening={voice.listening}
-        />
-      ) : null}
-      {!heroHallOpen ? (
-        <HelmetTypewriterIntel
-          graphRoute={graphRoute}
-          recommendedAgents={recommendedAgents}
-          status={agentStatus}
-          voiceAwake={voiceAwake}
-        />
-      ) : null}
+      <JarvisHelmetHud
+        inputMode={inputMode}
+        status={agentStatus}
+        voiceAwake={voiceAwake}
+        voiceListening={voice.listening}
+      />
+      <HelmetTypewriterIntel
+        graphRoute={graphRoute}
+        recommendedAgents={recommendedAgents}
+        status={agentStatus}
+        voiceAwake={voiceAwake}
+      />
       <WorkflowDock
         active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
         agents={dockRecommendedAgents}
@@ -1312,51 +1366,51 @@ export default function App() {
         onOpenHeroHall={() => setHeroHallOpen(true)}
         routeSegments={dockRouteSegments}
       />
-      <AgentHeroHall
-        agents={recommendedAgents}
-        open={heroHallOpen}
-        onClose={() => setHeroHallOpen(false)}
-        onLineupsChange={setHeroHallLineupState}
-      />
+      <div className="hero-hall-style-scope app-shell" data-hero-hall={heroHallOpen}>
+        <AgentHeroHall
+          agents={recommendedAgents}
+          open={heroHallOpen}
+          onClose={() => setHeroHallOpen(false)}
+          onLineupsChange={setHeroHallLineupState}
+        />
+      </div>
 
-      {!heroHallOpen ? (
-        <section className="dialogue-stage" aria-label="AI particle dialogue">
-          {captionText ? (
-            <div className="orb-caption" data-testid="conversation-state">
-              <Sparkles size={16} />
+      <section className="dialogue-stage" aria-label="AI particle dialogue">
+        {captionText ? (
+          <div className="orb-caption" data-testid="conversation-state">
+            <Sparkles size={16} />
+            <span className="assistant-subtitle-wave" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>{captionText}</span>
+          </div>
+        ) : null}
+
+        {readoutText ? (
+          <div className="voice-readout" aria-live="polite">
+            <span className="assistant-subtitle">
               <span className="assistant-subtitle-wave" aria-hidden="true">
                 <i />
                 <i />
                 <i />
                 <i />
                 <i />
+                <i />
+                <i />
               </span>
-              <span>{captionText}</span>
-            </div>
-          ) : null}
-
-          {readoutText ? (
-            <div className="voice-readout" aria-live="polite">
-              <span className="assistant-subtitle">
-                <span className="assistant-subtitle-wave" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span>{readoutText}</span>
-              </span>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+              <span>{readoutText}</span>
+            </span>
+          </div>
+        ) : null}
+      </section>
 
       <AgentConsole
         draft={draft}
-        helmetVoice={!heroHallOpen}
+        helmetVoice
         inputMode={inputMode}
         onDraftKeyDown={handleDraftKeyDown}
         onModeChange={switchInputMode}
@@ -1372,6 +1426,7 @@ export default function App() {
         voiceTranscript={voice.transcript}
         voiceSupported={voice.supported}
       />
+      {introOpen ? <ZhongyinIntro onEnter={closeIntro} /> : null}
     </main>
   );
 }
@@ -1463,7 +1518,26 @@ function JarvisHelmetHud({
   voiceListening: boolean;
 }) {
   const linkState = status === 'streaming' ? 'AI STREAM' : voiceAwake ? 'VOICE LINK' : 'STANDBY';
-  const neuralState = status === 'streaming' ? 'SYNCING' : voiceListening ? 'LISTENING' : 'ONLINE';
+  const aiIsResponding = status === 'streaming';
+  const [telemetrySnapshot, setTelemetrySnapshot] = useState(() => createHelmetTelemetrySnapshot(status, voiceAwake, voiceListening));
+
+  useEffect(() => {
+    const refreshTelemetry = () => {
+      setTelemetrySnapshot(createHelmetTelemetrySnapshot(status, voiceAwake, voiceListening));
+    };
+
+    refreshTelemetry();
+    const timer = window.setInterval(refreshTelemetry, HELMET_TELEMETRY_REFRESH_MS);
+
+    return () => window.clearInterval(timer);
+  }, [status, voiceAwake, voiceListening]);
+
+  const aiLevel = aiIsResponding ? 100 : telemetrySnapshot.ai;
+  const performanceTelemetry = [
+    { channel: 'CPU', icon: Cpu, level: `${telemetrySnapshot.cpu}%`, readout: `${telemetrySnapshot.cpu}%` },
+    { channel: 'GPU', icon: CircuitBoard, level: `${telemetrySnapshot.gpu}%`, readout: `${telemetrySnapshot.gpu}%` },
+    { channel: 'AI', icon: BrainCircuit, level: `${aiLevel}%`, readout: `${aiLevel}%` },
+  ];
 
   return (
     <div className="jarvis-helmet-hud" data-awake={voiceAwake} data-status={status} aria-hidden="true">
@@ -1498,17 +1572,38 @@ function JarvisHelmetHud({
       </div>
 
       <div className="helmet-hud-stack helmet-hud-stack-left">
-        <div>
-          <Cpu size={14} />
-          <span>{neuralState}</span>
-        </div>
+        {performanceTelemetry.map((telemetry, index) => {
+          const Icon = telemetry.icon;
+          return (
+            <div
+              className="helmet-status-card"
+              data-active={telemetry.channel === 'AI' && aiIsResponding ? 'true' : undefined}
+              data-channel={telemetry.channel.toLowerCase()}
+              key={telemetry.channel}
+              style={{
+                '--telemetry-level': telemetry.level,
+                '--telemetry-load-delay': `${index * -170}ms`,
+                '--telemetry-sweep-delay': `${index * -620}ms`,
+              } as CSSProperties}
+            >
+              <span className="helmet-status-label">
+                <Icon size={13} />
+                <strong>{telemetry.channel}</strong>
+              </span>
+              <span className="helmet-status-value">{telemetry.readout}</span>
+              <span className="helmet-status-meter" aria-hidden="true">
+                <i />
+              </span>
+            </div>
+          );
+        })}
         <i />
         <i />
         <i />
       </div>
 
       <div className="helmet-hud-stack helmet-hud-stack-right">
-        <div>
+        <div className="helmet-target-card">
           <Radar size={14} />
           <span>TARGET LOCK</span>
         </div>

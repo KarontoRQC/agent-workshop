@@ -4,6 +4,7 @@ import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from '
 import type { RecommendedAgent } from '../../types';
 import { getAgentDisplayName, getAgentStage, getRecommendedAgentKey } from '../agents/agentUtils';
 import type { WorkflowHighlight } from './workflowModel';
+import './WorkflowDock.css';
 
 export function WorkflowDock({
   active,
@@ -64,6 +65,13 @@ export function WorkflowDock({
 }
 
 function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; routeSegments: string[] }) {
+  const routeListRef = useRef<HTMLDivElement>(null);
+  const routeListKey = routeSegments.join('|');
+
+  useEffect(() => {
+    routeListRef.current?.scrollTo({ top: 0 });
+  }, [routeListKey]);
+
   return (
     <section className={`workflow-dock-section workflow-route-panel ${highlighted ? 'is-prism' : ''}`}>
       <div className="workflow-dock-title">
@@ -71,7 +79,7 @@ function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; rou
         <strong>知识路径</strong>
         <span>{routeSegments.length}</span>
       </div>
-      <div className="workflow-route-chain">
+      <div className="workflow-route-chain" ref={routeListRef}>
         {routeSegments.map((segment, index) => (
           <span data-current={index === routeSegments.length - 1} key={`${index}-${segment}`}>
             {segment}
