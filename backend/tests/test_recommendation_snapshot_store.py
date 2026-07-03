@@ -1,0 +1,215 @@
+from datetime import datetime, timezone
+import re
+
+import pytest
+
+from services.recommendation_snapshot_store import (
+    InMemoryRecommendationSnapshotStore,
+    PostgresRecommendationSnapshotStore,
+    RecommendationSnapshotStoreError,
+    new_recommendation_id,
+)
+
+
+def test_new_recommendation_id_uses_rec_prefix_and_16_hex_chars():
+    recommendation_id = new_recommendation_id()
+
+    assert re.fullmatch(r"rec_[0-9a-f]{16}", recommendation_id)
+
+
+def test_create_snapshot_starts_streaming():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+
+    snapshot = store.create_snapshot("plan baijiu sales conversion")
+
+    assert snapshot["id"] == "rec_test"
+    assert snapshot["status"] == "streaming"
+    assert snapshot["message"] == "plan baijiu sales conversion"
+    assert snapshot["agents"] == []
+
+
+def test_create_snapshot_uses_empty_api_fields():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+
+    snapshot = store.create_snapshot("message")
+
+    assert snapshot["summary"] == ""
+    assert snapshot["conversation_ids"] == {}
+    assert snapshot["error"] == ""
+
+
+def test_merge_agent_delta_keeps_current_agent_snapshot():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+
+    store.merge_agent("rec_test", {"agent_index": 0, "rank": 1, "agent_name": "Sales Master"})
+    store.merge_agent("rec_test", {"agent_index": 0, "stage": "closing", "reason": "handle objection"})
+
+    snapshot = store.get_snapshot("rec_test")
+    assert snapshot["agents"] == [
+        {
+            "agent_index": 0,
+            "rank": 1,
+            "agent_name": "Sales Master",
+            "stage": "closing",
+            "reason": "handle objection",
+        }
+    ]
+
+
+def test_replace_agents_update_summary_and_complete_snapshot():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+    agents = [
+        {"agent_index": 0, "agent_name": "Sales Master"},
+        {"agent_index": 1, "agent_name": "Customer Expert"},
+    ]
+
+    store.replace_agents("rec_test", agents)
+    store.update_summary("rec_test", "Handle objections first, then promote repurchase.")
+    snapshot = store.complete_snapshot("rec_test")
+
+    assert snapshot["status"] == "completed"
+    assert snapshot["summary"] == "Handle objections first, then promote repurchase."
+    assert snapshot["agents"] == agents
+
+
+def test_get_snapshot_returns_none_when_missing():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+
+    assert store.get_snapshot("missing") is None
+
+
+def test_postgres_store_exposes_planned_api_methods():
+    expected_methods = [
+        "ensure_schema",
+        "create_snapshot",
+        "get_snapshot",
+        "merge_agent",
+        "replace_agents",
+        "update_summary",
+        "update_graph_path",
+        "update_conversation_ids",
+        "complete_snapshot",
+        "fail_snapshot",
+        "complete",
+        "fail",
+    ]
+
+    for method_name in expected_methods:
+        assert callable(getattr(PostgresRecommendationSnapshotStore, method_name))
+
+
+def test_recommendation_snapshot_store_error_can_be_imported():
+    assert issubclass(RecommendationSnapshotStoreError, Exception)
+
+
+def test_in_memory_update_summary_none_normalizes_to_empty_string():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+
+    snapshot = store.update_summary("rec_test", None)
+
+    assert snapshot["summary"] == ""
+
+
+def test_in_memory_update_conversation_ids_none_normalizes_to_empty_dict():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+
+    snapshot = store.update_conversation_ids("rec_test", None)
+
+    assert snapshot["conversation_ids"] == {}
+
+
+def test_postgres_update_summary_none_normalizes_before_write():
+    store = PostgresRecommendationSnapshotStore(connection=object())
+    captured_params = []
+    store._execute_write_returning_optional = lambda query, params: captured_params.append(params) or None
+
+    store.update_summary("rec_test", None)
+
+    assert captured_params[0][0] == ""
+
+
+def test_postgres_update_conversation_ids_none_normalizes_before_write():
+    store = PostgresRecommendationSnapshotStore(connection=object())
+    captured_params = []
+    store._jsonb = lambda value: value
+    store._execute_write_returning_optional = lambda query, params: captured_params.append(params) or None
+
+    store.update_conversation_ids("rec_test", None)
+
+    assert captured_params[0][0] == {}
+
+
+def test_postgres_row_to_snapshot_formats_datetime_fields_as_iso_strings():
+    store = PostgresRecommendationSnapshotStore(connection=object())
+    created_at = datetime(2026, 7, 2, 10, 30, 45, tzinfo=timezone.utc)
+    updated_at = datetime(2026, 7, 2, 10, 31, 45, tzinfo=timezone.utc)
+
+    snapshot = store._row_to_snapshot(
+        {
+            "id": "rec_test",
+            "status": "streaming",
+            "message": "message",
+            "agents_json": [],
+            "summary": "",
+            "graph_path_json": None,
+            "conversation_ids_json": {},
+            "error": "",
+            "created_at": created_at,
+            "updated_at": updated_at,
+        }
+    )
+
+    assert snapshot["created_at"] == created_at.isoformat()
+    assert snapshot["updated_at"] == updated_at.isoformat()
+
+
+def test_postgres_write_rolls_back_existing_connection_on_error():
+    connection = FailingConnection()
+    store = PostgresRecommendationSnapshotStore(connection=connection)
+
+    with pytest.raises(RuntimeError, match="write failed"):
+        store._execute_write("UPDATE recommendation_snapshots SET status = %s", ("failed",))
+
+    assert connection.rollback_called is True
+
+
+def test_postgres_write_returning_rolls_back_existing_connection_on_error():
+    connection = FailingConnection()
+    store = PostgresRecommendationSnapshotStore(connection=connection)
+
+    with pytest.raises(RuntimeError, match="write failed"):
+        store._execute_write_returning_optional(
+            "UPDATE recommendation_snapshots SET status = %s RETURNING id",
+            ("failed",),
+        )
+
+    assert connection.rollback_called is True
+
+
+class FailingCursor:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return None
+
+    def execute(self, query, params):
+        raise RuntimeError("write failed")
+
+
+class FailingConnection:
+    def __init__(self):
+        self.rollback_called = False
+
+    def cursor(self, *args, **kwargs):
+        return FailingCursor()
+
+    def commit(self):
+        raise AssertionError("commit should not be called after cursor failure")
+
+    def rollback(self):
+        self.rollback_called = True

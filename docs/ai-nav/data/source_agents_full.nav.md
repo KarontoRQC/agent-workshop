@@ -4,7 +4,7 @@
 
 ## 用途
 
-保存智能体源目录。后端读取 `智能体名称` 作为默认推荐候选，前端读取完整记录用于头像匹配、展示名称、知识库提示和启动链接。
+保存智能体源目录。后端读取 `智能体名称` 作为默认推荐候选，并通过 `PostgresAgentCatalogStore` 将完整记录种子导入 `agents` 表；前端运行时通过 `GET /api/agents` 获取目录，不再直接读取该文件。
 
 ## 结构
 
@@ -21,16 +21,16 @@
 
 内部依赖:
 - `backend/config.py` — 从 `智能体名称` 加载默认候选。
-- `frontend/src/lib/agentLaunchCatalog.ts` — 解析链接、头像、知识库和稳定 key。
+- `backend/services/agent_catalog_store.py` — 归一化完整记录并导入数据库目录。
 
 ## 修改指南
 
 - **改名称**: 检查推荐 prompt 是否仍能完全匹配候选名称。
-- **改链接字段**: 检查 `getAgentLaunchTarget` 是否仍能解析。
+- **改链接字段**: 检查 `agent_catalog_store.py`、`routes/agents.py` 和 `agentLaunchCatalog.ts` 是否仍能传递并解析 `launch_url`。
 
 ## 依赖图
 
 ```text
 source_agents_full.json
-→ 被引用: backend/config.py, frontend/src/lib/agentLaunchCatalog.ts
+→ 被引用: backend/config.py, backend/services/agent_catalog_store.py
 ```

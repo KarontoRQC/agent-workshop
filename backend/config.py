@@ -35,6 +35,31 @@ def get_frontend_origins():
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 
+def get_database_url():
+    return os.getenv(
+        "DATABASE_URL",
+        "postgresql://agent_workshop:agent_workshop@127.0.0.1:54329/agent_workshop",
+    ).strip()
+
+
+def get_source_agents_path():
+    configured_path = os.getenv("SOURCE_AGENTS_PATH", "").strip()
+
+    if configured_path:
+        return configured_path
+
+    return os.path.join(ROOT_DIR, "data", "source_agents_full.json")
+
+
+def get_agent_avatar_dir():
+    configured_path = os.getenv("AGENT_AVATAR_DIR", "").strip()
+
+    if configured_path:
+        return configured_path
+
+    return os.path.join(ROOT_DIR, "frontend", "src", "assets", "agent-avatars")
+
+
 def _get_float_env(name, default):
     value = os.getenv(name, default)
 

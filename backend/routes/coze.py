@@ -10,6 +10,7 @@ from services.coze_client import (
 )
 from services.coze_stream_transformer import content_event, format_sse_event
 from services.coze_workflow import start_chat_workflow_stream
+from services.recommendation_snapshot_stream import persist_recommendation_snapshot_stream
 
 
 coze_bp = Blueprint("coze", __name__)
@@ -39,9 +40,10 @@ def stream_chat():
         )
     except CozeConfigurationError as exc:
         if _chat_config_fallback_enabled():
-            return _sse_response(_local_configuration_fallback_stream(message=message, error=exc))
+            stream = _local_configuration_fallback_stream(message=message, error=exc)
+        else:
+            return jsonify({"error": str(exc)}), 503
 
-        return jsonify({"error": str(exc)}), 503
     except CozeConnectionError as exc:
         return jsonify({"error": "Failed to connect to chat provider", "detail": str(exc)}), 502
     except CozeUpstreamError as exc:
@@ -56,6 +58,12 @@ def stream_chat():
             exc.status_code,
         )
 
+    try:
+        stream = _attach_recommendation_snapshot(stream, message)
+    except Exception:
+        current_app.logger.exception("Recommendation snapshot store unavailable")
+        return jsonify({"error": "recommendation snapshot store unavailable"}), 503
+
     return _sse_response(_guard_stream_errors(stream))
 
 
@@ -68,6 +76,12 @@ def _sse_response(stream):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+def _attach_recommendation_snapshot(stream, message):
+    store = current_app.config["RECOMMENDATION_SNAPSHOT_STORE"]
+    snapshot = store.create_snapshot(message)
+    return persist_recommendation_snapshot_stream(stream, store, snapshot["id"])
 
 
 def _get_parameters(data):
@@ -240,7 +254,6 @@ def _guard_stream_errors(stream):
                 "workflow.error",
                 {
                     "error": "Backend stream failed",
-                    "detail": str(exc),
                 },
             )
         )
