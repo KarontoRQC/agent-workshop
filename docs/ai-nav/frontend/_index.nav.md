@@ -20,6 +20,7 @@
 ## 子模块
 
 - `src/` — React/TypeScript 源码和样式。
+- `scripts/` — 面向推荐快照和 Hero Hall 交互约束的 Node 验证脚本。
 - `assets/` — 页面背景和视觉素材，不为二进制资产单独生成导航。
 
 ## 开发模式

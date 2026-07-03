@@ -1,4 +1,53 @@
-# Prototype Instructions
+# frontend/AGENTS.md
+
+本文件为 Codex 修改 `frontend/` 下代码时提供目录级指导。根级 `AGENTS.md` 仍然适用；前端视觉、交互、语音和 Hero Hall 的长期决策以本文件为准。
+
+## 快速参考
+
+- **源码入口**: `frontend/src/`
+- **应用入口**: `frontend/src/App.tsx`
+- **全局样式**: `frontend/src/App.css`、`frontend/src/index.css`
+- **流式客户端**: `frontend/src/lib/agentStreamClient.ts`
+- **工作流状态**: `frontend/src/features/workflow/workflowModel.ts`
+- **Hero Hall**: `frontend/src/features/heroHall/`
+- **导航入口**: `docs/ai-nav/frontend/_index.nav.md`
+
+## 命令
+
+```bash
+cd frontend && npm run dev -- --host 127.0.0.1 --port 5188
+cd frontend && npm run build
+cd frontend && npm run preview -- --host 127.0.0.1
+```
+
+## 验证标准
+
+- 修改 TypeScript、React 组件、样式或 Vite 配置后，至少运行 `cd frontend && npm run build`。
+- 修改 Three.js、Hero Hall、HUD、语音或布局视觉后，必须用浏览器实际预览；桌面和移动端至少各检查一次。
+- 修改 `/api/coze/chat/stream` 消费、SSE 事件、推荐智能体字段或工作流状态后，同步检查 `docs/coze-chat-stream-api.md`、`frontend/src/lib/agentStreamClient.ts` 和 `frontend/src/features/workflow/workflowModel.ts`。
+- 修改代理、TTS 或环境变量读取后，同步检查 `frontend/vite.config.ts`、`frontend/README.md` 和根级 `README.md`。
+
+## 禁止事项
+
+- 禁止在没有依赖变更时修改 `frontend/package-lock.json`；如确需更新依赖，必须说明触发原因。
+- 禁止让前端在 `workflow.stage.completed` 后停止读取 Coze/LongCat 流；完整结束信号以 `workflow.completed` 或 `chat.completed` 为准。
+- 禁止把 `frontend/src/features/heroHall/HeroTeamCarousel.tsx` 的轮播实现内联回 `AgentHeroHall.tsx` 或追加到全局 `App.css`。
+- 禁止在 Agent Hero Hall 中用静态占位文案覆盖后端返回的推荐智能体名称、阶段、理由、头像或启动目标。
+- 禁止用可见说明文案替代拖拽、状态反馈或 HUD 交互本身。
+
+## 代码导航
+
+| 你要改的代码 | 先读 |
+|---|---|
+| `frontend/src/` | `docs/ai-nav/frontend/src/_index.nav.md` |
+| `frontend/src/lib/` | `docs/ai-nav/frontend/src/lib/_index.nav.md` |
+| `frontend/src/components/` | `docs/ai-nav/frontend/src/components/_index.nav.md` |
+| `frontend/src/hooks/` | `docs/ai-nav/frontend/src/hooks/_index.nav.md` |
+| `frontend/src/features/` | `docs/ai-nav/frontend/src/features/_index.nav.md` |
+| `frontend/src/features/heroHall/` | `docs/ai-nav/frontend/src/features/heroHall/_index.nav.md` |
+| `frontend/src/features/workflow/` | `docs/ai-nav/frontend/src/features/workflow/_index.nav.md` |
+
+## 原型操作规则
 
 Run the local server yourself and open the preview in the in-app browser. Do not give the user server-start instructions when you can run it.
 

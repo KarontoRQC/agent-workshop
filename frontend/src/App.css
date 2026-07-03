@@ -3309,7 +3309,8 @@
   min-width: 0;
 }
 
-.recommended-agent-package button {
+.recommended-agent-package button,
+.recommended-agent-package a {
   display: inline-flex;
   min-width: 0;
   height: 32px;
@@ -3326,6 +3327,7 @@
   font-size: 11px;
   font-weight: 820;
   outline: none;
+  text-decoration: none;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -3340,7 +3342,9 @@
 }
 
 .recommended-agent-package button:hover:not(:disabled),
-.recommended-agent-package button:focus-visible:not(:disabled) {
+.recommended-agent-package button:focus-visible:not(:disabled),
+.recommended-agent-package a:hover,
+.recommended-agent-package a:focus-visible {
   border-color: rgba(255, 226, 152, 0.42);
   background: rgba(28, 96, 96, 0.68);
   transform: translateY(-1px);
@@ -3351,11 +3355,13 @@
   opacity: 0.52;
 }
 
-.recommended-agent-package button > span {
+.recommended-agent-package button > span,
+.recommended-agent-package a > span {
   min-width: 0;
 }
 
-.recommended-agent-package button em {
+.recommended-agent-package button em,
+.recommended-agent-package a em {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -3510,6 +3516,7 @@
 }
 
 .hero-hall-header-actions button,
+.hero-hall-header-actions a,
 .hero-lineup > button,
 .hero-agent-card button,
 .hero-lineup-chip button,
@@ -3524,6 +3531,7 @@
   cursor: pointer;
   font: inherit;
   outline: none;
+  text-decoration: none;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -3532,7 +3540,8 @@
     transform 160ms ease;
 }
 
-.hero-hall-header-actions button {
+.hero-hall-header-actions button,
+.hero-hall-header-actions a {
   display: inline-flex;
   height: 44px;
   align-items: center;
@@ -3546,7 +3555,8 @@
   white-space: nowrap;
 }
 
-.hero-hall-header-actions button:first-child {
+.hero-hall-header-actions button:first-child,
+.hero-hall-header-actions a:first-child {
   border-color: rgba(255, 219, 132, 0.56);
   color: rgba(255, 246, 214, 0.99);
   background:
@@ -3567,6 +3577,8 @@
 }
 
 .hero-hall-header-actions button:hover:not(:disabled),
+.hero-hall-header-actions a:hover,
+.hero-hall-header-actions a:focus-visible,
 .hero-lineup > button:hover:not(:disabled),
 .hero-agent-card button:hover,
 .hero-lineup-chip button:hover,
@@ -9614,7 +9626,8 @@
   gap: 10px;
 }
 
-.app-shell[data-hero-hall='true'] .hero-hall-stage-actions button {
+.app-shell[data-hero-hall='true'] .hero-hall-stage-actions button,
+.app-shell[data-hero-hall='true'] .hero-hall-stage-actions a {
   width: 100%;
   min-width: 0;
   height: 48px;
@@ -11145,7 +11158,8 @@
   pointer-events: none;
 }
 
-.app-shell[data-hero-hall='false'] .recommended-agent-package button {
+.app-shell[data-hero-hall='false'] .recommended-agent-package button,
+.app-shell[data-hero-hall='false'] .recommended-agent-package a {
   border-radius: 3px;
   clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
@@ -11692,6 +11706,7 @@
 }
 
 .app-shell[data-hero-hall='true'] .hero-hall-stage-actions button,
+.app-shell[data-hero-hall='true'] .hero-hall-stage-actions a,
 .app-shell[data-hero-hall='true'] .hero-pool-search,
 .app-shell[data-hero-hall='true'] .hero-pool-filter select {
   clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
@@ -11977,7 +11992,8 @@
   filter: none;
 }
 
-.app-shell[data-hero-hall='true'] .hero-hall-stage-actions button {
+.app-shell[data-hero-hall='true'] .hero-hall-stage-actions button,
+.app-shell[data-hero-hall='true'] .hero-hall-stage-actions a {
   width: auto;
   min-width: 0;
   height: 34px;
@@ -12560,6 +12576,8 @@
 }
 
 .hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-pool-topbar {
+  position: relative;
+  z-index: 3;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px;
   min-height: 32px;
@@ -12594,6 +12612,8 @@
 .hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-pool-layout {
   grid-template-columns: 76px minmax(0, 1fr);
   gap: 7px;
+  isolation: isolate;
+  overflow: hidden;
 }
 
 .hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-pool-filter {
@@ -12616,10 +12636,16 @@
 }
 
 .hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-armory-grid.hero-pool-grid {
+  position: relative;
+  z-index: 1;
   grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   grid-auto-rows: 158px;
   gap: 8px;
   padding: 1px 5px 5px 1px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  clip-path: inset(0);
+  contain: paint;
 }
 
 .hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-agent-card.hero-pool-card {

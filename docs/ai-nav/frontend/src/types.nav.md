@@ -1,10 +1,10 @@
 # types.ts
 
-> `frontend/src/types.ts` · TypeScript · 约 110 行
+> `frontend/src/types.ts` · TypeScript · 约 171 行
 
 ## 用途
 
-集中定义前端共享的对话、粒子、推荐智能体、图谱路径、工作流和会话 turn 类型。
+集中定义前端共享的对话、粒子、推荐智能体、数据库智能体目录、推荐快照、图谱路径、工作流和会话 turn 类型。
 
 ## 导出
 
@@ -15,11 +15,14 @@
 | `ParticleSettings` | type | ~20 | 粒子视觉参数。 |
 | `Message` | type | ~26 | 对话消息结构。 |
 | `RecommendedAgent` | type | ~32 | 推荐智能体展示、阵容和启动字段。 |
-| `AgentUserState` | type | ~53 | 发送给后端的当前用户状态。 |
-| `AgentGraphPath` | type | ~81 | 后端动态图谱路径结构。 |
-| `AgentWorkflow` | type | ~88 | 前端两阶段工作流状态。 |
-| `AgentTurn` | type | ~106 | 单轮对话记录。 |
-| `ChatResponse` | type | ~116 | AI 回复统一结构。 |
+| `AgentCatalogItem` | type | ~64 | `GET /api/agents` 返回的数据库智能体目录项，包含 `avatar_url`、`launch_url` 和 `knowledge`。 |
+| `AgentUserState` | type | ~86 | 发送给后端的当前用户状态。 |
+| `AgentGraphPath` | type | ~114 | 后端动态图谱路径结构。 |
+| `RecommendationSnapshotStatus` | type | ~122 | 推荐快照状态枚举。 |
+| `RecommendationSnapshot` | type | ~124 | `GET /api/recommendations/<id>` 返回的组合快照结构。 |
+| `AgentWorkflow` | type | ~137 | 前端两阶段工作流状态。 |
+| `AgentTurn` | type | ~154 | 单轮对话记录。 |
+| `ChatResponse` | type | ~165 | AI 回复统一结构。 |
 
 ## 依赖
 
@@ -28,8 +31,9 @@
 
 ## 修改指南
 
-- **新增后端字段**: 先更新这里，再更新 `agentStreamClient.ts` 和展示层。
-- **改 `RecommendedAgent`**: 同步检查 `agentLaunchCatalog.ts`、`agentUtils.ts`、`heroHallModel.ts`。
+- **新增后端字段**: 先更新这里，再更新 `agentStreamClient.ts`、对应 API client 和展示层。
+- **改 `RecommendedAgent`**: 同步检查 `agentLaunchCatalog.ts`、`heroTeamPresentation.ts`、`heroHallModel.ts` 和组合入口页。
+- **改 `AgentCatalogItem`**: 同步检查 `backend/routes/agents.py`、`agentCatalogClient.ts` 和 `agentLaunchCatalog.ts`。
 
 ## 依赖图
 

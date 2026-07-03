@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ArrowUpRight, Crown, ExternalLink, GitBranch, PackageOpen, Sparkles } from 'lucide-react';
-import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from '../../lib/agentLaunchCatalog';
+import { enrichDrawAgent, getAgentCombinationEntryUrl, getAgentLaunchTargets } from '../../lib/agentLaunchCatalog';
 import type { RecommendedAgent } from '../../types';
 import { getAgentDisplayName, getAgentStage, getRecommendedAgentKey } from '../agents/agentUtils';
 import type { WorkflowHighlight } from './workflowModel';
@@ -11,12 +11,14 @@ export function WorkflowDock({
   agents,
   highlight,
   onOpenHeroHall,
+  recommendationId,
   routeSegments,
 }: {
   active: boolean;
   agents: RecommendedAgent[];
   highlight: WorkflowHighlight;
   onOpenHeroHall: () => void;
+  recommendationId?: string;
   routeSegments: string[];
 }) {
   const hasRoute = routeSegments.length > 0;
@@ -57,7 +59,7 @@ export function WorkflowDock({
               <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
             ))}
           </div>
-          <RecommendedAgentLaunchBar agents={agents} onOpenHeroHall={onOpenHeroHall} />
+          <RecommendedAgentLaunchBar agents={agents} onOpenHeroHall={onOpenHeroHall} recommendationId={recommendationId} />
         </section>
       ) : null}
     </aside>
@@ -145,10 +147,19 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
   );
 }
 
-function RecommendedAgentLaunchBar({ agents, onOpenHeroHall }: { agents: RecommendedAgent[]; onOpenHeroHall: () => void }) {
+function RecommendedAgentLaunchBar({
+  agents,
+  onOpenHeroHall,
+  recommendationId,
+}: {
+  agents: RecommendedAgent[];
+  onOpenHeroHall: () => void;
+  recommendationId?: string;
+}) {
   const enrichedAgents = agents.map(enrichDrawAgent);
   const launchTargets = getAgentLaunchTargets(enrichedAgents);
-  const canOpen = launchTargets.length > 0;
+  const combinationEntryUrl = recommendationId ? getAgentCombinationEntryUrl(recommendationId) : '';
+  const canOpen = launchTargets.length > 0 && Boolean(combinationEntryUrl);
 
   return (
     <div className="recommended-agent-package">
@@ -161,16 +172,21 @@ function RecommendedAgentLaunchBar({ agents, onOpenHeroHall }: { agents: Recomme
           <Crown size={14} />
           <span>殿堂</span>
         </button>
-        <button disabled={!canOpen} onClick={() => openAgentLaunchTargets(launchTargets)} type="button">
-          <PackageOpen size={15} />
-          <span>{canOpen ? '打开组合' : '暂无链接'}</span>
-          {canOpen ? (
+        {canOpen ? (
+          <a className="recommended-agent-package-open" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
+            <PackageOpen size={15} />
+            <span>打开组合</span>
             <em>
               {launchTargets.length}
               <ArrowUpRight size={12} />
             </em>
-          ) : null}
-        </button>
+          </a>
+        ) : (
+          <button disabled type="button">
+            <PackageOpen size={15} />
+            <span>暂无链接</span>
+          </button>
+        )}
       </div>
     </div>
   );

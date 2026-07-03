@@ -11,8 +11,8 @@ import {
   type SetStateAction,
 } from 'react';
 import { Grid3X3, Menu, PackageOpen, Plus, RotateCcw, Search, Sparkles, Star, X } from 'lucide-react';
-import { enrichDrawAgent, getAgentLaunchTargets, getCatalogHeroAgents, openAgentLaunchTargets } from '../../lib/agentLaunchCatalog';
-import type { RecommendedAgent } from '../../types';
+import { enrichDrawAgent, getAgentCombinationEntryUrl, getAgentLaunchTargets, getCatalogHeroAgents } from '../../lib/agentLaunchCatalog';
+import type { AgentCatalogItem, RecommendedAgent } from '../../types';
 import { getAgentDisplayName, getAgentStage, hasDisplayableRecommendedAgent } from '../agents/agentUtils';
 import { HeroTeamCarousel } from './HeroTeamCarousel';
 import {
@@ -120,18 +120,24 @@ function getHeroPoolSuccess(index: number) {
 
 export function AgentHeroHall({
   agents,
+  catalogAgents,
+  onAppendRecommendedAgent,
   onClose,
   onLineupsChange,
   open,
+  recommendationId,
 }: {
   agents: RecommendedAgent[];
+  catalogAgents: AgentCatalogItem[];
+  onAppendRecommendedAgent?: (agentId: string) => Promise<void>;
   onClose: () => void;
   onLineupsChange: Dispatch<SetStateAction<HeroHallLineupsState>>;
   open: boolean;
+  recommendationId?: string;
 }) {
   const catalogHeroAgents = useMemo(
     () =>
-      getCatalogHeroAgents().map((enrichedAgent, index) => ({
+      getCatalogHeroAgents(catalogAgents).map((enrichedAgent, index) => ({
         agent: enrichedAgent,
         enrichedAgent,
         key: getHeroHallAgentKey(enrichedAgent, enrichedAgent),
@@ -139,7 +145,7 @@ export function AgentHeroHall({
         reason: String(enrichedAgent.fallbackReason || '').trim(),
         stage: enrichedAgent.stageLabel || getAgentStage(enrichedAgent, index),
       })),
-    [],
+    [catalogAgents],
   );
   const recommendedHeroAgents = useMemo(
     () =>
@@ -213,6 +219,7 @@ export function AgentHeroHall({
   const [dataFilter, setDataFilter] = useState('不限');
   const [availableOnly, setAvailableOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [appendingAgentKey, setAppendingAgentKey] = useState('');
 
   const heroPoolAgents = useMemo(
     () =>
@@ -342,6 +349,25 @@ export function AgentHeroHall({
   const resetRecommendationCards = useCallback(() => {
     setRecommendationOverrides({});
   }, []);
+
+  const appendHeroToRecommendation = useCallback(
+    async (agentKey: string) => {
+      const agent = agentByKey.get(agentKey);
+      const agentId = String(agent?.enrichedAgent.id || agent?.enrichedAgent.agent_id || agent?.key || '').trim();
+
+      if (!agentId || !recommendationId || !onAppendRecommendedAgent) {
+        return;
+      }
+
+      setAppendingAgentKey(agentKey);
+      try {
+        await onAppendRecommendedAgent(agentId);
+      } finally {
+        setAppendingAgentKey('');
+      }
+    },
+    [agentByKey, onAppendRecommendedAgent, recommendationId],
+  );
 
   const toggleFavoriteHero = useCallback((agentKey: string) => {
     setFavoriteHeroKeys((current) => {
@@ -513,7 +539,9 @@ export function AgentHeroHall({
   };
 
   const pointerDragAgent = pointerDrag ? agentByKey.get(pointerDrag.agentKey) : null;
-  const canOpenRecommended = recommendedLaunchTargets.length > 0;
+  const combinationEntryUrl = recommendationId ? getAgentCombinationEntryUrl(recommendationId) : '';
+  const canOpenRecommended = recommendedLaunchTargets.length > 0 && Boolean(combinationEntryUrl);
+  const canAppendRecommended = Boolean(recommendationId && onAppendRecommendedAgent);
 
   if (!open || heroAgents.length === 0) {
     return null;
@@ -529,10 +557,17 @@ export function AgentHeroHall({
           </div>
 
           <div className="hero-hall-header-actions hero-hall-stage-actions">
-            <button disabled={!canOpenRecommended} onClick={() => openAgentLaunchTargets(recommendedLaunchTargets)} type="button">
-              <PackageOpen size={16} />
-              <span>打开推荐</span>
-            </button>
+            {canOpenRecommended ? (
+              <a className="hero-hall-open-recommendation-link" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
+                <PackageOpen size={16} />
+                <span>打开推荐</span>
+              </a>
+            ) : (
+              <button disabled type="button">
+                <PackageOpen size={16} />
+                <span>暂无推荐</span>
+              </button>
+            )}
             <button onClick={resetRecommendationCards} type="button">
               <RotateCcw size={16} />
               <span>重置卡牌</span>
@@ -631,7 +666,9 @@ export function AgentHeroHall({
                       className={`hero-agent-card hero-armory-card hero-pool-card ${agent.isFavorite ? 'is-favorite' : ''} ${draggingKey === agent.key ? 'is-drag-source' : ''}`}
                       draggable={false}
                       key={agent.key}
-                      onDoubleClick={() => replaceRecommendationCard(0, agent.key)}
+                      onDoubleClick={() => {
+                        void appendHeroToRecommendation(agent.key);
+                      }}
                       onDragEnd={() => setDraggingKey('')}
                       onDragStart={(event) => handleDragStart(event, agent.key)}
                       onMouseDown={(event) => handlePointerDragStart(event, agent.key)}
@@ -669,10 +706,12 @@ export function AgentHeroHall({
                         </div>
                       </dl>
                       <button
-                        aria-label={`用${agent.displayName}替换第一张推荐卡牌`}
+                        aria-label={`追加${agent.displayName}到推荐组合`}
                         className="hero-pool-add"
-                        disabled={recommendedHeroAgents.length === 0}
-                        onClick={() => replaceRecommendationCard(0, agent.key)}
+                        disabled={!canAppendRecommended || appendingAgentKey === agent.key}
+                        onClick={() => {
+                          void appendHeroToRecommendation(agent.key);
+                        }}
                         onMouseDown={(event) => event.stopPropagation()}
                         onPointerDown={(event) => event.stopPropagation()}
                         type="button"

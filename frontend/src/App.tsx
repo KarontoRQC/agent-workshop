@@ -12,6 +12,7 @@ import ParticleField from './components/ParticleField';
 import { ZhongyinIntro } from './components/ZhongyinIntro';
 import { AgentConsole, type InputMode } from './features/agentConsole/AgentConsole';
 import { getAgentDisplayName, getRecommendedAgentKey } from './features/agents/agentUtils';
+import { AgentCombinationEntryPage } from './features/heroHall/AgentCombinationEntryPage';
 import { AgentHeroHall } from './features/heroHall/AgentHeroHall';
 import {
   createHeroHallLineups,
@@ -37,6 +38,11 @@ import {
   wantsSleep,
 } from './features/speech/speechOutput';
 import { WorkflowDock } from './features/workflow/WorkflowDock';
+import {
+  getAgentCombinationEntryIdFromUrl,
+  shouldPollRecommendationSnapshot,
+  snapshotToRecommendedAgents,
+} from './features/workflow/recommendationSnapshotModel';
 import {
   PATH_MATCH_ANIMATION_MS,
   RECOMMENDATION_DOCK_REVEAL_MS,
@@ -82,17 +88,22 @@ import {
 } from './features/workflow/workflowModel';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
+import { appendAgentToRecommendation, fetchAgentCatalog } from './lib/agentCatalogClient';
+import { setAgentCatalogAgents } from './lib/agentLaunchCatalog';
 import { streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
+import { fetchRecommendationSnapshot } from './lib/recommendationSnapshotClient';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
 import type {
   AgentAction,
+  AgentCatalogItem,
   AgentGraphPath,
   AgentStatus,
   AgentTurn,
   AgentWorkflow,
   Message,
   ParticleSettings,
+  RecommendationSnapshot,
   RecommendedAgent,
   ReplySource,
 } from './types';
@@ -239,6 +250,16 @@ function buildHelmetIntelStates({
 }
 
 export default function App() {
+  const agentCombinationEntryId = getAgentCombinationEntryIdFromUrl(window.location.href);
+
+  if (agentCombinationEntryId) {
+    return <AgentCombinationEntryPage recommendationId={agentCombinationEntryId} />;
+  }
+
+  return <JarvisApp />;
+}
+
+function JarvisApp() {
   const searchParams = new URLSearchParams(window.location.search);
   const demoGraphEnabled = searchParams.has('demoGraph');
   const introBypassed = demoGraphEnabled || searchParams.has('skipIntro');
@@ -262,7 +283,11 @@ export default function App() {
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
   const [heroHallOpen, setHeroHallOpen] = useState(false);
   const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
+  const [agentCatalog, setAgentCatalog] = useState<AgentCatalogItem[]>([]);
   const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
+  const [currentRecommendationId, setCurrentRecommendationId] = useState('');
+  const [sharedRecommendationSnapshot, setSharedRecommendationSnapshot] = useState<RecommendationSnapshot | null>(null);
+  const [sharedRecommendationError, setSharedRecommendationError] = useState('');
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
   const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
   const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
@@ -279,6 +304,37 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has('recommendation_id')) {
+      return;
+    }
+
+    url.searchParams.delete('recommendation_id');
+    window.history.replaceState(null, '', url);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadAgentCatalog = async () => {
+      try {
+        const agents = await fetchAgentCatalog(controller.signal);
+        setAgentCatalogAgents(agents);
+        setAgentCatalog(agents);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn('Agent catalog request failed.', error);
+        }
+      }
+    };
+
+    void loadAgentCatalog();
+
+    return () => controller.abort();
+  }, []);
 
   const rememberConversationIds = useCallback((event: AgentStreamEvent) => {
     const nextConversationIds = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
@@ -872,6 +928,12 @@ export default function App() {
           onEvent(event) {
             rememberConversationIds(event);
 
+            if (typeof event.recommendation_id === 'string' && event.recommendation_id.trim()) {
+              const nextRecommendationId = event.recommendation_id.trim();
+              setCurrentRecommendationId(nextRecommendationId);
+              setSharedRecommendationError('');
+            }
+
             const speechSegment = getCompletedSpeechSegment(event);
 
             if (speechSegment) {
@@ -1265,8 +1327,19 @@ export default function App() {
   );
 
   const latestDisplayableRecommendedAgents = getLatestDisplayableRecommendedAgents(agentTurns);
+  const snapshotRecommendedAgents = useMemo(
+    () => snapshotToRecommendedAgents(sharedRecommendationSnapshot),
+    [sharedRecommendationSnapshot],
+  );
+  const snapshotHasManualAgents = snapshotRecommendedAgents.some((agent) => agent.source === 'manual');
   const recommendedAgents =
-    latestDisplayableRecommendedAgents.length > 0 ? latestDisplayableRecommendedAgents : pinnedRecommendedAgents;
+    snapshotHasManualAgents || latestDisplayableRecommendedAgents.length === 0
+      ? snapshotRecommendedAgents.length > 0
+        ? snapshotRecommendedAgents
+        : pinnedRecommendedAgents
+      : latestDisplayableRecommendedAgents.length > 0
+      ? latestDisplayableRecommendedAgents
+      : pinnedRecommendedAgents;
   const fallbackRoute = getLatestRouteSegments(agentTurns);
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
@@ -1294,8 +1367,10 @@ export default function App() {
         ? currentSpeechText
         : '';
   const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
+  const snapshotStatusText = sharedRecommendationError ? `推荐组合读取失败：${sharedRecommendationError}` : '';
   const captionText =
     voiceCaptionError ||
+    snapshotStatusText ||
     (inputMode === 'text'
       ? ''
       : voice.listening
@@ -1321,6 +1396,52 @@ export default function App() {
   }, [latestDisplayableRecommendedAgents]);
 
   useEffect(() => {
+    if (!currentRecommendationId) {
+      setSharedRecommendationSnapshot(null);
+      setSharedRecommendationError('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let timeoutId: number | null = null;
+
+    setSharedRecommendationSnapshot(null);
+    setSharedRecommendationError('');
+
+    const loadSnapshot = async () => {
+      try {
+        const snapshot = await fetchRecommendationSnapshot(currentRecommendationId, controller.signal);
+        setSharedRecommendationSnapshot(snapshot);
+        setSharedRecommendationError('');
+
+        if (snapshot.agents.length > 0) {
+          setRecommendationDockVisible(true);
+        }
+
+        if (shouldPollRecommendationSnapshot(snapshot)) {
+          timeoutId = window.setTimeout(loadSnapshot, 2000);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSharedRecommendationSnapshot(null);
+        setSharedRecommendationError(error instanceof Error ? error.message : '推荐组合读取失败');
+      }
+    };
+
+    void loadSnapshot();
+
+    return () => {
+      controller.abort();
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [currentRecommendationId]);
+
+  useEffect(() => {
     if (!heroHallReady || !heroHallKey || lastHeroHallAutoKeyRef.current === heroHallKey) {
       return undefined;
     }
@@ -1330,6 +1451,21 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [heroHallKey, heroHallReady]);
+
+  const appendCatalogAgentToRecommendation = useCallback(
+    async (agentId: string) => {
+      if (!currentRecommendationId) {
+        return;
+      }
+
+      const snapshot = await appendAgentToRecommendation(currentRecommendationId, agentId);
+      setSharedRecommendationSnapshot(snapshot);
+      setSharedRecommendationError('');
+      setPinnedRecommendedAgents(snapshotToRecommendedAgents(snapshot));
+      setRecommendationDockVisible(true);
+    },
+    [currentRecommendationId],
+  );
 
   return (
     <main
@@ -1364,14 +1500,18 @@ export default function App() {
         agents={dockRecommendedAgents}
         highlight={workflowHighlight}
         onOpenHeroHall={() => setHeroHallOpen(true)}
+        recommendationId={currentRecommendationId}
         routeSegments={dockRouteSegments}
       />
       <div className="hero-hall-style-scope app-shell" data-hero-hall={heroHallOpen}>
         <AgentHeroHall
           agents={recommendedAgents}
+          catalogAgents={agentCatalog}
           open={heroHallOpen}
+          onAppendRecommendedAgent={appendCatalogAgentToRecommendation}
           onClose={() => setHeroHallOpen(false)}
           onLineupsChange={setHeroHallLineupState}
+          recommendationId={currentRecommendationId}
         />
       </div>
 

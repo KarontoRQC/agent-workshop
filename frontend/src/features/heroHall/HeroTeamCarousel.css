@@ -672,6 +672,105 @@
   animation: hero-team-card-replaced 680ms ease-out both;
 }
 
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-copy {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-rank-chip,
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-stage,
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-summary {
+  display: none;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-center {
+  width: min(178px, 30vw);
+  height: min(188px, calc(100% - 12px));
+  padding: 7px 10px 10px;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-portrait {
+  height: 72px;
+  margin-bottom: 2px;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-portrait::before {
+  width: 74px;
+  height: 74px;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-portrait::after {
+  top: 12px;
+  width: 54px;
+  height: 54px;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-portrait img {
+  width: 86px;
+  height: 82px;
+  border-radius: 7px 7px 42px 42px;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center h3 {
+  color: rgba(255, 235, 181, 0.98);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.1;
+  -webkit-line-clamp: 1;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-rank-chip {
+  display: inline-grid;
+  min-width: 28px;
+  height: 17px;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 222, 154, 0.48);
+  border-radius: 999px;
+  color: rgba(6, 15, 25, 0.92);
+  background: linear-gradient(135deg, #ffe8ad, #91efff);
+  box-shadow: 0 0 14px rgba(255, 214, 133, 0.22);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-stage {
+  display: block;
+  max-width: 100%;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(116, 220, 255, 0.34);
+  border-radius: 999px;
+  color: rgba(188, 241, 255, 0.92);
+  background: rgba(6, 23, 43, 0.72);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-hall-style-scope.app-shell[data-hero-hall='true'] .hero-team-card.is-center .hero-team-summary {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: rgba(226, 238, 247, 0.72);
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.32;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 @keyframes hero-team-card-replaced {
   0% {
     filter: brightness(1.45) saturate(1.18);

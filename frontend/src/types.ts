@@ -31,11 +31,17 @@ export type Message = {
 
 export type RecommendedAgent = {
   activeField?: string | null;
+  agent_id?: string;
   agent_index?: number;
   agent_name?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
+  description?: string;
   endpoint?: string;
+  function?: string;
   id?: string;
   jump_url?: string;
+  launch_url?: string;
   lineup?: AgentLineupId | string;
   lineup_id?: AgentLineupId | string;
   lineupId?: AgentLineupId | string;
@@ -43,9 +49,38 @@ export type RecommendedAgent = {
   name?: string;
   rank?: number | string;
   reason?: string;
+  source?: string;
   stage?: string;
   streamStatus?: 'streaming' | 'completed';
   score?: number | string;
+  tags?: string[];
+  type?: string;
+  url?: string;
+  [key: string]: unknown;
+};
+
+export type AgentCatalogItem = {
+  agentKey?: string;
+  agent_key?: string;
+  agent_name?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
+  description?: string;
+  endpoint?: string;
+  function?: string;
+  functionLabel?: string;
+  has_avatar?: boolean;
+  id?: string;
+  knowledge?: string[];
+  launchUrl?: string;
+  launch_url?: string;
+  link?: string;
+  name?: string;
+  reason?: string;
+  tags?: string[];
+  type?: string;
+  typeLabel?: string;
   url?: string;
   [key: string]: unknown;
 };
@@ -83,6 +118,21 @@ export type AgentGraphPath = {
   nodes?: Array<{ label?: string; [key: string]: unknown }>;
   route?: string;
   [key: string]: unknown;
+};
+
+export type RecommendationSnapshotStatus = 'streaming' | 'completed' | 'failed';
+
+export type RecommendationSnapshot = {
+  agents: RecommendedAgent[];
+  conversation_ids: Record<string, string>;
+  created_at: string;
+  error?: string;
+  graph_path: AgentGraphPath | null;
+  id: string;
+  message: string;
+  status: RecommendationSnapshotStatus;
+  summary: string;
+  updated_at: string;
 };
 
 export type AgentWorkflow = {
