@@ -12,10 +12,8 @@ import {
   libraryStats,
   ROOT_ID,
 } from "./agentAdapter.js";
-import { AgentDock } from "./components/AgentDock.jsx";
 import { ControlDock } from "./components/ControlDock.jsx";
 import { KnowledgeGraph } from "./components/KnowledgeGraph.jsx";
-import { RecommendationRail } from "./components/RecommendationRail.jsx";
 import { streamCozeChat } from "./cozeChatClient.js";
 import baiLogo from "./assets/bailogo.png";
 
@@ -101,8 +99,6 @@ export function App() {
     holdingReply: false,
     graphStarted: false,
   });
-  const hasRecommendedAgents = agentStream.workflow.agentRecommendation.agents.length > 0;
-
   useEffect(() => {
     return () => {
       agentRequestRef.current?.abort();
@@ -496,15 +492,8 @@ export function App() {
   }
 
   return (
-    <main className={`app-shell app-mode-${mode} ${hasRecommendedAgents ? "" : "rail-collapsed"}`}>
+    <main className={`app-shell app-shell-graph-only app-mode-${mode}`}>
       <TopBar mode={mode} setMode={setMode} />
-      <AgentDock
-        draft={draft}
-        setDraft={setDraft}
-        onSend={sendAgentMessage}
-        status={agentStream.status}
-        turns={agentTurns}
-      />
       <KnowledgeGraph
         focusId={focusId}
         selectedId={selectedId}
@@ -512,12 +501,6 @@ export function App() {
         mode={mode}
         onFocus={focusNode}
         onSelect={setSelectedId}
-      />
-      <RecommendationRail
-        focusId={focusId}
-        selectedId={selectedId}
-        recommendedAgents={agentStream.workflow.agentRecommendation.agents}
-        status={agentStream.status}
       />
       <ControlDock
         mode={mode}

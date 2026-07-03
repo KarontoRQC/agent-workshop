@@ -28,9 +28,9 @@ export function KnowledgeGraph({
     const mount = mountRef.current;
     if (!mount) return undefined;
 
-    import("../pixiGraphEngine.js")
-      .then(({ createPixiGraphEngine }) =>
-        createPixiGraphEngine(mount, {
+    import("../threeGraphEngine.js")
+      .then(({ createThreeGraphEngine }) =>
+        createThreeGraphEngine(mount, {
           onHover(id) {
             pendingHoverRef.current = id;
             if (hoverFrameRef.current) return;
@@ -115,7 +115,7 @@ export function KnowledgeGraph({
         </div>
       </div>
 
-      <div ref={mountRef} className="pixi-graph-host" aria-hidden="true" />
+      <div ref={mountRef} className="three-graph-host" aria-hidden="true" />
     </section>
   );
 }
