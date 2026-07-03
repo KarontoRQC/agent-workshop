@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { CENTER, VIEWBOX } from "./graphLayout.js";
 
 const NODE_VERTEX_SHADER = `
@@ -101,6 +104,8 @@ export function createThreeGraphEngine(mount, handlers = {}) {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 120);
   camera.position.set(BASE_CAMERA.atlas.x, BASE_CAMERA.atlas.y, BASE_CAMERA.atlas.z);
 
+  const composer = createPostProcessor(renderer, scene, camera);
+
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.075;
@@ -117,6 +122,8 @@ export function createThreeGraphEngine(mount, handlers = {}) {
 
   const stage = createStage();
   root.add(stage);
+  const hoverWave = createHoverWave();
+  root.add(hoverWave);
 
   const nodeGroup = new THREE.Group();
   const labelGroup = new THREE.Group();
@@ -149,6 +156,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     const width = Math.max(320, Math.floor(rect.width));
     const height = Math.max(320, Math.floor(rect.height));
     renderer.setSize(width, height, false);
+    composer?.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
   }
@@ -249,6 +257,45 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       });
     });
 
+    const ambientLimit = params.mode === "atlas" ? 460 : params.mode === "step" ? 230 : 180;
+    const ambientNodes = (params.ambientNodes || []).slice(0, ambientLimit);
+    const ambientLinks = (params.ambientLinks || []).slice(0, params.mode === "atlas" ? 520 : 180);
+
+    ambientLinks.forEach((link, index) => {
+      const sourceId = link.source?.id || link.source;
+      const targetId = link.target?.id || link.target;
+      if (!sourceId || !targetId || !nodeRecords.has(sourceId) || !nodeRecords.has(targetId)) return;
+      linkPairs.push({
+        id: `ambient-${index}-${sourceId}-${targetId}`,
+        sourceId,
+        targetId,
+        kind: "ambient",
+        ring: 0,
+      });
+    });
+
+    const rings = new Map();
+    ambientNodes.forEach((node) => {
+      const ring = ambientRingIndex(node);
+      if (!rings.has(ring)) rings.set(ring, []);
+      rings.get(ring).push(node);
+    });
+    rings.forEach((nodes, ring) => {
+      nodes
+        .sort((a, b) => ambientIndex(a) - ambientIndex(b))
+        .forEach((node, index) => {
+          const next = nodes[(index + 1) % nodes.length];
+          if (!next || node.id === next.id || !nodeRecords.has(node.id) || !nodeRecords.has(next.id)) return;
+          linkPairs.push({
+            id: `ambient-ring-${ring}-${node.id}-${next.id}`,
+            sourceId: node.id,
+            targetId: next.id,
+            kind: "ambient-ring",
+            ring,
+          });
+        });
+    });
+
     activeLinkState.links = linkPairs;
     const pointCount = Math.max(2, linkPairs.length * 2);
     const positions = new Float32Array(pointCount * 3);
@@ -301,12 +348,17 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     updateRaycast(elapsed);
     updateNodeAnimation(elapsed);
     updateLinks(elapsed);
+    updateHoverWave(elapsed);
     updateCamera();
 
     stage.rotation.y += 0.0009;
     starField.rotation.y -= 0.00035;
     controls.update();
-    renderer.render(scene, camera);
+    if (composer) {
+      composer.render();
+    } else {
+      renderer.render(scene, camera);
+    }
   }
 
   function updateNodeAnimation(elapsed) {
@@ -333,7 +385,8 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       if (!source || !target) return;
       const sourceHot = source.node.id === hoveredId || source.node.id === latestParams?.selectedId ? 1 : 0;
       const targetHot = target.node.id === hoveredId || target.node.id === latestParams?.selectedId ? 1 : 0;
-      const pulse = Math.max(sourceHot, targetHot, link.kind === "lineage" ? 0.85 : 0.18);
+      const basePulse = link.kind === "lineage" ? 0.85 : link.kind === "ambient-ring" ? 0.2 : link.kind === "ambient" ? 0.12 : 0.18;
+      const pulse = Math.max(sourceHot, targetHot, basePulse);
       positions.setXYZ(index * 2, source.mesh.position.x, source.mesh.position.y, source.mesh.position.z);
       positions.setXYZ(index * 2 + 1, target.mesh.position.x, target.mesh.position.y, target.mesh.position.z);
       pulses.setX(index * 2, pulse);
@@ -342,6 +395,26 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     positions.needsUpdate = true;
     pulses.needsUpdate = true;
     material.uniforms.uTime.value = elapsed;
+  }
+
+  function updateHoverWave(elapsed) {
+    const record = hoveredId ? nodeRecords.get(hoveredId) : null;
+    const targetOpacity = record ? 0.62 : 0;
+    hoverWave.userData.opacity += (targetOpacity - hoverWave.userData.opacity) * 0.18;
+
+    if (record) {
+      hoverWave.position.lerp(record.mesh.position, 0.32);
+      hoverWave.lookAt(camera.position);
+      hoverWave.userData.phase = (hoverWave.userData.phase + 0.035) % 1;
+    }
+
+    hoverWave.children.forEach((ring, index) => {
+      const phase = (hoverWave.userData.phase + index * 0.22) % 1;
+      const scale = 0.22 + phase * 1.55;
+      ring.scale.setScalar(scale);
+      ring.material.opacity = hoverWave.userData.opacity * (1 - phase) * (index === 0 ? 0.9 : 0.55);
+      ring.rotation.z = elapsed * (0.18 + index * 0.05);
+    });
   }
 
   function updateCamera() {
@@ -407,10 +480,27 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       }
       activeLinkState.geometry?.dispose();
       activeLinkState.material?.dispose();
+      composer?.dispose?.();
       renderer.dispose();
-      mount.removeChild(renderer.domElement);
+      if (renderer.domElement.parentNode === mount) {
+        mount.removeChild(renderer.domElement);
+      }
     },
   };
+}
+
+function createPostProcessor(renderer, scene, camera) {
+  try {
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.72, 0.58, 0.18);
+    composer.addPass(renderPass);
+    composer.addPass(bloomPass);
+    return composer;
+  } catch (error) {
+    console.warn("3D graph bloom post-processing is disabled.", error);
+    return null;
+  }
 }
 
 function nearestScreenNodeId(maxDistancePx) {
@@ -501,22 +591,70 @@ function projectNode(node, mode) {
 }
 
 function projectAmbientNode(node, mode) {
-  const seed = hash(node.id);
-  const angle = seed * Math.PI * 2;
+  const index = ambientIndex(node);
+  const ring = ambientRingIndex(node);
+  const slotCount = 28 + ring * 18;
+  const slot = Math.floor(index / 9) % slotCount;
+  const angle = (slot / slotCount) * Math.PI * 2 + ring * 0.115 + (hash(`${node.id}:a`) - 0.5) * 0.035;
   const second = hash(`${node.id}:b`);
-  const radius = 6.5 + second * 7.5;
+
   if (mode === "step") {
     return new THREE.Vector3(
-      (seed - 0.5) * 17,
-      -1.6 + hash(`${node.id}:y`) * 6.6,
-      (second - 0.5) * 12,
+      ((slot / slotCount) - 0.5) * 16,
+      -1.75 + ring * 0.58 + hash(`${node.id}:y`) * 0.4,
+      (second - 0.5) * 12 + ring * 0.35,
     );
   }
+
+  if (mode === "path") {
+    const radius = 2.2 + ring * 0.95 + second * 0.35;
+    return new THREE.Vector3(
+      Math.cos(angle) * radius,
+      -1.25 + ring * 0.25 + hash(`${node.id}:height`) * 2.8,
+      Math.sin(angle) * radius,
+    );
+  }
+
+  const radius = 1.55 + ring * 0.82 + second * 0.22;
+  const domeHeight = 3.78 - ring * 0.46 + Math.sin(angle * 2.0 + ring) * 0.08;
   return new THREE.Vector3(
     Math.cos(angle) * radius,
-    -1.8 + hash(`${node.id}:height`) * 7.8,
-    Math.sin(angle) * radius,
+    domeHeight,
+    Math.sin(angle) * radius * 0.72,
   );
+}
+
+function ambientIndex(node) {
+  const match = String(node.id || "").match(/ambient-(\d+)/);
+  return match ? Number(match[1]) : Math.floor(hash(node.id) * 1000);
+}
+
+function ambientRingIndex(node) {
+  return 1 + (ambientIndex(node) % 9);
+}
+
+function createHoverWave() {
+  const group = new THREE.Group();
+  group.userData.opacity = 0;
+  group.userData.phase = 0;
+
+  [0, 1, 2].forEach((_, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24 + index * 0.04, 0.006, 8, 96),
+      new THREE.MeshBasicMaterial({
+        color: index === 0 ? 0xaeefff : 0x58bdff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+  });
+
+  return group;
 }
 
 function createStage() {

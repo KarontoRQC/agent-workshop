@@ -64,6 +64,11 @@ export function KnowledgeGraph({
         }
         engineRef.current = engine;
         if (latestEngineParamsRef.current) engine.update(latestEngineParamsRef.current);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to initialize the 3D knowledge graph.", error);
+        }
       });
 
     return () => {

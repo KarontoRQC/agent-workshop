@@ -3737,6 +3737,33 @@ button {
     min-height: 100vh;
   }
 
+  .top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .brand-lockup {
+    flex: 1 1 100%;
+  }
+
+  .brand-logo {
+    height: 42px;
+  }
+
+  .top-switch {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .top-switch button {
+    min-width: 0;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+
   .top-bar,
   .recommendation-rail,
   .control-dock,
