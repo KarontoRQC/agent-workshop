@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agent_workshop
+      POSTGRES_USER: agent_workshop
+      POSTGRES_PASSWORD: agent_workshop
+    ports:
+      - "54329:5432"
+    volumes:
+      - agent_workshop_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_workshop -d agent_workshop"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: backend/.env
+        required: false
+      - path: backend/.env.local
+        required: false
+    environment:
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      FLASK_DEBUG: 0
+      FRONTEND_ORIGINS: http://127.0.0.1:5188,http://localhost:5188
+      DATABASE_URL: postgresql://agent_workshop:agent_workshop@postgres:5432/agent_workshop
+      SOURCE_AGENTS_PATH: /app/data/source_agents_full.json
+      AGENT_AVATAR_DIR: /app/frontend/src/assets/agent-avatars
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_PROXY_BASE_URL: http://backend:5000
+      TTS_PROXY_TARGET: http://backend:5000
+      VITE_TTS_BROWSER_FALLBACK: auto
+    ports:
+      - "5188:5188"
+
+volumes:
+  agent_workshop_pgdata:

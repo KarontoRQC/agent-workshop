@@ -1,0 +1,16 @@
+.git
+.gitignore
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+backend/.env
+backend/.env.local
+backend/.venv/
+backend/outputs/
+frontend/.env.local
+frontend/.codex-logs/
+frontend/dist/
+frontend/node_modules/
+frontend/outputs/
+outputs/
+TODO.md

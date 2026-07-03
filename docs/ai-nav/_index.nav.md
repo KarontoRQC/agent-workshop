@@ -30,6 +30,7 @@
 | `README.md` | 项目主线、目录职责、前后端启动方式和运行说明。 |
 | `docs/coze-chat-stream-api.md` | `/api/coze/chat/stream` 请求、SSE 事件、字段和错误协议。 |
 | `frontend/AGENTS.md` | 前端视觉、Hero Hall、语音和 JARVIS HUD 的长期设计决策。 |
+| `backend/AGENTS.md` | 后端 Flask、SSE、TTS、数据库和测试的目录级工作规则。 |
 | `frontend/README.md` | 前端原型运行、语音输出和模型端点说明。 |
 | `frontend/design-qa.md` | 前端设计验证记录。 |
 

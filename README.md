@@ -14,6 +14,26 @@ Agent Workshop 现在的主线是 JARVIS 语音粒子交互项目：一个面向
 - `data/source_agents_full.json`: source catalog for recommended agent cards and launch links.
 - `docs/`: backend stream/API integration notes.
 
+## Docker Local Test
+
+```powershell
+docker compose up --build
+```
+
+Open:
+
+```text
+http://127.0.0.1:5188/?skipIntro=1
+```
+
+This starts three local services:
+
+- `frontend`: Vite app on `127.0.0.1:5188`, with `/api` proxied to the Docker backend.
+- `backend`: Flask API on `127.0.0.1:5000`, connected to Docker Postgres.
+- `postgres`: local snapshot database on host port `54329`.
+
+The backend image does not bake local secrets. At runtime Docker Compose reads optional `backend/.env` and `backend/.env.local`, while overriding `DATABASE_URL` to the Docker Postgres service. To test real AI streaming, put `LONGCAT_API_KEY` or `COZE_API_TOKEN` in `backend/.env.local`; otherwise the API uses the local configuration fallback while recommendation snapshot IDs and database reads still work.
+
 ## Run Frontend
 
 ```powershell

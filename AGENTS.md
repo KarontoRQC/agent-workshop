@@ -8,14 +8,22 @@
 
 ## 快速参考
 
+- **前端规则入口**: `frontend/AGENTS.md`
+- **后端规则入口**: `backend/AGENTS.md`
 - **前端源码**: `frontend/src/`
 - **后端源码**: `backend/`
 - **数据目录**: `data/`
 - **AI 导航文档**: `docs/ai-nav/`
 - **接口说明**: `docs/coze-chat-stream-api.md`
 - **前端设计决策**: `frontend/AGENTS.md`
-- **测试目录**: 当前未发现独立测试目录
+- **测试目录**: `backend/tests/`
 - **配置文件**: `frontend/package.json`、`frontend/vite.config.ts`、`backend/config.py`、`backend/.env.example`
+
+## 分层规则入口
+
+- 修改 `frontend/` 下代码前，先读取 `frontend/AGENTS.md`；该文件承接前端视觉、交互、语音、Hero Hall 和构建验证规则。
+- 修改 `backend/` 下代码前，先读取 `backend/AGENTS.md`；该文件承接 Flask 路由、SSE 协议、TTS、数据库和后端测试规则。
+- 根级 `AGENTS.md` 只保留跨前后端的硬约束和导航入口；模块内细节放在对应目录的 `AGENTS.md` 与 `docs/ai-nav/`。
 
 ## 命令
 
@@ -26,6 +34,7 @@ cd frontend && npm run preview -- --host 127.0.0.1
 cd backend && python -m venv .venv
 cd backend && .\.venv\Scripts\python -m pip install -r requirements.txt
 cd backend && .\.venv\Scripts\python app.py
+cd backend && .\.venv\Scripts\python -m pytest tests
 ```
 
 ## 验证标准
@@ -34,7 +43,7 @@ cd backend && .\.venv\Scripts\python app.py
 - 修改后端路由、配置或服务后，至少启动 `cd backend && .\.venv\Scripts\python app.py` 并检查 `GET /api/health`。
 - 修改 `/api/coze/chat/stream`、SSE 事件、prompt 标签或推荐智能体字段后，必须同步检查 `docs/coze-chat-stream-api.md`、`frontend/src/lib/agentStreamClient.ts` 和 `frontend/src/features/workflow/workflowModel.ts`。
 - 修改 Three.js、Hero Hall、HUD、语音或布局视觉后，必须用浏览器实际预览；移动端和桌面至少各检查一次。
-- 当前没有独立测试目录，不能把“未发现测试”说成“测试通过”。
+- 当前后端存在 `backend/tests/`；没有运行对应命令时，不能把“已检查文件”说成“测试通过”。
 
 ## 禁止事项
 
@@ -59,6 +68,8 @@ cd backend && .\.venv\Scripts\python app.py
 ## 代码导航
 
 修改代码前，先读对应目录的 `_index.nav.md`。每个 `_index.nav.md` 头部按需声明该模块的功能文档；正文是逐文件索引、用途、关键导出和修改指南。
+
+跨前后端改动的阅读顺序：先读对应目录的 `AGENTS.md`，再读导航索引。
 
 | 你要改的代码 | 入口(`_index.nav.md`) |
 |---|---|
