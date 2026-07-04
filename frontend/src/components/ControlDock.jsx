@@ -9,9 +9,9 @@ import { makeAmbientField } from "../graphLayout.js";
 const minimapNodes = makeAmbientField(72);
 
 const modes = [
-  { id: "atlas", label: "全域星图", desc: "先展示行业规模感" },
-  { id: "path", label: "路径聚焦", desc: "高亮当前语义链" },
-  { id: "step", label: "逐层推进", desc: "适合现场讲解" },
+  { id: "atlas", label: "分层穹顶", desc: "聚合态" },
+  { id: "path", label: "同心炸开", desc: "展开态" },
+  { id: "step", label: "中心放射", desc: "讲解态" },
 ];
 
 export function ControlDock({ mode, setMode, depth, setDepth, onReset }) {

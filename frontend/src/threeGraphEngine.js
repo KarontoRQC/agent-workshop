@@ -11,12 +11,14 @@ const NODE_VERTEX_SHADER = `
   uniform float uSweep;
   varying vec3 vNormalWorld;
   varying vec3 vViewDirection;
+  varying vec3 vLocalPosition;
   varying vec2 vUv;
 
   void main() {
     vUv = uv;
-    float ripple = sin((position.y + position.x * 0.45) * 5.0 + uTime * 4.4) * 0.018;
-    float hoverLift = uHover * 0.16 + uSweep * 0.08;
+    vLocalPosition = position;
+    float ripple = sin((position.y + position.x * 0.45) * 8.0 + uTime * 3.2) * 0.009;
+    float hoverLift = uHover * 0.09 + uSweep * 0.05;
     vec3 shaped = position * (1.0 + ripple + hoverLift);
     vec4 worldPosition = modelMatrix * vec4(shaped, 1.0);
     vNormalWorld = normalize(mat3(modelMatrix) * normal);
@@ -34,17 +36,23 @@ const NODE_FRAGMENT_SHADER = `
   uniform float uAlpha;
   varying vec3 vNormalWorld;
   varying vec3 vViewDirection;
+  varying vec3 vLocalPosition;
   varying vec2 vUv;
 
   void main() {
     float facing = max(dot(normalize(vNormalWorld), normalize(vViewDirection)), 0.0);
-    float fresnel = pow(1.0 - facing, 2.25);
-    float scan = smoothstep(0.08, 0.52, abs(sin(vUv.y * 9.0 + uTime * 2.4)));
-    float pulse = uHover * (0.22 + 0.16 * sin(uTime * 9.0)) + uSweep * 0.38;
-    vec3 core = uColor * (0.24 + 0.08 * scan);
-    vec3 rim = uAccent * (fresnel * 1.12 + pulse);
-    vec3 color = core + rim;
-    float alpha = clamp(uAlpha + fresnel * 0.18 + pulse * 0.1, 0.16, 0.86);
+    float fresnel = pow(1.0 - facing, 3.4);
+    float inner = pow(facing, 2.9);
+    float latitude = abs(sin(vUv.y * 24.0 + uTime * 1.4));
+    float longitude = abs(sin((vUv.x + vUv.y * 0.18) * 18.0 - uTime * 0.9));
+    float filament = smoothstep(0.88, 1.0, max(latitude, longitude));
+    float pulse = uHover * (0.16 + 0.08 * sin(uTime * 8.0)) + uSweep * 0.28;
+    float crystal = smoothstep(0.36, 1.0, abs(vLocalPosition.y)) * 0.18;
+    vec3 glass = mix(uColor, vec3(0.76, 0.92, 1.0), 0.62) * (0.08 + inner * 0.18);
+    vec3 rim = uAccent * (fresnel * 1.18 + filament * 0.16 + pulse);
+    vec3 core = uColor * (inner * 0.2 + crystal);
+    vec3 color = glass + rim + core;
+    float alpha = clamp(uAlpha * (0.44 + fresnel * 0.92 + filament * 0.18) + pulse * 0.08, 0.08, 0.68);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -82,9 +90,9 @@ const VIOLET = new THREE.Color("#c78cff");
 const DUST = new THREE.Color("#7894b8");
 
 const BASE_CAMERA = {
-  atlas: { x: 0, y: 4.6, z: 13.8 },
-  path: { x: 0, y: 3.4, z: 12.2 },
-  step: { x: 7.2, y: 5.4, z: 13.8 },
+  atlas: { x: 0, y: 4.8, z: 14.2 },
+  path: { x: 0, y: 7.8, z: 12.8 },
+  step: { x: 6.2, y: 5.9, z: 12.6 },
 };
 
 export function createThreeGraphEngine(mount, handlers = {}) {
@@ -493,7 +501,7 @@ function createPostProcessor(renderer, scene, camera) {
   try {
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.72, 0.58, 0.18);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.46, 0.42, 0.28);
     composer.addPass(renderPass);
     composer.addPass(bloomPass);
     return composer;
@@ -562,27 +570,30 @@ function projectNode(node, mode) {
   const angle = Math.atan2(dy, dx);
   const distance = Math.min(1.25, Math.sqrt(dx * dx + dy * dy));
   const ring = node.ring || 0;
-  const jitter = (hash(node.id) - 0.5) * 0.75;
+  const jitter = (hash(node.id) - 0.5) * 0.36;
 
   if (mode === "step") {
+    const towerRadius = ring === 0 ? 0 : 0.68 + distance * 4.7 + ring * 0.22;
+    const towerHeight = -1.35 + ring * 0.48 + distance * 3.8 + hash(`${node.id}:lift`) * 0.48;
     return new THREE.Vector3(
-      dx * 8.6 + jitter,
-      -1.15 + ring * 0.72 + hash(`${node.id}:y`) * 0.62,
-      dy * 5.6 + ring * 1.15,
+      Math.cos(angle) * towerRadius + jitter,
+      towerHeight,
+      Math.sin(angle) * towerRadius * 0.72,
     );
   }
 
   if (mode === "path") {
-    const radius = ring === 0 ? 0 : 1.2 + distance * 5.8 + ring * 0.52;
+    const radius = ring === 0 ? 0 : 1.08 + ring * 1.24 + distance * 3.25;
+    const ringOffset = (hash(`${node.id}:ring`) - 0.5) * 0.18;
     return new THREE.Vector3(
-      Math.cos(angle) * radius + jitter,
-      -0.65 + ring * 0.38 + (hash(`${node.id}:rise`) - 0.5) * 1.8,
-      Math.sin(angle) * radius + (hash(`${node.id}:z`) - 0.5) * 1.25,
+      Math.cos(angle) * (radius + ringOffset) + jitter,
+      -1.18 + ring * 0.08 + hash(`${node.id}:rise`) * 0.22,
+      Math.sin(angle) * (radius + ringOffset) * 0.72,
     );
   }
 
-  const domeRadius = ring === 0 ? 0 : 1.45 + distance * 6.7 + ring * 0.5;
-  const domeHeight = 2.95 - ring * 0.68 - distance * 0.42 + hash(`${node.id}:h`) * 0.48;
+  const domeRadius = ring === 0 ? 0 : 1.08 + distance * 5.85 + ring * 0.46;
+  const domeHeight = 3.28 - ring * 0.5 - distance * 0.62 + hash(`${node.id}:h`) * 0.34;
   return new THREE.Vector3(
     Math.cos(angle) * domeRadius + jitter,
     domeHeight,
@@ -599,24 +610,26 @@ function projectAmbientNode(node, mode) {
   const second = hash(`${node.id}:b`);
 
   if (mode === "step") {
+    const towerRadius = 0.8 + ring * 0.58 + second * 0.38;
+    const towerHeight = -1.38 + ring * 0.58 + hash(`${node.id}:y`) * 0.28;
     return new THREE.Vector3(
-      ((slot / slotCount) - 0.5) * 16,
-      -1.75 + ring * 0.58 + hash(`${node.id}:y`) * 0.4,
-      (second - 0.5) * 12 + ring * 0.35,
+      Math.cos(angle) * towerRadius,
+      towerHeight,
+      Math.sin(angle) * towerRadius * 0.72,
     );
   }
 
   if (mode === "path") {
-    const radius = 2.2 + ring * 0.95 + second * 0.35;
+    const radius = 1.25 + ring * 0.94 + second * 0.16;
     return new THREE.Vector3(
       Math.cos(angle) * radius,
-      -1.25 + ring * 0.25 + hash(`${node.id}:height`) * 2.8,
-      Math.sin(angle) * radius,
+      -1.22 + ring * 0.045 + hash(`${node.id}:height`) * 0.12,
+      Math.sin(angle) * radius * 0.72,
     );
   }
 
-  const radius = 1.55 + ring * 0.82 + second * 0.22;
-  const domeHeight = 3.78 - ring * 0.46 + Math.sin(angle * 2.0 + ring) * 0.08;
+  const radius = 1.08 + ring * 0.74 + second * 0.16;
+  const domeHeight = 3.72 - ring * 0.42 + Math.sin(angle * 2.0 + ring) * 0.07;
   return new THREE.Vector3(
     Math.cos(angle) * radius,
     domeHeight,
@@ -769,16 +782,16 @@ function labelScale(node) {
 }
 
 function nodeScale(node) {
-  const base = node.ambient ? node.radius * 0.011 : Math.max(0.035, (node.radius || 10) * 0.0075);
-  if (node.kind === "focus") return base * 1.45;
-  if (node.kind === "industry") return base * 1.15;
+  const base = node.ambient ? node.radius * 0.008 : Math.max(0.028, (node.radius || 10) * 0.0058);
+  if (node.kind === "focus") return base * 1.36;
+  if (node.kind === "industry") return base * 1.08;
   return base;
 }
 
 function nodeAlpha(node) {
-  if (node.ambient) return 0.16;
-  if (node.kind === "focus") return 0.58;
-  return Math.max(0.22, Math.min(0.62, (node.opacity ?? 0.9) * 0.58));
+  if (node.ambient) return 0.1;
+  if (node.kind === "focus") return 0.42;
+  return Math.max(0.16, Math.min(0.48, (node.opacity ?? 0.9) * 0.42));
 }
 
 function nodeColor(node) {

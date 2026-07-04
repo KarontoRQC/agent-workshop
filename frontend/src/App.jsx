@@ -62,13 +62,13 @@ function TopBar({ mode, setMode }) {
 
       <div className="top-switch">
         <button type="button" className={mode === "atlas" ? "active" : ""} onClick={() => setMode("atlas")}>
-          全域
+          聚合
         </button>
         <button type="button" className={mode === "path" ? "active" : ""} onClick={() => setMode("path")}>
-          路径
+          炸开
         </button>
         <button type="button" className={mode === "step" ? "active" : ""} onClick={() => setMode("step")}>
-          推进
+          放射
         </button>
       </div>
     </header>
