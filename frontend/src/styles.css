@@ -2066,6 +2066,33 @@ button {
   cursor: grabbing;
 }
 
+.three-graph-hover-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  max-width: min(300px, calc(100vw - 36px));
+  padding: 7px 10px;
+  border: 1px solid rgba(126, 210, 255, 0.32);
+  background: rgba(4, 12, 24, 0.78);
+  box-shadow:
+    0 0 20px rgba(80, 174, 255, 0.16),
+    inset 0 0 18px rgba(90, 184, 255, 0.08);
+  color: rgba(224, 243, 255, 0.96);
+  font-size: 12px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  transition: opacity 140ms ease;
+}
+
+.three-graph-hover-label.is-visible {
+  opacity: 1;
+}
+
 .pixi-graph-canvas.is-dragging {
   cursor: grabbing;
 }

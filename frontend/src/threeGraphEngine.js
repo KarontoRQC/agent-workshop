@@ -60,24 +60,27 @@ const NODE_FRAGMENT_SHADER = `
 const LINK_VERTEX_SHADER = `
   uniform float uTime;
   attribute float pulse;
+  attribute vec3 lineColor;
   varying float vPulse;
+  varying vec3 vLineColor;
 
   void main() {
     vPulse = pulse;
+    vLineColor = lineColor;
     vec3 p = position;
-    p.y += sin(uTime * 1.8 + position.x * 0.21 + position.z * 0.13) * 0.012;
+    p.y += sin(uTime * 1.2 + position.x * 0.16 + position.z * 0.11) * 0.004;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
 
 const LINK_FRAGMENT_SHADER = `
-  uniform vec3 uColor;
   uniform float uAlpha;
   varying float vPulse;
+  varying vec3 vLineColor;
 
   void main() {
-    float energy = 0.42 + vPulse * 0.58;
-    gl_FragColor = vec4(uColor * energy, uAlpha * energy);
+    float energy = 0.22 + vPulse * 0.38;
+    gl_FragColor = vec4(vLineColor * energy, uAlpha * energy);
   }
 `;
 
@@ -88,6 +91,15 @@ const ROSE = new THREE.Color("#ff715f");
 const GOLD = new THREE.Color("#ffd55c");
 const VIOLET = new THREE.Color("#c78cff");
 const DUST = new THREE.Color("#7894b8");
+const LAYER_COLORS = [
+  new THREE.Color("#f6d46b"),
+  new THREE.Color("#ff8d72"),
+  new THREE.Color("#ff77ae"),
+  new THREE.Color("#c08cff"),
+  new THREE.Color("#80d8ff"),
+  new THREE.Color("#a4c8ff"),
+  new THREE.Color("#d9e6ff"),
+];
 
 const BASE_CAMERA = {
   atlas: { x: 0, y: 4.8, z: 14.2 },
@@ -108,6 +120,9 @@ export function createThreeGraphEngine(mount, handlers = {}) {
   renderer.setClearColor(0x020713, 0);
   renderer.domElement.className = "three-graph-canvas";
   mount.appendChild(renderer.domElement);
+  const hoverLabel = document.createElement("div");
+  hoverLabel.className = "three-graph-hover-label";
+  mount.appendChild(hoverLabel);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 120);
   camera.position.set(BASE_CAMERA.atlas.x, BASE_CAMERA.atlas.y, BASE_CAMERA.atlas.z);
@@ -240,7 +255,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       record.material.uniforms.uColor.value.copy(nodeColor(node));
       record.material.uniforms.uAccent.value.copy(nodeAccent(node));
       record.material.uniforms.uAlpha.value = nodeAlpha(node);
-      record.label.visible = shouldShowLabel(node, params);
+      record.label.visible = false;
       record.label.material.opacity = node.ambient ? 0 : labelOpacity(node, params);
       record.label.scale.setScalar(labelScale(node));
       record.label.userData.offset = nodeScale(node) * 1.45;
@@ -250,37 +265,9 @@ export function createThreeGraphEngine(mount, handlers = {}) {
   }
 
   function syncLinks(params) {
-    const linkPairs = [];
-    const nodeById = new Map(params.layout.nodes.map((node) => [node.id, node]));
-    params.layout.links.forEach((link) => {
-      const source = nodeById.get(link.source);
-      const target = nodeById.get(link.target);
-      if (!source || !target) return;
-      linkPairs.push({
-        id: link.id,
-        sourceId: source.id,
-        targetId: target.id,
-        kind: link.kind,
-        ring: link.ring || 1,
-      });
-    });
-
+    const linkPairs = buildOrderedLinks(params);
     const ambientLimit = params.mode === "atlas" ? 460 : params.mode === "step" ? 230 : 180;
     const ambientNodes = (params.ambientNodes || []).slice(0, ambientLimit);
-    const ambientLinks = (params.ambientLinks || []).slice(0, params.mode === "atlas" ? 520 : 180);
-
-    ambientLinks.forEach((link, index) => {
-      const sourceId = link.source?.id || link.source;
-      const targetId = link.target?.id || link.target;
-      if (!sourceId || !targetId || !nodeRecords.has(sourceId) || !nodeRecords.has(targetId)) return;
-      linkPairs.push({
-        id: `ambient-${index}-${sourceId}-${targetId}`,
-        sourceId,
-        targetId,
-        kind: "ambient",
-        ring: 0,
-      });
-    });
 
     const rings = new Map();
     ambientNodes.forEach((node) => {
@@ -301,6 +288,18 @@ export function createThreeGraphEngine(mount, handlers = {}) {
             kind: "ambient-ring",
             ring,
           });
+          if (index % 9 === 0 && ring > 1) {
+            const prev = nearestAmbientOnRing(ambientNodes, ring - 1, angleOfAmbientNode(node));
+            if (prev && nodeRecords.has(prev.id)) {
+              linkPairs.push({
+                id: `ambient-spoke-${ring}-${node.id}-${prev.id}`,
+                sourceId: prev.id,
+                targetId: node.id,
+                kind: "ambient-spoke",
+                ring,
+              });
+            }
+          }
         });
     });
 
@@ -308,6 +307,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     const pointCount = Math.max(2, linkPairs.length * 2);
     const positions = new Float32Array(pointCount * 3);
     const pulses = new Float32Array(pointCount);
+    const colors = new Float32Array(pointCount * 3);
 
     if (activeLinkState.geometry) {
       activeLinkState.geometry.dispose();
@@ -318,11 +318,16 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("pulse", new THREE.BufferAttribute(pulses, 1));
+    geometry.setAttribute("lineColor", new THREE.BufferAttribute(colors, 3));
+    linkPairs.forEach((link, index) => {
+      const color = linkColor(link);
+      colors.set([color.r, color.g, color.b], index * 6);
+      colors.set([color.r, color.g, color.b], index * 6 + 3);
+    });
     const material = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color("#61bdfd") },
-        uAlpha: { value: 0.42 },
+        uAlpha: { value: 0.34 },
       },
       vertexShader: LINK_VERTEX_SHADER,
       fragmentShader: LINK_FRAGMENT_SHADER,
@@ -339,7 +344,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
 
   function syncLabels(params) {
     for (const record of nodeRecords.values()) {
-      record.label.visible = shouldShowLabel(record.node, params);
+      record.label.visible = false;
     }
   }
 
@@ -358,6 +363,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
     updateLinks(elapsed);
     updateHoverWave(elapsed);
     updateCamera();
+    updateHoverLabel();
 
     stage.rotation.y += 0.0009;
     starField.rotation.y -= 0.00035;
@@ -393,7 +399,7 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       if (!source || !target) return;
       const sourceHot = source.node.id === hoveredId || source.node.id === latestParams?.selectedId ? 1 : 0;
       const targetHot = target.node.id === hoveredId || target.node.id === latestParams?.selectedId ? 1 : 0;
-      const basePulse = link.kind === "lineage" ? 0.85 : link.kind === "ambient-ring" ? 0.2 : link.kind === "ambient" ? 0.12 : 0.18;
+      const basePulse = link.kind === "ring" ? 0.12 : link.kind === "spoke" ? 0.08 : link.kind === "ambient-ring" ? 0.1 : link.kind === "ambient-spoke" ? 0.06 : 0.1;
       const pulse = Math.max(sourceHot, targetHot, basePulse);
       positions.setXYZ(index * 2, source.mesh.position.x, source.mesh.position.y, source.mesh.position.z);
       positions.setXYZ(index * 2 + 1, target.mesh.position.x, target.mesh.position.y, target.mesh.position.z);
@@ -423,6 +429,27 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       ring.material.opacity = hoverWave.userData.opacity * (1 - phase) * (index === 0 ? 0.9 : 0.55);
       ring.rotation.z = elapsed * (0.18 + index * 0.05);
     });
+  }
+
+  function updateHoverLabel() {
+    const record = hoveredId ? nodeRecords.get(hoveredId) : null;
+    if (!record || record.node.ambient) {
+      hoverLabel.classList.remove("is-visible");
+      return;
+    }
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const projected = record.mesh.position.clone().project(camera);
+    if (projected.z < -1 || projected.z > 1) {
+      hoverLabel.classList.remove("is-visible");
+      return;
+    }
+
+    const x = (projected.x * 0.5 + 0.5) * rect.width;
+    const y = (-projected.y * 0.5 + 0.5) * rect.height;
+    hoverLabel.textContent = record.node.displayLabel || record.node.label || record.node.id;
+    hoverLabel.style.transform = `translate3d(${x}px, ${y - 18}px, 0) translate(-50%, -100%)`;
+    hoverLabel.classList.add("is-visible");
   }
 
   function updateCamera() {
@@ -488,6 +515,9 @@ export function createThreeGraphEngine(mount, handlers = {}) {
       }
       activeLinkState.geometry?.dispose();
       activeLinkState.material?.dispose();
+      if (hoverLabel.parentNode === mount) {
+        mount.removeChild(hoverLabel);
+      }
       composer?.dispose?.();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) {
@@ -509,6 +539,104 @@ function createPostProcessor(renderer, scene, camera) {
     console.warn("3D graph bloom post-processing is disabled.", error);
     return null;
   }
+}
+
+function buildOrderedLinks(params) {
+  const linkPairs = [];
+  const rings = new Map();
+  params.layout.nodes.forEach((node) => {
+    const ring = node.ring || 0;
+    if (!rings.has(ring)) rings.set(ring, []);
+    rings.get(ring).push(node);
+  });
+
+  rings.forEach((nodes, ring) => {
+    const sorted = [...nodes].sort((a, b) => polarAngle(a) - polarAngle(b));
+    if (sorted.length > 2) {
+      sorted.forEach((node, index) => {
+        const next = sorted[(index + 1) % sorted.length];
+        if (!next || node.id === next.id) return;
+        linkPairs.push({
+          id: `ring-${ring}-${node.id}-${next.id}`,
+          sourceId: node.id,
+          targetId: next.id,
+          kind: "ring",
+          ring,
+        });
+      });
+    }
+
+    if (ring > 0) {
+      const previous = rings.get(ring - 1) || [];
+      const stride = params.mode === "step" ? 2 : 3;
+      sorted.forEach((node, index) => {
+        if (index % stride !== 0) return;
+        const target = nearestByAngle(previous, polarAngle(node));
+        if (!target || target.id === node.id) return;
+        linkPairs.push({
+          id: `spoke-${ring}-${target.id}-${node.id}`,
+          sourceId: target.id,
+          targetId: node.id,
+          kind: "spoke",
+          ring,
+        });
+      });
+    }
+  });
+
+  return linkPairs;
+}
+
+function nearestByAngle(nodes, targetAngle) {
+  let best = null;
+  let bestDistance = Infinity;
+  nodes.forEach((node) => {
+    const distance = angularDistance(polarAngle(node), targetAngle);
+    if (distance < bestDistance) {
+      best = node;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function polarAngle(node) {
+  return Math.atan2(node.y - CENTER.y, node.x - CENTER.x);
+}
+
+function nearestAmbientOnRing(nodes, targetRing, targetAngle) {
+  let best = null;
+  let bestDistance = Infinity;
+  nodes.forEach((node) => {
+    if (ambientRingIndex(node) !== targetRing) return;
+    const distance = angularDistance(angleOfAmbientNode(node), targetAngle);
+    if (distance < bestDistance) {
+      best = node;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function angleOfAmbientNode(node) {
+  const ring = ambientRingIndex(node);
+  const slotCount = 28 + ring * 18;
+  const slot = Math.floor(ambientIndex(node) / 9) % slotCount;
+  return (slot / slotCount) * Math.PI * 2 + ring * 0.115 + (hash(`${node.id}:a`) - 0.5) * 0.035;
+}
+
+function angularDistance(a, b) {
+  return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+}
+
+function linkColor(link) {
+  const color = layerColor(link.ring || 0);
+  if (link.kind === "spoke" || link.kind === "ambient-spoke") return color.clone().lerp(BLUE, 0.42);
+  return color.clone().lerp(new THREE.Color("#cfeaff"), 0.18);
+}
+
+function layerColor(ring) {
+  return LAYER_COLORS[Math.abs(ring) % LAYER_COLORS.length].clone();
 }
 
 function nearestScreenNodeId(maxDistancePx) {
@@ -782,34 +910,31 @@ function labelScale(node) {
 }
 
 function nodeScale(node) {
-  const base = node.ambient ? node.radius * 0.008 : Math.max(0.028, (node.radius || 10) * 0.0058);
-  if (node.kind === "focus") return base * 1.36;
+  const base = node.ambient ? node.radius * 0.0062 : Math.max(0.024, (node.radius || 10) * 0.0048);
+  if (node.kind === "focus") return Math.min(0.22, base * 0.58);
   if (node.kind === "industry") return base * 1.08;
   return base;
 }
 
 function nodeAlpha(node) {
-  if (node.ambient) return 0.1;
-  if (node.kind === "focus") return 0.42;
-  return Math.max(0.16, Math.min(0.48, (node.opacity ?? 0.9) * 0.42));
+  if (node.ambient) return 0.08;
+  if (node.kind === "focus") return 0.32;
+  return Math.max(0.12, Math.min(0.38, (node.opacity ?? 0.9) * 0.34));
 }
 
 function nodeColor(node) {
-  if (node.ambient) return node.tone === "amber" ? GOLD.clone() : node.tone === "blue" ? BLUE.clone() : DUST.clone();
-  if (node.kind === "focus") return GOLD.clone();
-  if (node.type === "industry") return BLUE.clone();
-  if (node.type === "problem") return PINK.clone();
-  if (node.type === "capability") return VIOLET.clone();
-  if (node.type === "agent") return GOLD.clone();
-  if (node.type === "action") return ROSE.clone();
-  return CYAN.clone();
+  const ring = node.ambient ? ambientRingIndex(node) : node.ring || 0;
+  const color = layerColor(ring);
+  if (node.kind === "focus") return color.lerp(GOLD, 0.35);
+  if (node.ambient && node.tone === "muted") return color.lerp(DUST, 0.48);
+  if (node.ambient && node.tone === "blue") return color.lerp(BLUE, 0.34);
+  return color;
 }
 
 function nodeAccent(node) {
-  if (node.kind === "focus") return new THREE.Color("#fff7b0");
-  if (node.type === "problem" || node.type === "action") return new THREE.Color("#ffb1cf");
-  if (node.type === "agent") return new THREE.Color("#fff0a0");
-  return new THREE.Color("#bdeaff");
+  const ring = node.ambient ? ambientRingIndex(node) : node.ring || 0;
+  if (node.kind === "focus") return new THREE.Color("#fff1a8");
+  return layerColor(ring).lerp(new THREE.Color("#eef8ff"), 0.42);
 }
 
 function nextPowerOfTwo(value) {
