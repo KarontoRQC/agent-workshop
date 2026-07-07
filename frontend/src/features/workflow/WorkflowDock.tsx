@@ -1,21 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { ArrowUpRight, Crown, ExternalLink, GitBranch, PackageOpen, Sparkles } from 'lucide-react';
-import { enrichDrawAgent, getAgentLaunchTargets, openAgentLaunchTargets } from '../../lib/agentLaunchCatalog';
+import { enrichDrawAgent, getAgentCombinationEntryUrl, getAgentLaunchTargets } from '../../lib/agentLaunchCatalog';
 import type { RecommendedAgent } from '../../types';
 import { getAgentDisplayName, getAgentStage, getRecommendedAgentKey } from '../agents/agentUtils';
 import type { WorkflowHighlight } from './workflowModel';
+import './WorkflowDock.css';
 
 export function WorkflowDock({
   active,
   agents,
   highlight,
-  onOpenHeroHall,
+  recommendationId,
   routeSegments,
 }: {
   active: boolean;
   agents: RecommendedAgent[];
   highlight: WorkflowHighlight;
-  onOpenHeroHall: () => void;
+  recommendationId?: string;
   routeSegments: string[];
 }) {
   const hasRoute = routeSegments.length > 0;
@@ -56,7 +57,7 @@ export function WorkflowDock({
               <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
             ))}
           </div>
-          <RecommendedAgentLaunchBar agents={agents} onOpenHeroHall={onOpenHeroHall} />
+          <RecommendedAgentLaunchBar agents={agents} recommendationId={recommendationId} />
         </section>
       ) : null}
     </aside>
@@ -64,6 +65,13 @@ export function WorkflowDock({
 }
 
 function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; routeSegments: string[] }) {
+  const routeListRef = useRef<HTMLDivElement>(null);
+  const routeListKey = routeSegments.join('|');
+
+  useEffect(() => {
+    routeListRef.current?.scrollTo({ top: 0 });
+  }, [routeListKey]);
+
   return (
     <section className={`workflow-dock-section workflow-route-panel ${highlighted ? 'is-prism' : ''}`}>
       <div className="workflow-dock-title">
@@ -71,7 +79,7 @@ function RouteResult({ highlighted, routeSegments }: { highlighted: boolean; rou
         <strong>知识路径</strong>
         <span>{routeSegments.length}</span>
       </div>
-      <div className="workflow-route-chain">
+      <div className="workflow-route-chain" ref={routeListRef}>
         {routeSegments.map((segment, index) => (
           <span data-current={index === routeSegments.length - 1} key={`${index}-${segment}`}>
             {segment}
@@ -137,10 +145,18 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
   );
 }
 
-function RecommendedAgentLaunchBar({ agents, onOpenHeroHall }: { agents: RecommendedAgent[]; onOpenHeroHall: () => void }) {
+function RecommendedAgentLaunchBar({
+  agents,
+  recommendationId,
+}: {
+  agents: RecommendedAgent[];
+  recommendationId?: string;
+}) {
   const enrichedAgents = agents.map(enrichDrawAgent);
   const launchTargets = getAgentLaunchTargets(enrichedAgents);
-  const canOpen = launchTargets.length > 0;
+  const combinationEntryUrl = recommendationId ? getAgentCombinationEntryUrl(recommendationId) : '';
+  const canOpenHall = Boolean(combinationEntryUrl);
+  const canOpen = launchTargets.length > 0 && Boolean(combinationEntryUrl);
 
   return (
     <div className="recommended-agent-package">
@@ -149,20 +165,32 @@ function RecommendedAgentLaunchBar({ agents, onOpenHeroHall }: { agents: Recomme
         <strong>{agents.length} 个智能体已生成</strong>
       </div>
       <div className="recommended-agent-package-actions">
-        <button aria-label="进入智能体英雄殿堂" className="recommended-agent-package-hall" onClick={onOpenHeroHall} type="button">
-          <Crown size={14} />
-          <span>殿堂</span>
-        </button>
-        <button disabled={!canOpen} onClick={() => openAgentLaunchTargets(launchTargets)} type="button">
-          <PackageOpen size={15} />
-          <span>{canOpen ? '打开组合' : '暂无链接'}</span>
-          {canOpen ? (
+        {canOpenHall ? (
+          <a aria-label="打开你的智能体英雄殿堂" className="recommended-agent-package-hall" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
+            <Crown size={14} />
+            <span>打开你的殿堂</span>
+          </a>
+        ) : (
+          <button aria-label="等待智能体英雄殿堂生成" className="recommended-agent-package-hall" disabled type="button">
+            <Crown size={14} />
+            <span>等待殿堂</span>
+          </button>
+        )}
+        {canOpen ? (
+          <a className="recommended-agent-package-open" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
+            <PackageOpen size={15} />
+            <span>打开组合</span>
             <em>
               {launchTargets.length}
               <ArrowUpRight size={12} />
             </em>
-          ) : null}
-        </button>
+          </a>
+        ) : (
+          <button disabled type="button">
+            <PackageOpen size={15} />
+            <span>暂无链接</span>
+          </button>
+        )}
       </div>
     </div>
   );

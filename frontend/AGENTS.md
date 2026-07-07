@@ -1,4 +1,53 @@
-# Prototype Instructions
+# frontend/AGENTS.md
+
+本文件为 Codex 修改 `frontend/` 下代码时提供目录级指导。根级 `AGENTS.md` 仍然适用；前端视觉、交互、语音和 Hero Hall 的长期决策以本文件为准。
+
+## 快速参考
+
+- **源码入口**: `frontend/src/`
+- **应用入口**: `frontend/src/App.tsx`
+- **全局样式**: `frontend/src/App.css`、`frontend/src/index.css`
+- **流式客户端**: `frontend/src/lib/agentStreamClient.ts`
+- **工作流状态**: `frontend/src/features/workflow/workflowModel.ts`
+- **Hero Hall**: `frontend/src/features/heroHall/`
+- **导航入口**: `docs/ai-nav/frontend/_index.nav.md`
+
+## 命令
+
+```bash
+cd frontend && npm run dev -- --host 127.0.0.1 --port 5188
+cd frontend && npm run build
+cd frontend && npm run preview -- --host 127.0.0.1
+```
+
+## 验证标准
+
+- 修改 TypeScript、React 组件、样式或 Vite 配置后，至少运行 `cd frontend && npm run build`。
+- 修改 Three.js、Hero Hall、HUD、语音或布局视觉后，必须用浏览器实际预览；桌面和移动端至少各检查一次。
+- 修改 `/api/coze/chat/stream` 消费、SSE 事件、推荐智能体字段或工作流状态后，同步检查 `docs/coze-chat-stream-api.md`、`frontend/src/lib/agentStreamClient.ts` 和 `frontend/src/features/workflow/workflowModel.ts`。
+- 修改代理、TTS 或环境变量读取后，同步检查 `frontend/vite.config.ts`、`frontend/README.md` 和根级 `README.md`。
+
+## 禁止事项
+
+- 禁止在没有依赖变更时修改 `frontend/package-lock.json`；如确需更新依赖，必须说明触发原因。
+- 禁止让前端在 `workflow.stage.completed` 后停止读取 Coze/LongCat 流；完整结束信号以 `workflow.completed` 或 `chat.completed` 为准。
+- 禁止把 `frontend/src/features/heroHall/HeroTeamCarousel.tsx` 的轮播实现内联回 `AgentHeroHall.tsx` 或追加到全局 `App.css`。
+- 禁止在 Agent Hero Hall 中用静态占位文案覆盖后端返回的推荐智能体名称、阶段、理由、头像或启动目标。
+- 禁止用可见说明文案替代拖拽、状态反馈或 HUD 交互本身。
+
+## 代码导航
+
+| 你要改的代码 | 先读 |
+|---|---|
+| `frontend/src/` | `docs/ai-nav/frontend/src/_index.nav.md` |
+| `frontend/src/lib/` | `docs/ai-nav/frontend/src/lib/_index.nav.md` |
+| `frontend/src/components/` | `docs/ai-nav/frontend/src/components/_index.nav.md` |
+| `frontend/src/hooks/` | `docs/ai-nav/frontend/src/hooks/_index.nav.md` |
+| `frontend/src/features/` | `docs/ai-nav/frontend/src/features/_index.nav.md` |
+| `frontend/src/features/heroHall/` | `docs/ai-nav/frontend/src/features/heroHall/_index.nav.md` |
+| `frontend/src/features/workflow/` | `docs/ai-nav/frontend/src/features/workflow/_index.nav.md` |
+
+## 原型操作规则
 
 Run the local server yourself and open the preview in the in-app browser. Do not give the user server-start instructions when you can run it.
 
@@ -45,3 +94,42 @@ When drilling from a parent node into a child node, do not collapse the parent i
 - 2026-07-01: The top-left homepage HUD typewriter intel panel should stay semi-transparent and glass-like, letting the reactor, star-chain, and particle field show through while preserving readable blue-gold cockpit borders and scan details.
 - 2026-07-01: Homepage perimeter mech feeling should come from visible armor hardware, not faint decorative lines. Use angular side/top/bottom visor plates, corner armor locks, segmented metal ribs, and stronger blue-gold energy seams while keeping the graph core and lower-left chat dock unobstructed.
 - 2026-07-01: The TTS backend is deployed on the shared server. In Vite dev mode, `/api/tts/*` should proxy to `API_PROXY_BASE_URL` by default, not localhost, unless `TTS_PROXY_TARGET` is explicitly set for local backend testing.
+- 2026-07-01: Homepage information boxes such as dialogue, knowledge path, and recommended agents should feel like embedded mech helmet displays, not generic floating web cards. Use angular screen housings, exposed interface rails, corner locks, scan grids, status lamps, and blue-gold hardware seams while preserving the current compact dock layout.
+- 2026-07-01: Homepage left and right mech visor armor should sit farther toward the screen edges. Keep the strong side-hardware feeling, but avoid letting the side plates bite too deeply into the graph/core area.
+- 2026-07-01: In Agent Hero Hall, replace the recommended battle team strip with the previously cut-out hero-card carousel module. First pass should prioritize data wiring and interaction over final styling.
+- 2026-07-01: Move the Agent Hero Hall recommended battle team carousel into the middle showcase slot and swap the hero library down into the lower slot.
+- 2026-07-01: The Agent Hero Hall recommended battle team carousel should be a 1:1 clone of the previously cut-out module. Only agent names and avatars stay dynamic; copy, score, tag, card anatomy, card sizing, arrows, pedestal, and carousel chrome should follow the cut-out module rather than recommendation-specific parameters.
+- 2026-07-01: Keep the Hero Hall recommended battle team carousel modular. Its implementation belongs in a dedicated HeroTeamCarousel component and colocated stylesheet rather than being embedded in AgentHeroHall or appended to App.css.
+- 2026-07-01: Move the homepage left HUD status module upward and evolve it from a simple ONLINE chip into a compact dynamic CPU / GPU / AI telemetry block with mech performance meters, while keeping it lightweight and inside the helmet display language.
+- 2026-07-01: Align the homepage script radar and CPU/GPU/AI telemetry modules higher with the right-side HUD status module. CPU and GPU telemetry should keep randomly drifting within 0-80%. AI telemetry should idle at a low nonzero load, then switch to 100% with a red progress bar only during active AI response/streaming.
+- 2026-07-01: Homepage HUD radar and CPU/GPU/AI telemetry positions must remain fixed whether or not the user has chatted or a workflow dock is visible; do not use chat/workflow state selectors to change their coordinates.
+- 2026-07-01: The homepage left GRAPH SCAN radar module should be fixed to the same top baseline as the right-side knowledge path panel. CPU/GPU/AI telemetry should stay locked directly below that left radar block, not float lower before chat.
+- 2026-07-01: The homepage knowledge path panel should render as a contained scroll window showing five route nodes at a time; longer paths scroll inside the panel instead of stretching the dock.
+- 2026-07-01: When the right-side knowledge path dock is visible, align the top-left script radar module and the CPU/GPU/AI telemetry module group to the same top rail as the right knowledge path card; do not move the chat composer for this alignment.
+- 2026-07-01: In Agent Hero Hall, the recommended hero-card carousel must stay above the hero library. Do not let older App.css "hero library middle / recommended bottom" rules override the modular HeroTeamCarousel layout.
+- 2026-07-01: The Agent Hero Hall should feel like a cockpit HUD popup rather than a full right-side page. Keep the left chat visible, dim/preserve the Jarvis cockpit context behind it, and present the hall as an armored blue-gold modal with visor framing, scan rails, corner locks, and elevated depth similar to the recommended-agent cockpit displays.
+- 2026-07-01: Revised Agent Hero Hall direction: it should appear as a main-page cockpit HUD module, similar to the recommended-agent and knowledge-path panels, not as a full page, full right-side replacement, or oversized modal. Keep the Jarvis homepage HUD, particle core, and compact chat context visible behind it.
+- 2026-07-01: Revised Agent Hero Hall placement: the hall should pop out in the center cockpit viewing area, as if launched from a main-page HUD control. Keep symmetrical top/bottom cockpit clearance and do not let the hall extend beyond the helmet/visor visual bounds.
+- 2026-07-01: Opening Agent Hero Hall must not mutate or restyle the homepage behind it. Treat the hall as an isolated functional popup/module; the homepage HUD, recommendation dock, knowledge path, subtitles, and chat should keep their normal main-page layout and styling.
+- 2026-07-01: In the isolated Agent Hero Hall popup, keep the hero pool chrome compact and make individual hero cards larger; the pool should feel like a focused module rather than a dense tiny table.
+- 2026-07-02: When syncing from `KarontoRQC/agent-workshop-jarvis`, selectively import only the opening planet / particle-field visual work into the current `frontend/src` app. Do not replace the local Agent Hero Hall popup isolation, modular carousel, or homepage HUD layout with the remote nested app structure.
+- 2026-07-02: Agent Hero Hall should make drag replacement obvious and reliable. Disable native image/browser drag inside hall cards, use custom pointer/mouse dragging from the hero pool or recommendation carousel, glow the current recommendation drop target, and pulse the card after replacement. Keep this as a functional module with no instructional text added to the visible UI.
+- 2026-07-02: The homepage background should maintain an outer-space cruising feeling: use a deep-space starfield / warp-streak backdrop behind the particle core, keep the center readable, and preserve the Jarvis HUD, graph, and compact chat layers above it.
+- 2026-07-06: Agent Hero Hall middle carousel cards must mirror the current 推荐智能体 list from the workflow dock / recommendation snapshot. Do not show static reference cards or hero-pool catalog cards in that carousel unless they have first entered the recommended-agent source.
+- 2026-07-06: Homepage thinking/speaking readout such as “思考中...” should sit on the cockpit centerline, not offset by the left chat dock or side HUD panels.
+- 2026-07-06: Agent Hero Hall middle recommended area must show every current 推荐智能体 card at once as a visible horizontal team strip. Do not hide extra recommended agents behind a three-card/center-only coverflow.
+- 2026-07-06: On the homepage, right-side knowledge-path and recommended-agent panels plus graph focus should reveal only after the left agent console has shown the corresponding 工具调用 marker. Streaming recommendation snapshots must not auto-open the right panel before that left-side tool-call cue.
+- 2026-07-06: The homepage center graph must remain contained in the cockpit viewport during rotation. In graph mode, use bounded yaw / gentle sway, restrained active scale, and a wider camera instead of unrestricted spin that can push knowledge-path or recommended-agent nodes offscreen.
+- 2026-07-06: Homepage performance optimization must preserve the premium cockpit / graph visual effect. Prefer capping WebGL pixel ratio, throttling idle/background/hidden frames, disabling expensive canvas filters, and putting ParticleField into background mode while Hero Hall is open instead of removing visible graph, particle, or HUD effects. The graph should still visibly rotate within bounded yaw.
+- 2026-07-06: The homepage center ParticleField graph must always visualize the knowledge path route, not the recommended-agent roster. Recommended agents belong in the right recommendation dock and Agent Hero Hall only; do not feed recommended-agent names into the center graph labels or graph focus key.
+- 2026-07-06: During agent speech output, the center knowledge-path graph must stay spatially stable. Speech energy may add subtle glow/shimmer, but must not drive large particle scale, pulse seed expansion, or diamond/route-node popping while the graph is visible.
+- 2026-07-06: When an agent reply completes successfully with a `recommendation_id` and generated recommended agents, the homepage should automatically open the matching `agent_combination` Hero Hall entry page in a new browser page/tab. Do not replace the original homepage tab and do not revive the legacy in-page Hero Hall popup for this jump.
+- 2026-07-06: On the `agent_combination` Hero Hall entry page, agent cards should show rarity/level badges such as SSR in the top-right corner instead of numeric order badges. Card titles, reasons, tags, and buttons must be laid out so long Chinese text stays clipped or wrapped inside the module and never overflows the card.
+- 2026-07-06: The homepage diamond knowledge-path star graph must not react to mouse hover with collision, magnetic pull, swirl, hover glow, or camera push. Preserve its bounded auto-rotation, route highlighting, and click pulse unless a later request explicitly removes click feedback too.
+- 2026-07-06: Voice output should use the backend Edge TTS Chinese female voice path by default. Do not rely on Piper/local model synthesis or automatic browser speech fallback for the normal JARVIS voice path.
+- 2026-07-07: The `agent_combination` Hero Hall entry page should keep the full hero-hall palace background beyond the top hero. Under the recommended-agent module, provide a usable combination lineup builder where users can choose candidate agents into a five-slot lineup, drag agents into slots, drag within the lineup to swap positions, and view a live combination score table.
+- 2026-07-07: The `agent_combination` Hero Hall entry page background should use the generated deep-blue cosmic palace / crown-stage image. Page content must scroll inside the palace frame and be clipped by that frame; do not let cards or sections slide outside the visible background frame when scrolling upward.
+- 2026-07-07: In the `agent_combination` lineup builder, optional/candidate agent cards must prioritize readable names and stage labels over dense tiny-card quantity. Keep a dedicated one-click open button for the currently composed lineup, separate from the recommended-agent batch open action.
+- 2026-07-07: `agent_combination` 阵容搭建器的可选智能体必须提供类目筛选，让客户能按全部、推荐优先、已入阵以及阶段/能力类目选择候选；类目只筛选候选池，不改变推荐智能体真实字段、阵容槽位或评分逻辑。
+- 2026-07-07: `agent_combination` 组合评分表必须根据用户当前阵容实时计算；填满五个槽位不能自动高分，重复阶段/能力类目、未保留推荐核心或入口不可用都应拉低对应指标和总分。
+- 2026-07-07: `agent_combination` 组合智能体页右上角必须提供保存按钮。用户调整五槽阵容后点击保存，应持久化到当前推荐快照；页面刷新或重新打开时优先恢复后端保存的阵容，没有保存阵容时才使用推荐智能体默认阵容。

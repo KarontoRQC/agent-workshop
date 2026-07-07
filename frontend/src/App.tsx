@@ -4,13 +4,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from 'react';
-import { Activity, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
+import { Activity, BrainCircuit, CircuitBoard, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
 import ParticleField from './components/ParticleField';
+import { ZhongyinIntro } from './components/ZhongyinIntro';
 import { AgentConsole, type InputMode } from './features/agentConsole/AgentConsole';
-import { getRecommendedAgentKey } from './features/agents/agentUtils';
-import { AgentHeroHall } from './features/heroHall/AgentHeroHall';
+import { AgentCombinationEntryPage } from './features/heroHall/AgentCombinationEntryPage';
 import {
   createHeroHallLineups,
   createHeroHallLineupsFromAgents,
@@ -36,6 +37,11 @@ import {
 } from './features/speech/speechOutput';
 import { WorkflowDock } from './features/workflow/WorkflowDock';
 import {
+  getAgentCombinationEntryIdFromUrl,
+  shouldPollRecommendationSnapshot,
+  snapshotToRecommendedAgents,
+} from './features/workflow/recommendationSnapshotModel';
+import {
   PATH_MATCH_ANIMATION_MS,
   RECOMMENDATION_DOCK_REVEAL_MS,
   SPEECH_SEGMENT_WAIT_MS,
@@ -54,7 +60,6 @@ import {
   getCompletedSpeechSegment,
   getLatestAgentUserState,
   getLatestDisplayableRecommendedAgents,
-  getLatestRecommendationSummary,
   getLatestRouteSegments,
   getRevealForSpeechSegment,
   getSpeechTextForSegment,
@@ -80,8 +85,11 @@ import {
 } from './features/workflow/workflowModel';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
+import { fetchAgentCatalog } from './lib/agentCatalogClient';
+import { getAgentCombinationEntryUrl, setAgentCatalogAgents } from './lib/agentLaunchCatalog';
 import { streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
+import { fetchRecommendationSnapshot } from './lib/recommendationSnapshotClient';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
 import type {
   AgentAction,
@@ -91,6 +99,7 @@ import type {
   AgentWorkflow,
   Message,
   ParticleSettings,
+  RecommendationSnapshot,
   RecommendedAgent,
   ReplySource,
 } from './types';
@@ -101,6 +110,11 @@ const baseSettings: ParticleSettings = {
   mode: 'idle',
   pulseSeed: 0,
 };
+
+const TOOL_CALL_TO_MAIN_SURFACE_REVEAL_MS = 420;
+const HERO_HALL_AUTO_JUMP_DELAY_MS = 700;
+const HOME_PAGE_TITLE = '中隐会 - 星系图谱';
+const HERO_HALL_PAGE_TITLE = '中隐会 - 英雄殿堂';
 
 const demoGraphAction: AgentAction = {
   confidence: 1,
@@ -117,6 +131,34 @@ type HelmetIntelState = {
   metaRight: string;
   tone: 'active' | 'nominal' | 'warning';
 };
+
+type HelmetTelemetrySnapshot = {
+  ai: number;
+  cpu: number;
+  gpu: number;
+};
+
+const HELMET_TELEMETRY_REFRESH_MS = 3200;
+
+function randomTelemetryValue(min: number, max: number) {
+  return Math.round(min + Math.random() * (max - min));
+}
+
+function createHelmetTelemetrySnapshot(status: AgentStatus, voiceAwake: boolean, voiceListening: boolean): HelmetTelemetrySnapshot {
+  const active = status === 'streaming';
+
+  return {
+    ai: active ? 100 : randomTelemetryValue(voiceListening ? 8 : voiceAwake ? 6 : 3, voiceListening ? 24 : voiceAwake ? 18 : 14),
+    cpu: randomTelemetryValue(active ? 34 : voiceListening ? 18 : 4, active ? 80 : voiceListening ? 72 : 58),
+    gpu: randomTelemetryValue(active ? 38 : voiceListening ? 20 : 6, active ? 80 : voiceListening ? 76 : 64),
+  };
+}
+
+function hasGeneratedRecommendedAgents(agents: RecommendedAgent[]) {
+  return agents.some((agent) =>
+    [agent.agent_name, agent.name, agent.stage, agent.reason].some((value) => String(value ?? '').trim()),
+  );
+}
 
 function buildHelmetIntelStates({
   graphRoute,
@@ -215,7 +257,23 @@ function buildHelmetIntelStates({
 }
 
 export default function App() {
-  const demoGraphEnabled = new URLSearchParams(window.location.search).has('demoGraph');
+  const agentCombinationEntryId = getAgentCombinationEntryIdFromUrl(window.location.href);
+
+  useEffect(() => {
+    document.title = agentCombinationEntryId ? HERO_HALL_PAGE_TITLE : HOME_PAGE_TITLE;
+  }, [agentCombinationEntryId]);
+
+  if (agentCombinationEntryId) {
+    return <AgentCombinationEntryPage recommendationId={agentCombinationEntryId} />;
+  }
+
+  return <JarvisApp />;
+}
+
+function JarvisApp() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const demoGraphEnabled = searchParams.has('demoGraph');
+  const introBypassed = demoGraphEnabled || searchParams.has('skipIntro');
   const speechCaptionTimerRef = useRef<number | null>(null);
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
@@ -225,15 +283,22 @@ export default function App() {
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
   const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
-  const lastHeroHallAutoKeyRef = useRef('');
+  const introBootFlashTimerRef = useRef<number | null>(null);
+  const heroHallJumpTimerRef = useRef<number | null>(null);
+  const heroHallJumpSequenceRef = useRef(0);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+  const [, setAgentCatalogVersion] = useState(0);
+  const [introOpen, setIntroOpen] = useState(!introBypassed);
+  const [introBootFlash, setIntroBootFlash] = useState(false);
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
-  const [heroHallOpen, setHeroHallOpen] = useState(false);
   const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
   const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
+  const [currentRecommendationId, setCurrentRecommendationId] = useState('');
+  const [sharedRecommendationSnapshot, setSharedRecommendationSnapshot] = useState<RecommendationSnapshot | null>(null);
+  const [sharedRecommendationError, setSharedRecommendationError] = useState('');
   const [routeDockVisible, setRouteDockVisible] = useState(demoGraphEnabled);
   const [recommendationDockVisible, setRecommendationDockVisible] = useState(false);
   const [workflowHighlight, setWorkflowHighlight] = useState<WorkflowHighlight>('none');
@@ -250,6 +315,93 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
+
+  const cancelHeroHallJump = useCallback(() => {
+    heroHallJumpSequenceRef.current += 1;
+
+    if (heroHallJumpTimerRef.current !== null) {
+      window.clearTimeout(heroHallJumpTimerRef.current);
+      heroHallJumpTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHeroHallJump = useCallback((recommendationId: string, agents: RecommendedAgent[]) => {
+    const id = recommendationId.trim();
+
+    if (!id) {
+      return;
+    }
+
+    const jumpSequence = heroHallJumpSequenceRef.current + 1;
+    heroHallJumpSequenceRef.current = jumpSequence;
+
+    const queueJump = () => {
+      if (heroHallJumpSequenceRef.current !== jumpSequence) {
+        return;
+      }
+
+      if (heroHallJumpTimerRef.current !== null) {
+        window.clearTimeout(heroHallJumpTimerRef.current);
+      }
+
+      heroHallJumpTimerRef.current = window.setTimeout(() => {
+        if (heroHallJumpSequenceRef.current !== jumpSequence) {
+          return;
+        }
+
+        heroHallJumpTimerRef.current = null;
+        window.open(getAgentCombinationEntryUrl(id), '_blank', 'noopener,noreferrer');
+      }, HERO_HALL_AUTO_JUMP_DELAY_MS);
+    };
+
+    if (hasGeneratedRecommendedAgents(agents)) {
+      queueJump();
+      return;
+    }
+
+    void fetchRecommendationSnapshot(id)
+      .then((snapshot) => {
+        if (hasGeneratedRecommendedAgents(snapshotToRecommendedAgents(snapshot))) {
+          queueJump();
+        }
+      })
+      .catch((error) => {
+        console.warn('Recommendation snapshot was not ready for hero hall auto jump.', error);
+      });
+  }, []);
+
+  useEffect(() => () => cancelHeroHallJump(), [cancelHeroHallJump]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has('recommendation_id')) {
+      return;
+    }
+
+    url.searchParams.delete('recommendation_id');
+    window.history.replaceState(null, '', url);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadAgentCatalog = async () => {
+      try {
+        const agents = await fetchAgentCatalog(controller.signal);
+        setAgentCatalogAgents(agents);
+        setAgentCatalogVersion((version) => version + 1);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn('Agent catalog request failed.', error);
+        }
+      }
+    };
+
+    void loadAgentCatalog();
+
+    return () => controller.abort();
+  }, []);
 
   const rememberConversationIds = useCallback((event: AgentStreamEvent) => {
     const nextConversationIds = mergeConversationIdsFromEvent(agentConversationIdsRef.current, event);
@@ -441,6 +593,8 @@ export default function App() {
         return;
       }
 
+      cancelHeroHallJump();
+
       const shouldResumeListening = options.resumeListening ?? (inputMode === 'voice' && (voiceAwake || manualVoiceSession));
       const now = Date.now();
       const nextUserMessage: Message = { id: now, speaker: 'you', text };
@@ -484,6 +638,7 @@ export default function App() {
       let playedSpeechInTurn = false;
       let requestedLineupForResponse = requestedLineupForRequest;
       let appliedLineupFallback = false;
+      let recommendationIdForResponse = '';
       const cardReadyWaiters: Array<(ready: boolean) => void> = [];
       const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
       const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
@@ -501,6 +656,26 @@ export default function App() {
       const revealWorkflow = (nextReveal: Partial<WorkflowRevealState>) => {
         revealState = { ...revealState, ...nextReveal };
         publishVisibleWorkflow();
+      };
+      const revealMainSurfaceAfterToolCall = async (showMainSurface: () => void) => {
+        await wait(TOOL_CALL_TO_MAIN_SURFACE_REVEAL_MS);
+
+        if (controller.signal.aborted) {
+          return false;
+        }
+
+        showMainSurface();
+        return true;
+      };
+      const queueRecommendationSurfaceAfterToolCall = () => {
+        window.setTimeout(() => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setRecommendationDockVisible(true);
+          setWorkflowHighlight('agents');
+        }, TOOL_CALL_TO_MAIN_SURFACE_REVEAL_MS);
       };
       const isSpeechSegmentVisible = (segment: SpeechSegmentKey) => {
         if (segment === 'knowledgeAck') {
@@ -719,9 +894,7 @@ export default function App() {
             ),
           ),
         );
-        setHeroHallOpen(true);
-        setRecommendationDockVisible(true);
-        setWorkflowHighlight('agents');
+        queueRecommendationSurfaceAfterToolCall();
         markCardsReady();
       };
       const closeCardsReady = () => {
@@ -754,10 +927,11 @@ export default function App() {
         }
 
         revealWorkflow({ knowledgePath: true });
-        setLastAction(routeAction);
-        setRouteDockVisible(true);
-        setWorkflowHighlight('route');
-        return true;
+        return revealMainSurfaceAfterToolCall(() => {
+          setLastAction(routeAction);
+          setRouteDockVisible(true);
+          setWorkflowHighlight('route');
+        });
       };
       const runCardAnimation = async () => {
         const hasCards = await waitForCardsReady();
@@ -775,8 +949,14 @@ export default function App() {
 
         agentRevealCount = 1;
         revealWorkflow({ recommendationAgents: true });
-        setRecommendationDockVisible(true);
-        setWorkflowHighlight('agents');
+        const mainSurfaceVisible = await revealMainSurfaceAfterToolCall(() => {
+          setRecommendationDockVisible(true);
+          setWorkflowHighlight('agents');
+        });
+
+        if (!mainSurfaceVisible) {
+          return;
+        }
 
         while (agentRevealCount < accumulatedWorkflow.agentRecommendation.agents.length) {
           if (controller.signal.aborted) {
@@ -842,6 +1022,13 @@ export default function App() {
           userState: userStateForRequest,
           onEvent(event) {
             rememberConversationIds(event);
+
+            if (typeof event.recommendation_id === 'string' && event.recommendation_id.trim()) {
+              const nextRecommendationId = event.recommendation_id.trim();
+              recommendationIdForResponse = nextRecommendationId;
+              setCurrentRecommendationId(nextRecommendationId);
+              setSharedRecommendationError('');
+            }
 
             const speechSegment = getCompletedSpeechSegment(event);
 
@@ -961,6 +1148,7 @@ export default function App() {
 
         const finalText = buildAgentReplyText(accumulatedWorkflow, streamError || 'Agent 已完成，但没有返回可展示内容。');
         const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
+        const finalRecommendedAgents = accumulatedWorkflow.agentRecommendation.agents;
         setMessages((current) => {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: finalText }];
@@ -969,6 +1157,9 @@ export default function App() {
         setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
         void orchestrationPromise.finally(() => {
           finishReplyWithoutSpeech(shouldResumeListening);
+          if (finalStatus === 'completed') {
+            scheduleHeroHallJump(recommendationIdForResponse, finalRecommendedAgents);
+          }
         });
       } catch (error) {
         if (controller.signal.aborted) {
@@ -1048,6 +1239,7 @@ export default function App() {
     [
       agentStatus,
       agentTurns,
+      cancelHeroHallJump,
       finishReplyWithoutSpeech,
       heroHallLineupState,
       inputMode,
@@ -1055,6 +1247,7 @@ export default function App() {
       messages,
       pinnedRecommendedAgents,
       rememberConversationIds,
+      scheduleHeroHallJump,
       speakWithParticleOutput,
       voiceAwake,
     ],
@@ -1124,10 +1317,27 @@ export default function App() {
     primeSpeechOutput();
     return () => {
       agentRequestRef.current?.abort();
+      if (introBootFlashTimerRef.current !== null) {
+        window.clearTimeout(introBootFlashTimerRef.current);
+      }
       clearSpeechEndTimer();
       cancelSpeechPlayback();
     };
   }, [clearSpeechEndTimer]);
+
+  const closeIntro = useCallback(() => {
+    setIntroOpen(false);
+    setIntroBootFlash(true);
+
+    if (introBootFlashTimerRef.current !== null) {
+      window.clearTimeout(introBootFlashTimerRef.current);
+    }
+
+    introBootFlashTimerRef.current = window.setTimeout(() => {
+      setIntroBootFlash(false);
+      introBootFlashTimerRef.current = null;
+    }, 1900);
+  }, []);
 
   const toggleManualVoiceSession = useCallback(() => {
     if (!voice.supported) {
@@ -1219,19 +1429,25 @@ export default function App() {
   );
 
   const latestDisplayableRecommendedAgents = getLatestDisplayableRecommendedAgents(agentTurns);
+  const snapshotRecommendedAgents = useMemo(
+    () => snapshotToRecommendedAgents(sharedRecommendationSnapshot),
+    [sharedRecommendationSnapshot],
+  );
+  const snapshotHasManualAgents = snapshotRecommendedAgents.some((agent) => agent.source === 'manual');
   const recommendedAgents =
-    latestDisplayableRecommendedAgents.length > 0 ? latestDisplayableRecommendedAgents : pinnedRecommendedAgents;
+    snapshotHasManualAgents || latestDisplayableRecommendedAgents.length === 0
+      ? snapshotRecommendedAgents.length > 0
+        ? snapshotRecommendedAgents
+        : pinnedRecommendedAgents
+      : latestDisplayableRecommendedAgents.length > 0
+      ? latestDisplayableRecommendedAgents
+      : pinnedRecommendedAgents;
   const fallbackRoute = getLatestRouteSegments(agentTurns);
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
   const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
   const graphFocusKey =
-    graphRoute.length > 0
-      ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
-      : '';
-  const heroHallSummary = getLatestRecommendationSummary(agentTurns);
-  const heroHallKey = recommendedAgents.map(getRecommendedAgentKey).join('|');
-  const heroHallReady = agentStatus === 'completed' && recommendedAgents.length > 0 && Boolean(heroHallSummary);
+    graphRoute.length > 0 ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}` : '';
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
@@ -1241,8 +1457,10 @@ export default function App() {
         ? currentSpeechText
         : '';
   const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
+  const snapshotStatusText = sharedRecommendationError ? `推荐组合读取失败：${sharedRecommendationError}` : '';
   const captionText =
     voiceCaptionError ||
+    snapshotStatusText ||
     (inputMode === 'text'
       ? ''
       : voice.listening
@@ -1268,95 +1486,124 @@ export default function App() {
   }, [latestDisplayableRecommendedAgents]);
 
   useEffect(() => {
-    if (!heroHallReady || !heroHallKey || lastHeroHallAutoKeyRef.current === heroHallKey) {
+    if (!currentRecommendationId) {
+      setSharedRecommendationSnapshot(null);
+      setSharedRecommendationError('');
       return undefined;
     }
 
-    lastHeroHallAutoKeyRef.current = heroHallKey;
-    const timer = window.setTimeout(() => setHeroHallOpen(true), 620);
+    const controller = new AbortController();
+    let timeoutId: number | null = null;
 
-    return () => window.clearTimeout(timer);
-  }, [heroHallKey, heroHallReady]);
+    setSharedRecommendationSnapshot(null);
+    setSharedRecommendationError('');
+
+    const loadSnapshot = async () => {
+      try {
+        const snapshot = await fetchRecommendationSnapshot(currentRecommendationId, controller.signal);
+        setSharedRecommendationSnapshot(snapshot);
+        setSharedRecommendationError('');
+
+        if (snapshot.agents.length > 0 && agentStatus !== 'streaming') {
+          setRecommendationDockVisible(true);
+        }
+
+        if (shouldPollRecommendationSnapshot(snapshot)) {
+          timeoutId = window.setTimeout(loadSnapshot, 2000);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSharedRecommendationSnapshot(null);
+        setSharedRecommendationError(error instanceof Error ? error.message : '推荐组合读取失败');
+      }
+    };
+
+    void loadSnapshot();
+
+    return () => {
+      controller.abort();
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [currentRecommendationId]);
 
   return (
-    <main className="app-shell" data-hero-hall={heroHallOpen}>
-      {!heroHallOpen ? (
-        <ParticleField
-          audioLevel={micLevel.level}
-          graphFocusKey={graphFocusKey}
-          graphRoute={graphRoute}
-          settings={settings}
-        />
-      ) : null}
+    <main
+      className="app-shell"
+      data-boot-flash={introBootFlash}
+      data-hero-hall="false"
+      data-hero-modal-open="false"
+      data-intro={introOpen}
+    >
+      <div className="space-cruise-backdrop" aria-hidden="true" />
+      <ParticleField
+        audioLevel={micLevel.level}
+        graphFocusKey={graphFocusKey}
+        graphRoute={graphRoute}
+        performanceMode="active"
+        settings={settings}
+      />
       <div className="scene-vignette" />
-      {!heroHallOpen ? (
-        <JarvisHelmetHud
-          inputMode={inputMode}
-          status={agentStatus}
-          voiceAwake={voiceAwake}
-          voiceListening={voice.listening}
-        />
-      ) : null}
-      {!heroHallOpen ? (
-        <HelmetTypewriterIntel
-          graphRoute={graphRoute}
-          recommendedAgents={recommendedAgents}
-          status={agentStatus}
-          voiceAwake={voiceAwake}
-        />
-      ) : null}
+      <JarvisHelmetHud
+        inputMode={inputMode}
+        status={agentStatus}
+        voiceAwake={voiceAwake}
+        voiceListening={voice.listening}
+      />
+      <HelmetTypewriterIntel
+        graphRoute={graphRoute}
+        recommendedAgents={recommendedAgents}
+        status={agentStatus}
+        voiceAwake={voiceAwake}
+      />
       <WorkflowDock
         active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
         agents={dockRecommendedAgents}
         highlight={workflowHighlight}
-        onOpenHeroHall={() => setHeroHallOpen(true)}
+        recommendationId={currentRecommendationId}
         routeSegments={dockRouteSegments}
       />
-      <AgentHeroHall
-        agents={recommendedAgents}
-        open={heroHallOpen}
-        onClose={() => setHeroHallOpen(false)}
-        onLineupsChange={setHeroHallLineupState}
-      />
 
-      {!heroHallOpen ? (
-        <section className="dialogue-stage" aria-label="AI particle dialogue">
-          {captionText ? (
-            <div className="orb-caption" data-testid="conversation-state">
-              <Sparkles size={16} />
+      <section className="dialogue-stage" aria-label="AI particle dialogue">
+        {captionText ? (
+          <div className="orb-caption" data-testid="conversation-state">
+            <Sparkles size={16} />
+            <span className="assistant-subtitle-wave" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>{captionText}</span>
+          </div>
+        ) : null}
+
+        {readoutText ? (
+          <div className="voice-readout" aria-live="polite">
+            <span className="assistant-subtitle">
               <span className="assistant-subtitle-wave" aria-hidden="true">
                 <i />
                 <i />
                 <i />
                 <i />
                 <i />
+                <i />
+                <i />
               </span>
-              <span>{captionText}</span>
-            </div>
-          ) : null}
-
-          {readoutText ? (
-            <div className="voice-readout" aria-live="polite">
-              <span className="assistant-subtitle">
-                <span className="assistant-subtitle-wave" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span>{readoutText}</span>
-              </span>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+              <span>{readoutText}</span>
+            </span>
+          </div>
+        ) : null}
+      </section>
 
       <AgentConsole
         draft={draft}
-        helmetVoice={!heroHallOpen}
+        helmetVoice
         inputMode={inputMode}
         onDraftKeyDown={handleDraftKeyDown}
         onModeChange={switchInputMode}
@@ -1372,6 +1619,7 @@ export default function App() {
         voiceTranscript={voice.transcript}
         voiceSupported={voice.supported}
       />
+      {introOpen ? <ZhongyinIntro onEnter={closeIntro} /> : null}
     </main>
   );
 }
@@ -1463,7 +1711,26 @@ function JarvisHelmetHud({
   voiceListening: boolean;
 }) {
   const linkState = status === 'streaming' ? 'AI STREAM' : voiceAwake ? 'VOICE LINK' : 'STANDBY';
-  const neuralState = status === 'streaming' ? 'SYNCING' : voiceListening ? 'LISTENING' : 'ONLINE';
+  const aiIsResponding = status === 'streaming';
+  const [telemetrySnapshot, setTelemetrySnapshot] = useState(() => createHelmetTelemetrySnapshot(status, voiceAwake, voiceListening));
+
+  useEffect(() => {
+    const refreshTelemetry = () => {
+      setTelemetrySnapshot(createHelmetTelemetrySnapshot(status, voiceAwake, voiceListening));
+    };
+
+    refreshTelemetry();
+    const timer = window.setInterval(refreshTelemetry, HELMET_TELEMETRY_REFRESH_MS);
+
+    return () => window.clearInterval(timer);
+  }, [status, voiceAwake, voiceListening]);
+
+  const aiLevel = aiIsResponding ? 100 : telemetrySnapshot.ai;
+  const performanceTelemetry = [
+    { channel: 'CPU', icon: Cpu, level: `${telemetrySnapshot.cpu}%`, readout: `${telemetrySnapshot.cpu}%` },
+    { channel: 'GPU', icon: CircuitBoard, level: `${telemetrySnapshot.gpu}%`, readout: `${telemetrySnapshot.gpu}%` },
+    { channel: 'AI', icon: BrainCircuit, level: `${aiLevel}%`, readout: `${aiLevel}%` },
+  ];
 
   return (
     <div className="jarvis-helmet-hud" data-awake={voiceAwake} data-status={status} aria-hidden="true">
@@ -1498,17 +1765,38 @@ function JarvisHelmetHud({
       </div>
 
       <div className="helmet-hud-stack helmet-hud-stack-left">
-        <div>
-          <Cpu size={14} />
-          <span>{neuralState}</span>
-        </div>
+        {performanceTelemetry.map((telemetry, index) => {
+          const Icon = telemetry.icon;
+          return (
+            <div
+              className="helmet-status-card"
+              data-active={telemetry.channel === 'AI' && aiIsResponding ? 'true' : undefined}
+              data-channel={telemetry.channel.toLowerCase()}
+              key={telemetry.channel}
+              style={{
+                '--telemetry-level': telemetry.level,
+                '--telemetry-load-delay': `${index * -170}ms`,
+                '--telemetry-sweep-delay': `${index * -620}ms`,
+              } as CSSProperties}
+            >
+              <span className="helmet-status-label">
+                <Icon size={13} />
+                <strong>{telemetry.channel}</strong>
+              </span>
+              <span className="helmet-status-value">{telemetry.readout}</span>
+              <span className="helmet-status-meter" aria-hidden="true">
+                <i />
+              </span>
+            </div>
+          );
+        })}
         <i />
         <i />
         <i />
       </div>
 
       <div className="helmet-hud-stack helmet-hud-stack-right">
-        <div>
+        <div className="helmet-target-card">
           <Radar size={14} />
           <span>TARGET LOCK</span>
         </div>

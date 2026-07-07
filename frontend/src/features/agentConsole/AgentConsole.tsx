@@ -70,10 +70,10 @@ export function AgentConsole({
   const threadRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const isStreaming = status === 'streaming';
-  const visibleVoiceText = voiceHeardText || voiceTranscript;
   const latestTurn = turns.at(-1) ?? null;
   const latestTurnId = latestTurn?.id ?? '';
   const hasTurns = turns.length > 0;
+  const visibleVoiceText = voiceHeardText || voiceTranscript;
   const pendingVoiceText = inputMode === 'voice' && !hasTurns ? visibleVoiceText : '';
   const voiceActivityLabel = !voiceSupported
     ? '语音链路不可用'

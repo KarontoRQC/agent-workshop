@@ -1,0 +1,42 @@
+.workflow-route-chain {
+  --workflow-route-visible-items: 5;
+  --workflow-route-item-height: 30px;
+  --workflow-route-gap: 7px;
+
+  max-height: calc((var(--workflow-route-item-height) * var(--workflow-route-visible-items)) + (var(--workflow-route-gap) * (var(--workflow-route-visible-items) - 1)));
+  padding-right: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(var(--hud-gold), 0.62) rgba(5, 18, 39, 0.52);
+  scrollbar-width: thin;
+}
+
+.workflow-route-chain::-webkit-scrollbar {
+  width: 6px;
+}
+
+.workflow-route-chain::-webkit-scrollbar-track {
+  border: 1px solid rgba(var(--hud-blue), 0.14);
+  background: rgba(5, 18, 39, 0.52);
+}
+
+.workflow-route-chain::-webkit-scrollbar-thumb {
+  border: 1px solid rgba(var(--hud-gold), 0.26);
+  background:
+    linear-gradient(180deg, rgba(var(--hud-gold), 0.74), rgba(var(--hud-blue), 0.34)),
+    rgba(255, 226, 152, 0.42);
+}
+
+.workflow-route-chain span {
+  min-height: var(--workflow-route-item-height);
+}
+
+.app-shell[data-hero-hall='false'] .workflow-route-chain {
+  --workflow-route-gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .workflow-route-chain {
+    --workflow-route-item-height: 30px;
+  }
+}

@@ -16,6 +16,7 @@ export type AgentStreamEvent = {
   event: string;
   master_conversation_id?: string;
   node?: unknown;
+  recommendation_id?: string;
   route?: string;
   stage?: string;
   type?: string;
