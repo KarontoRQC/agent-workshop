@@ -22,7 +22,7 @@
 ## 修改指南
 
 - **改入口 URL 参数**: 同步 `agentLaunchCatalog.ts` 的 `getAgentCombinationEntryUrl`。
-- **改快照状态**: 同步 `RecommendationSnapshotStatus` 和后端快照 store。
+- **改快照状态或字段**: 同步 `RecommendationSnapshotStatus` / `RecommendationSnapshot` 和后端快照 store；组合入口页标题使用 `entry_title`。
 
 ## 依赖图
 

@@ -1,0 +1,71 @@
+.agent-combination-pending-page {
+  display: grid;
+  place-items: center;
+}
+
+.agent-combination-pending-stage {
+  display: grid;
+  max-width: min(680px, calc(100vw - 48px));
+  justify-items: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.agent-combination-pending-stage p {
+  margin: 18px 0 8px;
+  color: rgba(111, 221, 255, 0.72);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.agent-combination-pending-stage h1 {
+  margin: 0;
+  color: rgba(248, 252, 255, 0.98);
+  font-size: clamp(30px, 5vw, 58px);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-shadow: 0 0 24px rgba(83, 207, 255, 0.28);
+}
+
+.agent-combination-pending-mark {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid rgba(241, 209, 130, 0.48);
+  color: rgba(241, 209, 130, 0.92);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+.agent-combination-pending-mark svg {
+  width: 25px;
+  height: 25px;
+  animation: agent-combination-pending-spin 4.2s linear infinite;
+}
+
+.agent-combination-pending-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  color: rgba(221, 242, 251, 0.72);
+  font-size: 13px;
+}
+
+.agent-combination-pending-status svg {
+  width: 15px;
+  height: 15px;
+  color: rgba(111, 221, 255, 0.8);
+}
+
+@keyframes agent-combination-pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-combination-pending-mark svg {
+    animation: agent-combination-pending-spin 7s linear infinite !important;
+  }
+}

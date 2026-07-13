@@ -35,6 +35,11 @@ services:
       DATABASE_URL: postgresql://agent_workshop:agent_workshop@postgres:5432/agent_workshop
       SOURCE_AGENTS_PATH: /app/data/source_agents_full.json
       AGENT_AVATAR_DIR: /app/frontend/src/assets/agent-avatars
+      AGENT_STATIC_AVATAR_DIR: /app/static/agent-avatars
+      AGENT_STATIC_AVATAR_BASE_URL: /agent-avatars
+      EDGE_TTS_VOICE: zh-CN-XiaoxiaoNeural
+    volumes:
+      - agent_avatar_static:/app/static/agent-avatars
     ports:
       - "5000:5000"
     healthcheck:
@@ -59,9 +64,12 @@ services:
     environment:
       API_PROXY_BASE_URL: http://backend:5000
       TTS_PROXY_TARGET: http://backend:5000
-      VITE_TTS_BROWSER_FALLBACK: auto
+      VITE_TTS_BROWSER_FALLBACK: server
+    volumes:
+      - agent_avatar_static:/app/frontend/public/agent-avatars:ro
     ports:
       - "5188:5188"
 
 volumes:
   agent_workshop_pgdata:
+  agent_avatar_static:

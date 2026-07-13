@@ -1,6 +1,6 @@
 # workflow/
 
-> `frontend/src/features/workflow/` · 4 个文件
+> `frontend/src/features/workflow/` · 5 个文件
 > **功能文档**: `docs/coze-chat-stream-api.md`
 
 ## 职责
@@ -13,6 +13,7 @@ Workflow 模块维护后端 SSE 事件到前端展示状态的转换，包括知
 |------|------|----------|
 | `workflowModel.ts` | 工作流状态、事件合并、语音 reveal 和用户状态构造。 | `createEmptyAgentWorkflow`, `appendWorkflowContent`, `upsertRecommendedAgent` |
 | `recommendationSnapshotModel.ts` | 组合入口 URL ID 解析、轮询判断和快照 agents 映射。 | `getAgentCombinationEntryIdFromUrl`, `shouldPollRecommendationSnapshot`, `snapshotToRecommendedAgents` |
+| `recentDialogue.ts` | 从已完成页面消息生成最近 5 轮、双重限长的后端多轮上下文窗口。 | `buildRecentDialogue`, `RECENT_DIALOGUE_HISTORY_MODE` |
 | `WorkflowDock.tsx` | 右侧知识路径和推荐智能体 dock 展示。 | `WorkflowDock` |
 | `WorkflowDock.css` | Workflow Dock 样式。 | CSS class |
 

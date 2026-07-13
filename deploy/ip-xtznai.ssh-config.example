@@ -1,0 +1,10 @@
+# ip.xtznai.com 生产服务器。该文件不包含私钥内容。
+Host ip-xtznai
+    HostName 120.25.172.3
+    User root
+    Port 22
+    IdentityFile ~/.ssh/codex_temp
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3

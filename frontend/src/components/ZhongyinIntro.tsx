@@ -387,7 +387,6 @@ export function ZhongyinIntro({ onEnter }: ZhongyinIntroProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const completeTimerRef = useRef<number | null>(null);
   const exitTimerRef = useRef<number | null>(null);
-  const [ready, setReady] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
@@ -407,7 +406,6 @@ export function ZhongyinIntro({ onEnter }: ZhongyinIntroProps) {
     const resize = () => {
       controller.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
     };
-    const readyTimer = window.setTimeout(() => setReady(true), 900);
     const autoExitTimer = window.setTimeout(() => {
       setExiting(true);
       completeTimerRef.current = window.setTimeout(onEnter, INTRO_REMOVE_DELAY_MS);
@@ -418,7 +416,6 @@ export function ZhongyinIntro({ onEnter }: ZhongyinIntroProps) {
     window.addEventListener('resize', resize);
 
     return () => {
-      window.clearTimeout(readyTimer);
       window.clearTimeout(autoExitTimer);
       window.removeEventListener('resize', resize);
       controller.destroy();
@@ -437,7 +434,7 @@ export function ZhongyinIntro({ onEnter }: ZhongyinIntroProps) {
 
   return (
     <section
-      className={`zhongyin-intro ${ready ? 'is-ready' : ''} ${exiting ? 'is-exiting' : ''}`}
+      className={`zhongyin-intro is-ready ${exiting ? 'is-exiting' : ''}`}
       aria-label="中隐会开场"
     >
       <canvas ref={canvasRef} className="zhongyin-intro__canvas" aria-hidden="true" />

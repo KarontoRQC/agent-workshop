@@ -4,7 +4,7 @@
 
 ## 用途
 
-渲染右侧知识路径和推荐智能体 dock，包括路径节点、推荐卡片和打开 Hero Hall 的入口。
+渲染右侧知识路径和推荐智能体 dock，包括路径节点、推荐卡片和打开对应英雄殿堂入口页的推荐包操作区。
 
 ## 导出
 
@@ -26,7 +26,7 @@
 
 ## 修改指南
 
-- **改推荐入口**: 检查 `onOpenHeroHall` 只负责打开 Hero Hall，不要在 dock 内改阵容状态。
+- **改推荐入口**: 右下角“打开你的殿堂”必须使用 `getAgentCombinationEntryUrl(recommendationId)` 跳转组合入口页，不再打开旧 Hero Hall 弹层。
 - **改路径显示数量**: 同步 `frontend/AGENTS.md` 中「五个 route nodes contained scroll」约束。
 
 ## 依赖图

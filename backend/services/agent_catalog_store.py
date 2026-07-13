@@ -42,6 +42,7 @@ AGENT_COLUMNS = (
     "has_avatar",
 )
 GPT_ID_PATTERN = re.compile(r"g-[a-z0-9]+", re.IGNORECASE)
+RASTER_AVATAR_EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
 class AgentCatalogStoreError(RuntimeError):
@@ -67,6 +68,33 @@ def _first_text(*values: Any) -> str:
 def _extract_gpt_id(value: Any) -> str:
     match = GPT_ID_PATTERN.search(_first_text(value))
     return match.group(0).lower() if match else ""
+
+
+def _safe_static_name(value: Any) -> str:
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", _first_text(value)).strip("-")
+    return safe_name or "agent"
+
+
+def _avatar_static_extension(avatar: Avatar) -> str:
+    filename_suffix = Path(_first_text(avatar.get("filename"))).suffix.lower()
+
+    if filename_suffix and re.match(r"^\.[a-z0-9]+$", filename_suffix):
+        return ".jpg" if filename_suffix == ".jpe" else filename_suffix
+
+    mime_type = _first_text(avatar.get("mime_type")).split(";", 1)[0]
+    guessed_suffix = mimetypes.guess_extension(mime_type) or ""
+
+    return ".jpg" if guessed_suffix == ".jpe" else guessed_suffix
+
+
+def _avatar_static_filename(agent_id: str, avatar: Avatar) -> str:
+    digest = _first_text(avatar.get("sha256"))
+    digest_part = digest[:12] if digest else hashlib.sha256(avatar.get("content") or b"").hexdigest()[:12]
+    return f"{_safe_static_name(agent_id)}-{digest_part}{_avatar_static_extension(avatar)}"
+
+
+def _join_public_url(base_url: str, filename: str) -> str:
+    return f"{base_url.rstrip('/')}/{filename.lstrip('/')}" if base_url else filename
 
 
 def _split_knowledge(value: Any) -> list[str]:
@@ -158,9 +186,15 @@ AVATAR_PALETTES = (
 
 
 class InMemoryAgentCatalogStore:
-    def __init__(self, agents: list[Agent] | None = None, avatars: dict[str, Avatar] | None = None):
+    def __init__(
+        self,
+        agents: list[Agent] | None = None,
+        avatars: dict[str, Avatar] | None = None,
+        static_avatar_base_url: str = "/agent-avatars",
+    ):
         self._agents = [_public_agent(agent) for agent in agents or []]
         self._avatars = deepcopy(avatars or {})
+        self._static_avatar_base_url = static_avatar_base_url
 
     def ensure_schema(self) -> None:
         return None
@@ -178,6 +212,19 @@ class InMemoryAgentCatalogStore:
         avatar = self._avatars.get(agent_id)
         return deepcopy(avatar) if avatar else None
 
+    def get_static_avatar_url(self, agent_id: str) -> str:
+        avatar = self._avatars.get(agent_id)
+        if not avatar or not self._static_avatar_base_url:
+            return ""
+
+        normalized_avatar = deepcopy(avatar)
+        if "sha256" not in normalized_avatar:
+            normalized_avatar["sha256"] = hashlib.sha256(normalized_avatar.get("content") or b"").hexdigest()
+        if "filename" not in normalized_avatar:
+            normalized_avatar["filename"] = f"{agent_id}{_avatar_static_extension(normalized_avatar)}"
+
+        return _join_public_url(self._static_avatar_base_url, _avatar_static_filename(agent_id, normalized_avatar))
+
 
 class PostgresAgentCatalogStore:
     def __init__(
@@ -185,6 +232,8 @@ class PostgresAgentCatalogStore:
         dsn: str | None = None,
         source_agents_path: str | None = None,
         avatar_dir: str | None = None,
+        static_avatar_dir: str | None = None,
+        static_avatar_base_url: str = "/agent-avatars",
         connection: Any | None = None,
         agents_table: str = "agents",
         assets_table: str = "agent_assets",
@@ -199,6 +248,8 @@ class PostgresAgentCatalogStore:
         self._connection = connection
         self._source_agents_path = source_agents_path
         self._avatar_dir = avatar_dir
+        self._static_avatar_dir = static_avatar_dir
+        self._static_avatar_base_url = static_avatar_base_url.rstrip("/") if static_avatar_base_url else ""
         self._agents_table = agents_table
         self._assets_table = assets_table
 
@@ -239,14 +290,15 @@ class PostgresAgentCatalogStore:
             (),
         )
         self.seed_from_files()
+        self.export_avatars_to_static_dir()
 
     def seed_from_files(self) -> None:
         for agent in self._load_seed_agents():
             self._upsert_agent(agent)
-            avatar_file = self._find_avatar_file(agent.get("gpt_id"))
+            avatar_file = self._find_avatar_file(agent.get("gpt_id"), agent.get("id"))
             if avatar_file:
                 self._upsert_avatar(str(agent["id"]), avatar_file)
-            else:
+            elif self._should_write_fallback_avatar(str(agent["id"])):
                 self._upsert_avatar_data(str(agent["id"]), build_fallback_avatar(agent))
 
     def list_agents(self) -> list[Agent]:
@@ -279,6 +331,40 @@ class PostgresAgentCatalogStore:
             (agent_id,),
         )
         return dict(row) if row else None
+
+    def _should_write_fallback_avatar(self, agent_id: str) -> bool:
+        existing_avatar = self.get_avatar(agent_id)
+        if not existing_avatar:
+            return True
+
+        filename = _first_text(existing_avatar.get("filename")).lower()
+        mime_type = _first_text(existing_avatar.get("mime_type")).lower()
+        return filename.endswith(".svg") or mime_type == "image/svg+xml"
+
+    def get_static_avatar_url(self, agent_id: str) -> str:
+        avatar = self.get_avatar(agent_id)
+        if not avatar or not self._static_avatar_base_url:
+            return ""
+
+        self._write_static_avatar(agent_id, avatar)
+        return _join_public_url(self._static_avatar_base_url, _avatar_static_filename(agent_id, avatar))
+
+    def export_avatars_to_static_dir(self) -> None:
+        if not self._static_avatar_dir:
+            return
+
+        rows = self._execute_raw_read_all(
+            f"""
+            SELECT agent_id, filename, mime_type, content, sha256, size_bytes
+            FROM {self._assets_table}
+            ORDER BY agent_id ASC
+            """,
+            (),
+        )
+
+        for row in rows:
+            avatar = dict(row)
+            self._write_static_avatar(str(avatar.get("agent_id") or ""), avatar)
 
     def _load_seed_agents(self) -> list[Agent]:
         if not self._source_agents_path:
@@ -381,18 +467,55 @@ class PostgresAgentCatalogStore:
             ),
         )
 
-    def _find_avatar_file(self, gpt_id: Any) -> Path | None:
+    def _write_static_avatar(self, agent_id: str, avatar: Avatar) -> Path | None:
+        content = avatar.get("content") or b""
+        if not agent_id or not content or not self._static_avatar_dir:
+            return None
+
+        avatar_root = Path(self._static_avatar_dir)
+        avatar_root.mkdir(parents=True, exist_ok=True)
+        target_path = avatar_root / _avatar_static_filename(agent_id, avatar)
+        expected_sha = _first_text(avatar.get("sha256")) or hashlib.sha256(content).hexdigest()
+
+        if target_path.exists():
+            try:
+                if hashlib.sha256(target_path.read_bytes()).hexdigest() == expected_sha:
+                    return target_path
+            except OSError:
+                pass
+
+        target_path.write_bytes(content)
+        return target_path
+
+    def _find_avatar_file(self, gpt_id: Any, agent_id: Any = "") -> Path | None:
         normalized_gpt_id = _first_text(gpt_id).lower()
-        if not normalized_gpt_id or not self._avatar_dir:
+        if not self._avatar_dir:
             return None
 
         avatar_root = Path(self._avatar_dir)
         if not avatar_root.exists():
             return None
 
-        for avatar_file in sorted(avatar_root.iterdir()):
-            if avatar_file.is_file() and normalized_gpt_id in avatar_file.name.lower():
-                return avatar_file
+        avatar_files = [
+            avatar_file
+            for avatar_file in sorted(avatar_root.iterdir())
+            if avatar_file.is_file() and avatar_file.suffix.lower() in RASTER_AVATAR_EXTENSIONS
+        ]
+
+        if normalized_gpt_id:
+            for avatar_file in avatar_files:
+                if normalized_gpt_id in avatar_file.name.lower():
+                    return avatar_file
+
+        agent_number_match = re.search(r"(\d+)$", _first_text(agent_id))
+        if agent_number_match:
+            agent_number = int(agent_number_match.group(1))
+            source_prefix = f"{agent_number:03d}_"
+            static_prefix = f"agent-{agent_number:03d}-"
+            for avatar_file in avatar_files:
+                avatar_name = avatar_file.name.lower()
+                if avatar_name.startswith(source_prefix) or avatar_name.startswith(static_prefix):
+                    return avatar_file
 
         return None
 
@@ -452,6 +575,12 @@ class PostgresAgentCatalogStore:
             with self._cursor(connection) as cursor:
                 cursor.execute(query, params)
                 return cursor.fetchone()
+
+    def _execute_raw_read_all(self, query: str, params: tuple[Any, ...]) -> list[Any]:
+        with self._connect() as connection:
+            with self._cursor(connection) as cursor:
+                cursor.execute(query, params)
+                return cursor.fetchall()
 
     def _row_to_agent(self, row: Any) -> Agent:
         if not isinstance(row, dict):

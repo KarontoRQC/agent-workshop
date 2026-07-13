@@ -1,6 +1,10 @@
-import type { AgentLineupId, AgentUserState, RecommendedAgent } from '../types';
+import type { AgentLineupId, AgentUserState, RecentDialogueEntry, RecommendedAgent } from '../types';
+import { RECENT_DIALOGUE_HISTORY_MODE } from '../features/workflow/recentDialogue';
+import type { ParticipantIdentity } from './participantIdentity';
+import { API_BASE_URL } from './apiBase';
+import { fetchApiMutation } from './apiSession';
 
-const DEFAULT_REMOTE_API_BASE_URL = 'http://106.52.56.14/agent-workshop-api';
+export { API_BASE_URL } from './apiBase';
 
 export type AgentStreamEvent = {
   agent?: RecommendedAgent;
@@ -17,6 +21,7 @@ export type AgentStreamEvent = {
   master_conversation_id?: string;
   node?: unknown;
   recommendation_id?: string;
+  recommendation_edit_token?: string;
   route?: string;
   stage?: string;
   type?: string;
@@ -39,28 +44,13 @@ type StreamAgentHandlers = {
   onRecommendedAgentStarted?: (event: AgentStreamEvent) => void;
   onRecommendedAgentsCompleted?: (agents: RecommendedAgent[], event: AgentStreamEvent) => void;
   onWorkflowError?: (event: AgentStreamEvent) => void;
+  participantIdentity?: ParticipantIdentity;
+  recentDialogue?: RecentDialogueEntry[];
   requestedLineup?: AgentLineupId | string;
   signal?: AbortSignal;
   userState?: AgentUserState;
 };
 
-function trimTrailingSlash(value: string) {
-  return value.replace(/\/+$/, '');
-}
-
-export function resolveApiBaseUrl() {
-  const configuredBaseUrl = String(
-    import.meta.env.VITE_AGENT_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || '',
-  ).trim();
-
-  if (configuredBaseUrl) {
-    return trimTrailingSlash(configuredBaseUrl);
-  }
-
-  return import.meta.env.DEV ? '/api' : DEFAULT_REMOTE_API_BASE_URL;
-}
-
-export const API_BASE_URL = resolveApiBaseUrl();
 export const COZE_CHAT_STREAM_URL = `${API_BASE_URL}/coze/chat/stream`;
 
 export function isAgentStreamEnabled() {
@@ -75,9 +65,12 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     auto_save_history?: boolean;
     conversation_id?: string;
     conversation_ids?: Record<string, string>;
+    history_mode?: typeof RECENT_DIALOGUE_HISTORY_MODE;
     lineups?: AgentUserState['lineups'];
     message: string;
     parameters: Record<string, never>;
+    participant_identity?: ParticipantIdentity;
+    recent_dialogue?: RecentDialogueEntry[];
     requested_lineup?: AgentLineupId | string;
     user_state?: AgentUserState;
   } = {
@@ -101,8 +94,17 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     body.auto_save_history = handlers.autoSaveHistory;
   }
 
+  if (Array.isArray(handlers.recentDialogue)) {
+    body.history_mode = RECENT_DIALOGUE_HISTORY_MODE;
+    body.recent_dialogue = handlers.recentDialogue;
+  }
+
   if (handlers.requestedLineup) {
     body.requested_lineup = handlers.requestedLineup;
+  }
+
+  if (handlers.participantIdentity) {
+    body.participant_identity = handlers.participantIdentity;
   }
 
   if (handlers.userState && Object.keys(handlers.userState).length > 0) {
@@ -113,7 +115,7 @@ export async function streamAgentChat(message: string, handlers: StreamAgentHand
     }
   }
 
-  const response = await fetch(COZE_CHAT_STREAM_URL, {
+  const response = await fetchApiMutation(COZE_CHAT_STREAM_URL, {
     body: JSON.stringify(body),
     headers: {
       'content-type': 'application/json',

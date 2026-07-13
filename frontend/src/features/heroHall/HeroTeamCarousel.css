@@ -653,6 +653,118 @@
   cursor: grabbing;
 }
 
+.app-shell[data-hero-hall='true'] .hero-recommendation-deck.hero-team-carousel-track.is-all-visible {
+  position: relative;
+  inset: auto;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(8px, 1vw, 12px);
+  padding: 18px 48px 30px;
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  list-style: none;
+}
+
+.app-shell[data-hero-hall='true'] .hero-recommendation-deck.hero-team-carousel-track.is-all-visible::-webkit-scrollbar {
+  height: 6px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-recommendation-deck.hero-team-carousel-track.is-all-visible::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(223, 184, 118, 0.32);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  z-index: 1;
+  flex: 0 0 clamp(104px, 10.4vw, 120px);
+  width: clamp(104px, 10.4vw, 120px);
+  height: clamp(154px, 16.5vw, 184px);
+  min-width: 0;
+  min-height: 0;
+  padding: 9px 10px 10px;
+  opacity: 0.9;
+  pointer-events: auto;
+  filter: none;
+  transform: none;
+  scroll-snap-align: center;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card.is-focused {
+  z-index: 2;
+  border-color: rgba(248, 224, 182, 0.7);
+  box-shadow:
+    0 0 42px rgba(227, 193, 132, 0.18),
+    0 26px 68px rgba(0, 0, 0, 0.5),
+    inset 0 0 24px rgba(255, 255, 255, 0.07);
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait {
+  height: clamp(52px, 6.4vw, 66px);
+  margin: -2px 0 3px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait::before {
+  top: 2px;
+  width: clamp(48px, 5.8vw, 60px);
+  height: clamp(48px, 5.8vw, 60px);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait img,
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait svg {
+  width: clamp(46px, 5.5vw, 58px);
+  height: clamp(46px, 5.5vw, 58px);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-rank-chip {
+  margin-bottom: 3px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card h3 {
+  min-height: 0;
+  font-size: clamp(11px, 0.98vw, 13px);
+  line-height: 1.14;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-stage {
+  max-width: 100%;
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-summary {
+  display: -webkit-box;
+  min-height: 28px;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.42;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-divider,
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card footer,
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-badge {
+  display: none;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-action {
+  right: 7px;
+  bottom: 7px;
+}
+
 .hero-team-card.is-drop-target {
   border-color: rgba(135, 245, 255, 0.82);
   box-shadow:
@@ -782,5 +894,192 @@
 
   100% {
     filter: brightness(1) saturate(1);
+  }
+}
+
+/* Premium display-case pass for the in-page Hero Hall team strip. */
+.app-shell[data-hero-hall='true'] .hero-hall-recommendations:has(.hero-team-carousel) {
+  border-color: rgba(255, 221, 151, 0.34);
+  border-left-color: rgba(137, 226, 255, 0.36);
+  background:
+    linear-gradient(90deg, rgba(255, 221, 151, 0.2), transparent 32% 68%, rgba(117, 222, 255, 0.18)) top / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, rgba(117, 222, 255, 0.045) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 12px),
+    linear-gradient(180deg, rgba(5, 20, 44, 0.9), rgba(2, 8, 20, 0.97));
+  box-shadow:
+    0 16px 42px rgba(0, 0, 0, 0.32),
+    0 0 32px rgba(117, 222, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 36px rgba(255, 221, 151, 0.04);
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-carousel {
+  background:
+    linear-gradient(90deg, rgba(255, 221, 151, 0.1), transparent 24% 76%, rgba(117, 222, 255, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 46%);
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-carousel::before {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 234, 181, 0.14), rgba(117, 222, 255, 0.12), transparent),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgba(255, 221, 151, 0.045) 47px 48px, transparent 49px 94px);
+  opacity: 0.72;
+}
+
+.app-shell[data-hero-hall='true'] .hero-recommendation-deck.hero-team-carousel-track.is-all-visible {
+  align-items: stretch;
+  gap: clamp(12px, 1.4vw, 18px);
+  padding: 18px 52px 22px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card {
+  flex-basis: clamp(138px, 14vw, 176px);
+  width: clamp(138px, 14vw, 176px);
+  height: auto;
+  min-height: 205px;
+  padding: 13px 12px 12px;
+  border-color: rgba(129, 214, 255, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(220, 240, 255, 0.18), rgba(41, 71, 104, 0.18) 34%, rgba(3, 9, 20, 0.96) 100%),
+    rgba(5, 18, 38, 0.94);
+  box-shadow:
+    0 24px 58px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 0 30px rgba(117, 222, 255, 0.055);
+  clip-path: polygon(10px 0, calc(100% - 13px) 0, 100% 13px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 13px 100%, 0 calc(100% - 13px), 0 10px);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card.is-focused {
+  border-color: rgba(255, 225, 160, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(255, 225, 160, 0.14),
+    0 0 42px rgba(255, 210, 124, 0.2),
+    0 28px 70px rgba(0, 0, 0, 0.48),
+    inset 0 0 32px rgba(255, 255, 255, 0.075);
+  transform: translateY(-5px);
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-copy {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  justify-items: center;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait {
+  height: 78px;
+  margin: 0 0 6px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait::before {
+  top: 3px;
+  width: 72px;
+  height: 72px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.72), rgba(208, 235, 255, 0.28) 42%, rgba(255, 221, 151, 0.12) 62%, transparent 72%);
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait img,
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-portrait svg {
+  width: 72px;
+  height: 72px;
+  border-radius: 9px 9px 34px 34px;
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-rank-chip {
+  display: inline-grid;
+  min-width: 34px;
+  height: 19px;
+  place-items: center;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 225, 160, 0.46);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffe8ad, #95edff);
+  color: rgba(5, 14, 24, 0.94);
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-stage {
+  display: block;
+  max-width: 100%;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(120, 224, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(6, 23, 44, 0.66);
+  color: rgba(199, 240, 255, 0.88);
+  font-size: 10px;
+  font-weight: 780;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-card .hero-team-summary {
+  display: -webkit-box;
+  max-width: 100%;
+  min-height: 38px;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(224, 238, 247, 0.74);
+  font-size: 10.5px;
+  font-weight: 560;
+  line-height: 1.38;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card h3 {
+  color: rgba(255, 235, 181, 0.99);
+  font-size: clamp(13px, 1.05vw, 15px);
+  font-weight: 850;
+  line-height: 1.16;
+  text-shadow:
+    0 0 16px rgba(255, 211, 128, 0.28),
+    0 1px 0 rgba(0, 0, 0, 0.44);
+  -webkit-line-clamp: 2;
+}
+
+.app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card .hero-team-action {
+  display: grid;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-color: rgba(255, 225, 160, 0.46);
+  background:
+    linear-gradient(135deg, rgba(255, 229, 170, 0.2), rgba(9, 31, 58, 0.94)),
+    rgba(5, 18, 36, 0.96);
+  color: rgba(255, 239, 196, 0.96);
+  box-shadow: 0 0 14px rgba(255, 213, 130, 0.14);
+}
+
+.app-shell[data-hero-hall='true'] .hero-team-card.is-drop-target {
+  border-color: rgba(135, 245, 255, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(116, 235, 255, 0.38),
+    0 0 42px rgba(77, 217, 255, 0.38),
+    0 28px 70px rgba(0, 0, 0, 0.48),
+    inset 0 0 32px rgba(122, 240, 255, 0.14);
+}
+
+@media (max-width: 900px) {
+  .app-shell[data-hero-hall='true'] .hero-recommendation-deck.hero-team-carousel-track.is-all-visible {
+    padding-inline: 44px;
+  }
+
+  .app-shell[data-hero-hall='true'] .hero-hall-ranking .hero-recommendation-card.hero-deploy-card.hero-team-card.is-all-visible-card {
+    flex-basis: 136px;
+    width: 136px;
+    min-height: 198px;
   }
 }

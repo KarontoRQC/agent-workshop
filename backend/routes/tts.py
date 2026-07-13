@@ -1,6 +1,7 @@
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from services.tts_service import TtsConfigurationError, TtsSynthesisError, synthesize_speech
+from routes.access_control import require_api_session
 
 
 tts_bp = Blueprint("tts", __name__)
@@ -8,6 +9,11 @@ tts_bp = Blueprint("tts", __name__)
 
 @tts_bp.post("/speech")
 def speech():
+    access_error = require_api_session()
+
+    if access_error is not None:
+        return access_error
+
     data = request.get_json(silent=True) or {}
     text = data.get("text", "")
     mood = data.get("mood", "neutral")
@@ -23,9 +29,11 @@ def speech():
     try:
         audio, mimetype = synthesize_speech(text, mood=mood if isinstance(mood, str) else "neutral")
     except TtsConfigurationError as exc:
-        return jsonify({"error": "TTS is not configured", "detail": str(exc)}), 503
+        current_app.logger.warning("TTS configuration is unavailable: %s", exc)
+        return jsonify({"error": "TTS is not configured"}), 503
     except TtsSynthesisError as exc:
-        return jsonify({"error": "TTS synthesis failed", "detail": str(exc)}), 502
+        current_app.logger.warning("TTS synthesis failed: %s", exc)
+        return jsonify({"error": "TTS synthesis failed"}), 502
 
     return Response(
         audio,

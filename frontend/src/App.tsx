@@ -1,19 +1,28 @@
 import {
   useCallback,
   useEffect,
+  lazy,
   useMemo,
   useRef,
   useState,
+  Suspense,
   type CSSProperties,
   type KeyboardEvent,
 } from 'react';
-import { Activity, BrainCircuit, CircuitBoard, Cpu, Radar, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
-import ParticleField from './components/ParticleField';
+import { BrainCircuit, CircuitBoard, Cpu, Radar, ScanLine, Sparkles } from 'lucide-react';
+import { MechaCockpitFrame } from './components/MechaCockpitFrame';
 import { ZhongyinIntro } from './components/ZhongyinIntro';
 import { AgentConsole, type InputMode } from './features/agentConsole/AgentConsole';
-import { getAgentDisplayName, getRecommendedAgentKey } from './features/agents/agentUtils';
-import { AgentCombinationEntryPage } from './features/heroHall/AgentCombinationEntryPage';
-import { AgentHeroHall } from './features/heroHall/AgentHeroHall';
+import { getVoiceInteractionCopy, resolveVoiceInteractionPhase } from './features/agentConsole/voiceInteractionModel';
+import { AgentCombinationPendingPage } from './features/heroHall/AgentCombinationPendingPage';
+import {
+  closeHeroHallReservation,
+  isPendingHeroHallUrl,
+  navigateHeroHallReservation,
+  reserveHeroHallLaunch,
+  shouldReserveHeroHallLaunch,
+  type HeroHallLaunchReservation,
+} from './features/heroHall/heroHallLaunchReservation';
 import {
   createHeroHallLineups,
   createHeroHallLineupsFromAgents,
@@ -38,6 +47,7 @@ import {
   wantsSleep,
 } from './features/speech/speechOutput';
 import { WorkflowDock } from './features/workflow/WorkflowDock';
+import { buildRecentDialogue } from './features/workflow/recentDialogue';
 import {
   getAgentCombinationEntryIdFromUrl,
   shouldPollRecommendationSnapshot,
@@ -62,7 +72,6 @@ import {
   getCompletedSpeechSegment,
   getLatestAgentUserState,
   getLatestDisplayableRecommendedAgents,
-  getLatestRecommendationSummary,
   getLatestRouteSegments,
   getRevealForSpeechSegment,
   getSpeechTextForSegment,
@@ -88,15 +97,19 @@ import {
 } from './features/workflow/workflowModel';
 import { useMicLevel } from './hooks/useMicLevel';
 import { useVoiceControl } from './hooks/useVoiceControl';
-import { appendAgentToRecommendation, fetchAgentCatalog } from './lib/agentCatalogClient';
-import { setAgentCatalogAgents } from './lib/agentLaunchCatalog';
+import { fetchAgentCatalog } from './lib/agentCatalogClient';
+import {
+  openAgentCombinationEntryPage,
+  setAgentCatalogAgents,
+} from './lib/agentLaunchCatalog';
 import { streamAgentChat, type AgentStreamEvent } from './lib/agentStreamClient';
 import { requestAIReply } from './lib/aiClient';
 import { fetchRecommendationSnapshot } from './lib/recommendationSnapshotClient';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from './lib/language';
+import { getParticipantIdentityFromSearch } from './lib/participantIdentity';
+import { storeRecommendationEditToken } from './lib/recommendationEditAccess';
 import type {
   AgentAction,
-  AgentCatalogItem,
   AgentGraphPath,
   AgentStatus,
   AgentTurn,
@@ -108,12 +121,18 @@ import type {
   ReplySource,
 } from './types';
 import './App.css';
+import './components/MechaCockpitFrame.css';
 
 const baseSettings: ParticleSettings = {
   energy: 0.34,
   mode: 'idle',
   pulseSeed: 0,
 };
+
+const TOOL_CALL_TO_MAIN_SURFACE_REVEAL_MS = 420;
+const HERO_HALL_AUTO_JUMP_DELAY_MS = 700;
+const HOME_PAGE_TITLE = '中隐会 - 星系图谱';
+const HERO_HALL_PAGE_TITLE = '中隐会 - 英雄殿堂';
 
 const demoGraphAction: AgentAction = {
   confidence: 1,
@@ -151,6 +170,12 @@ function createHelmetTelemetrySnapshot(status: AgentStatus, voiceAwake: boolean,
     cpu: randomTelemetryValue(active ? 34 : voiceListening ? 18 : 4, active ? 80 : voiceListening ? 72 : 58),
     gpu: randomTelemetryValue(active ? 38 : voiceListening ? 20 : 6, active ? 80 : voiceListening ? 76 : 64),
   };
+}
+
+function hasGeneratedRecommendedAgents(agents: RecommendedAgent[]) {
+  return agents.some((agent) =>
+    [agent.agent_name, agent.name, agent.stage, agent.reason].some((value) => String(value ?? '').trim()),
+  );
 }
 
 function buildHelmetIntelStates({
@@ -249,11 +274,30 @@ function buildHelmetIntelStates({
   ];
 }
 
+const ParticleField = lazy(() => import('./components/ParticleField'));
+
+const AgentCombinationEntryPage = lazy(() =>
+  import('./features/heroHall/AgentCombinationEntryPage').then((module) => ({ default: module.AgentCombinationEntryPage })),
+);
+
 export default function App() {
   const agentCombinationEntryId = getAgentCombinationEntryIdFromUrl(window.location.href);
+  const agentCombinationPending = isPendingHeroHallUrl(window.location.href);
+
+  useEffect(() => {
+    document.title = agentCombinationEntryId || agentCombinationPending ? HERO_HALL_PAGE_TITLE : HOME_PAGE_TITLE;
+  }, [agentCombinationEntryId, agentCombinationPending]);
 
   if (agentCombinationEntryId) {
-    return <AgentCombinationEntryPage recommendationId={agentCombinationEntryId} />;
+    return (
+      <Suspense fallback={<AgentCombinationPendingPage />}>
+        <AgentCombinationEntryPage recommendationId={agentCombinationEntryId} />
+      </Suspense>
+    );
+  }
+
+  if (agentCombinationPending) {
+    return <AgentCombinationPendingPage />;
   }
 
   return <JarvisApp />;
@@ -261,29 +305,34 @@ export default function App() {
 
 function JarvisApp() {
   const searchParams = new URLSearchParams(window.location.search);
+  const participantIdentity = getParticipantIdentityFromSearch(window.location.search);
   const demoGraphEnabled = searchParams.has('demoGraph');
   const introBypassed = demoGraphEnabled || searchParams.has('skipIntro');
   const speechCaptionTimerRef = useRef<number | null>(null);
   const speechEndTimerRef = useRef<number | null>(null);
   const speechOutputActiveRef = useRef(false);
   const speechSessionRef = useRef(0);
+  const pendingSpeechSettlementRef = useRef<(() => void) | null>(null);
   const voiceControlRef = useRef<{ pause: () => void; resume: () => void; stop: () => void } | null>(null);
   const micLevelRef = useRef<{ start: () => Promise<void>; stop: () => void } | null>(null);
   const lastSpeechPulseAtRef = useRef(0);
   const agentRequestRef = useRef<AbortController | null>(null);
+  const agentCanSubmitRef = useRef(true);
   const agentConversationIdsRef = useRef<AgentConversationIds>(createClientConversationIds());
   const introBootFlashTimerRef = useRef<number | null>(null);
-  const lastHeroHallAutoKeyRef = useRef('');
+  const heroHallJumpTimerRef = useRef<number | null>(null);
+  const heroHallJumpSequenceRef = useRef(0);
+  const heroHallLaunchReservationRef = useRef<HeroHallLaunchReservation | null>(null);
+  const recommendationSurfaceUnlockedRef = useRef(false);
   const [settings, setSettings] = useState<ParticleSettings>(baseSettings);
   const [, setReplySource] = useState<ReplySource>('local-mock');
   const [, setConversationIdsVersion] = useState(0);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+  const [, setAgentCatalogVersion] = useState(0);
   const [introOpen, setIntroOpen] = useState(!introBypassed);
   const [introBootFlash, setIntroBootFlash] = useState(false);
   const [agentTurns, setAgentTurns] = useState<AgentTurn[]>([]);
-  const [heroHallOpen, setHeroHallOpen] = useState(false);
   const [heroHallLineupState, setHeroHallLineupState] = useState<HeroHallLineupsState>(() => createHeroHallLineups());
-  const [agentCatalog, setAgentCatalog] = useState<AgentCatalogItem[]>([]);
   const [pinnedRecommendedAgents, setPinnedRecommendedAgents] = useState<RecommendedAgent[]>([]);
   const [currentRecommendationId, setCurrentRecommendationId] = useState('');
   const [sharedRecommendationSnapshot, setSharedRecommendationSnapshot] = useState<RecommendationSnapshot | null>(null);
@@ -305,6 +354,78 @@ function JarvisApp() {
     { id: 1, speaker: 'ai', text: '晚上好，先生。系统已上线，正在待命。' },
   ]);
 
+  const releaseHeroHallReservation = useCallback(() => {
+    const reservation = heroHallLaunchReservationRef.current;
+    heroHallLaunchReservationRef.current = null;
+    closeHeroHallReservation(reservation);
+  }, []);
+
+  const cancelHeroHallJump = useCallback(() => {
+    heroHallJumpSequenceRef.current += 1;
+
+    if (heroHallJumpTimerRef.current !== null) {
+      window.clearTimeout(heroHallJumpTimerRef.current);
+      heroHallJumpTimerRef.current = null;
+    }
+    releaseHeroHallReservation();
+  }, [releaseHeroHallReservation]);
+
+  const scheduleHeroHallJump = useCallback((recommendationId: string, agents: RecommendedAgent[]) => {
+    const id = recommendationId.trim();
+
+    if (!id) {
+      releaseHeroHallReservation();
+      return;
+    }
+
+    const jumpSequence = heroHallJumpSequenceRef.current + 1;
+    heroHallJumpSequenceRef.current = jumpSequence;
+
+    const queueJump = () => {
+      if (heroHallJumpSequenceRef.current !== jumpSequence) {
+        return;
+      }
+
+      if (heroHallJumpTimerRef.current !== null) {
+        window.clearTimeout(heroHallJumpTimerRef.current);
+      }
+
+      heroHallJumpTimerRef.current = window.setTimeout(() => {
+        if (heroHallJumpSequenceRef.current !== jumpSequence) {
+          return;
+        }
+
+        heroHallJumpTimerRef.current = null;
+        const reservation = heroHallLaunchReservationRef.current;
+        heroHallLaunchReservationRef.current = null;
+
+        if (!navigateHeroHallReservation(reservation, id)) {
+          openAgentCombinationEntryPage(id);
+        }
+      }, HERO_HALL_AUTO_JUMP_DELAY_MS);
+    };
+
+    if (hasGeneratedRecommendedAgents(agents)) {
+      queueJump();
+      return;
+    }
+
+    void fetchRecommendationSnapshot(id)
+      .then((snapshot) => {
+        if (hasGeneratedRecommendedAgents(snapshotToRecommendedAgents(snapshot))) {
+          queueJump();
+          return;
+        }
+        releaseHeroHallReservation();
+      })
+      .catch((error) => {
+        releaseHeroHallReservation();
+        console.warn('Recommendation snapshot was not ready for hero hall auto jump.', error);
+      });
+  }, [releaseHeroHallReservation]);
+
+  useEffect(() => () => cancelHeroHallJump(), [cancelHeroHallJump]);
+
   useEffect(() => {
     const url = new URL(window.location.href);
 
@@ -323,7 +444,7 @@ function JarvisApp() {
       try {
         const agents = await fetchAgentCatalog(controller.signal);
         setAgentCatalogAgents(agents);
-        setAgentCatalog(agents);
+        setAgentCatalogVersion((version) => version + 1);
       } catch (error) {
         if (!controller.signal.aborted) {
           console.warn('Agent catalog request failed.', error);
@@ -423,9 +544,10 @@ function JarvisApp() {
 
   const speakWithParticleOutput = useCallback(
     (text: string, options: SpeechOutputOptions = {}) => {
-      const shouldResumeListening = options.resumeListening ?? true;
+      const shouldResumeListening = options.resumeListening ?? false;
       const speechSessionId = speechSessionRef.current + 1;
       speechSessionRef.current = speechSessionId;
+      pendingSpeechSettlementRef.current = options.onSettled ?? null;
 
       setSpeechError('');
       startSpeechCaption(options.displayText ?? text, speechSessionId);
@@ -439,6 +561,8 @@ function JarvisApp() {
           return;
         }
 
+        const onSettled = pendingSpeechSettlementRef.current;
+        pendingSpeechSettlementRef.current = null;
         finishSpeechOutput();
         if (shouldResumeListening) {
           setSettings((current) => ({
@@ -453,7 +577,7 @@ function JarvisApp() {
           }, 260);
         }
 
-        options.onSettled?.();
+        onSettled?.();
       };
       const finishAfterMinimum = () => {
         if (speechSessionId !== speechSessionRef.current) {
@@ -495,6 +619,17 @@ function JarvisApp() {
     [beginSpeechOutput, clearSpeechEndTimer, finishSpeechOutput, pulseSpeechOutput, startSpeechCaption],
   );
 
+  const cancelActiveSpeechOutput = useCallback(() => {
+    const onSettled = pendingSpeechSettlementRef.current;
+    pendingSpeechSettlementRef.current = null;
+    speechSessionRef.current += 1;
+    cancelSpeechPlayback();
+    window.speechSynthesis?.cancel();
+    finishSpeechOutput();
+    setSpeechError('');
+    onSettled?.();
+  }, [finishSpeechOutput]);
+
   const finishReplyWithoutSpeech = useCallback(
     (shouldResumeListening: boolean) => {
       clearSpeechEndTimer();
@@ -514,6 +649,22 @@ function JarvisApp() {
     [clearSpeechCaptionTimer, clearSpeechEndTimer],
   );
 
+  const releasePreviousTurnForNewMessage = useCallback(() => {
+    const previousController = agentRequestRef.current;
+
+    if (previousController) {
+      previousController.abort();
+
+      if (agentRequestRef.current === previousController) {
+        agentRequestRef.current = null;
+      }
+    }
+
+    if (previousController || speechOutputActiveRef.current) {
+      cancelActiveSpeechOutput();
+    }
+  }, [cancelActiveSpeechOutput]);
+
   const submitMessage = useCallback(
     async (raw: string, options: SubmitMessageOptions = {}) => {
       const text = raw.trim();
@@ -522,16 +673,27 @@ function JarvisApp() {
         return;
       }
 
-      if (agentStatus === 'streaming' || agentRequestRef.current) {
+      if (!agentCanSubmitRef.current) {
         return;
       }
+      agentCanSubmitRef.current = false;
 
-      const shouldResumeListening = options.resumeListening ?? (inputMode === 'voice' && (voiceAwake || manualVoiceSession));
+      releasePreviousTurnForNewMessage();
+
+      cancelHeroHallJump();
+      recommendationSurfaceUnlockedRef.current = false;
+
+      if (shouldReserveHeroHallLaunch(text)) {
+        heroHallLaunchReservationRef.current = reserveHeroHallLaunch();
+      }
+
+      const shouldResumeListening = options.resumeListening ?? false;
       const now = Date.now();
       const nextUserMessage: Message = { id: now, speaker: 'you', text };
       const turnId = `turn-${now}`;
       const controller = new AbortController();
       const history = [...messages, nextUserMessage];
+      const recentDialogueForRequest = buildRecentDialogue(messages);
       agentConversationIdsRef.current = ensureClientConversationIds(agentConversationIdsRef.current);
       const conversationIdsForRequest = { ...agentConversationIdsRef.current };
       const latestRecommendedAgentsForState = getLatestDisplayableRecommendedAgents(agentTurns);
@@ -569,6 +731,10 @@ function JarvisApp() {
       let playedSpeechInTurn = false;
       let requestedLineupForResponse = requestedLineupForRequest;
       let appliedLineupFallback = false;
+      let recommendationIdForResponse = '';
+      let heroHallJumpScheduled = false;
+      let heroHallSpeechSettled = false;
+      let pendingHeroHallJump: { agents: RecommendedAgent[]; recommendationId: string } | null = null;
       const cardReadyWaiters: Array<(ready: boolean) => void> = [];
       const routeActionWaiters: Array<(action: AgentAction | null) => void> = [];
       const speechAssets = new Map<SpeechSegmentKey, PreloadedSpeechAsset>();
@@ -586,6 +752,48 @@ function JarvisApp() {
       const revealWorkflow = (nextReveal: Partial<WorkflowRevealState>) => {
         revealState = { ...revealState, ...nextReveal };
         publishVisibleWorkflow();
+      };
+      const revealMainSurfaceAfterToolCall = async (showMainSurface: () => void) => {
+        await wait(TOOL_CALL_TO_MAIN_SURFACE_REVEAL_MS);
+
+        if (controller.signal.aborted) {
+          return false;
+        }
+
+        showMainSurface();
+        return true;
+      };
+      const schedulePendingHeroHallJump = () => {
+        if (
+          heroHallJumpScheduled ||
+          !pendingHeroHallJump ||
+          !recommendationSurfaceUnlockedRef.current ||
+          !heroHallSpeechSettled ||
+          controller.signal.aborted
+        ) {
+          return;
+        }
+
+        const { agents, recommendationId } = pendingHeroHallJump;
+        pendingHeroHallJump = null;
+        heroHallJumpScheduled = true;
+        scheduleHeroHallJump(recommendationId, agents);
+      };
+      const showRecommendationSurface = () => {
+        const nextRecommendedAgents = accumulatedWorkflow.agentRecommendation.agents;
+
+        if (nextRecommendedAgents.length > 0) {
+          setPinnedRecommendedAgents(nextRecommendedAgents);
+        }
+        if (recommendationIdForResponse) {
+          setSharedRecommendationSnapshot(null);
+          setSharedRecommendationError('');
+          setCurrentRecommendationId(recommendationIdForResponse);
+        }
+        recommendationSurfaceUnlockedRef.current = true;
+        setRecommendationDockVisible(true);
+        setWorkflowHighlight('agents');
+        schedulePendingHeroHallJump();
       };
       const isSpeechSegmentVisible = (segment: SpeechSegmentKey) => {
         if (segment === 'knowledgeAck') {
@@ -723,7 +931,16 @@ function JarvisApp() {
         speechWaiters.forEach((waiters) => waiters.splice(0).forEach((resolve) => resolve(null)));
       };
       const playSpeechSegment = async (segment: SpeechSegmentKey) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         const asset = await waitForSpeechSegment(segment);
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
         const speechText = asset?.text || getSpeechTextForSegment(accumulatedWorkflow, segment);
 
         if (!speechText) {
@@ -741,6 +958,10 @@ function JarvisApp() {
               return null;
             })
           : undefined;
+
+        if (controller.signal.aborted) {
+          return;
+        }
 
         await new Promise<void>((resolve) => {
           speakWithParticleOutput(speechText, {
@@ -792,7 +1013,6 @@ function JarvisApp() {
         requestedLineupForResponse = lineupId;
         commitWorkflow(setWorkflowLineupIntent(replaceRecommendedAgents(accumulatedWorkflow, fallbackAgents), lineupId));
         agentRevealCount = null;
-        revealWorkflow({ recommendationAgents: true });
         setHeroHallLineupState((current) =>
           mergeHeroHallLineups(
             current,
@@ -804,9 +1024,6 @@ function JarvisApp() {
             ),
           ),
         );
-        setHeroHallOpen(true);
-        setRecommendationDockVisible(true);
-        setWorkflowHighlight('agents');
         markCardsReady();
       };
       const closeCardsReady = () => {
@@ -834,34 +1051,39 @@ function JarvisApp() {
       const activatePathAnimation = async () => {
         const routeAction = await waitForRouteAction();
 
-        if (!routeAction || routeAction.type !== 'focus_graph_path') {
+        if (controller.signal.aborted || !routeAction || routeAction.type !== 'focus_graph_path') {
           return false;
         }
 
         revealWorkflow({ knowledgePath: true });
-        setLastAction(routeAction);
-        setRouteDockVisible(true);
-        setWorkflowHighlight('route');
-        return true;
+        return revealMainSurfaceAfterToolCall(() => {
+          setLastAction(routeAction);
+          setRouteDockVisible(true);
+          setWorkflowHighlight('route');
+        });
       };
       const runCardAnimation = async () => {
         const hasCards = await waitForCardsReady();
 
-        if (!hasCards) {
+        if (controller.signal.aborted || !hasCards) {
           return;
         }
 
         if (revealState.recommendationAgents) {
           agentRevealCount = null;
           publishVisibleWorkflow();
+          await revealMainSurfaceAfterToolCall(showRecommendationSurface);
           await wait(RECOMMENDATION_DOCK_REVEAL_MS);
           return;
         }
 
         agentRevealCount = 1;
         revealWorkflow({ recommendationAgents: true });
-        setRecommendationDockVisible(true);
-        setWorkflowHighlight('agents');
+        const mainSurfaceVisible = await revealMainSurfaceAfterToolCall(showRecommendationSurface);
+
+        if (!mainSurfaceVisible) {
+          return;
+        }
 
         while (agentRevealCount < accumulatedWorkflow.agentRecommendation.agents.length) {
           if (controller.signal.aborted) {
@@ -878,6 +1100,10 @@ function JarvisApp() {
         await wait(RECOMMENDATION_DOCK_REVEAL_MS);
       };
       const revealCompletedWorkflow = () => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         revealWorkflow({
           knowledgeAck: true,
           knowledgeExplanation: true,
@@ -900,6 +1126,11 @@ function JarvisApp() {
         await Promise.all([playSpeechSegment('recommendationSummary'), runCardAnimation()]);
         setWorkflowHighlight('none');
         revealCompletedWorkflow();
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
         if (!playedSpeechInTurn) {
           const fallbackSpeechText = cleanSpeechText(buildAgentReplyText(accumulatedWorkflow, ''));
 
@@ -922,6 +1153,8 @@ function JarvisApp() {
           autoSaveHistory: true,
           conversationId: conversationIdsForRequest.route_planner,
           conversationIds: conversationIdsForRequest,
+          participantIdentity,
+          recentDialogue: recentDialogueForRequest,
           requestedLineup: requestedLineupForRequest,
           signal: controller.signal,
           userState: userStateForRequest,
@@ -930,8 +1163,13 @@ function JarvisApp() {
 
             if (typeof event.recommendation_id === 'string' && event.recommendation_id.trim()) {
               const nextRecommendationId = event.recommendation_id.trim();
-              setCurrentRecommendationId(nextRecommendationId);
-              setSharedRecommendationError('');
+              const editToken = typeof event.recommendation_edit_token === 'string' ? event.recommendation_edit_token.trim() : '';
+
+              if (editToken) {
+                storeRecommendationEditToken(nextRecommendationId, editToken);
+              }
+
+              recommendationIdForResponse = nextRecommendationId;
             }
 
             const speechSegment = getCompletedSpeechSegment(event);
@@ -1036,6 +1274,14 @@ function JarvisApp() {
           },
         });
 
+        if (controller.signal.aborted) {
+          closeSpeechSegments();
+          closeRouteAction();
+          closeCardsReady();
+          setWorkflowHighlight('none');
+          return;
+        }
+
         if (!routeActionReady) {
           commitRouteAction(accumulatedWorkflow.knowledgeGraph.KG_PATH);
         }
@@ -1052,16 +1298,47 @@ function JarvisApp() {
 
         const finalText = buildAgentReplyText(accumulatedWorkflow, streamError || 'Agent 已完成，但没有返回可展示内容。');
         const finalStatus: AgentStatus = streamError ? 'error' : 'completed';
+        const finalRecommendedAgents = accumulatedWorkflow.agentRecommendation.agents;
         setMessages((current) => {
           const withoutThinking = current.filter((message) => message.text !== 'Processing...');
           return [...withoutThinking.slice(-19), { id: Date.now(), speaker: 'ai', text: finalText }];
         });
         setAgentStatus(finalStatus);
+        agentCanSubmitRef.current = true;
         setAgentTurns(updateTurnById(turnId, (turn) => ({ ...turn, status: finalStatus })));
-        void orchestrationPromise.finally(() => {
+
+        if (!controller.signal.aborted && finalStatus === 'completed') {
+          pendingHeroHallJump = {
+            agents: finalRecommendedAgents,
+            recommendationId: recommendationIdForResponse,
+          };
+          schedulePendingHeroHallJump();
+        } else {
+          releaseHeroHallReservation();
+        }
+
+        await orchestrationPromise.finally(() => {
+          if (agentRequestRef.current !== controller) {
+            return;
+          }
+
           finishReplyWithoutSpeech(shouldResumeListening);
         });
+        heroHallSpeechSettled = true;
+
+        if (controller.signal.aborted) {
+          pendingHeroHallJump = null;
+          releaseHeroHallReservation();
+        } else {
+          schedulePendingHeroHallJump();
+
+          if (pendingHeroHallJump && !heroHallJumpScheduled) {
+            pendingHeroHallJump = null;
+            releaseHeroHallReservation();
+          }
+        }
       } catch (error) {
+        releaseHeroHallReservation();
         if (controller.signal.aborted) {
           closeSpeechSegments();
           closeRouteAction();
@@ -1078,6 +1355,7 @@ function JarvisApp() {
         try {
           const response = await requestAIReply(text, history);
           setReplySource(response.source);
+          agentCanSubmitRef.current = true;
           setAgentStatus('completed');
           setLastAction(response.actions[0] ?? null);
           setAgentTurns(
@@ -1108,6 +1386,7 @@ function JarvisApp() {
               : '智能体接口连接失败，本地操作仍保持在线。';
 
           setReplySource('local-mock');
+          agentCanSubmitRef.current = true;
           setAgentStatus('error');
           setLastAction({ type: 'chat' });
           setAgentTurns(
@@ -1132,22 +1411,23 @@ function JarvisApp() {
         }
       } finally {
         if (agentRequestRef.current === controller) {
+          agentCanSubmitRef.current = true;
           agentRequestRef.current = null;
         }
       }
     },
     [
-      agentStatus,
       agentTurns,
+      cancelHeroHallJump,
       finishReplyWithoutSpeech,
       heroHallLineupState,
-      inputMode,
-      manualVoiceSession,
       messages,
       pinnedRecommendedAgents,
+      releasePreviousTurnForNewMessage,
+      releaseHeroHallReservation,
       rememberConversationIds,
+      scheduleHeroHallJump,
       speakWithParticleOutput,
-      voiceAwake,
     ],
   );
 
@@ -1156,7 +1436,9 @@ function JarvisApp() {
       const text = raw.trim();
 
       if (agentStatus === 'streaming' || agentRequestRef.current) {
-        voiceControlRef.current?.pause();
+        setManualVoiceSession(false);
+        setVoiceAwake(false);
+        voiceControlRef.current?.stop();
         micLevelRef.current?.stop();
         setLastHeard('');
         return;
@@ -1174,7 +1456,6 @@ function JarvisApp() {
       if (wantsSleep(text)) {
         setManualVoiceSession(false);
         setVoiceAwake(false);
-        setLastAction(null);
         setLastHeard('');
         voiceControlRef.current?.stop();
         micLevelRef.current?.stop();
@@ -1183,27 +1464,21 @@ function JarvisApp() {
       }
 
       const wakeCommand = extractWakeCommand(text);
+      const command = wakeCommand?.command || (wakeCommand ? '' : text);
 
-      if (!voiceAwake) {
-        setManualVoiceSession(false);
-        setVoiceAwake(true);
+      setManualVoiceSession(false);
+      setVoiceAwake(false);
+      voiceControlRef.current?.stop();
+      micLevelRef.current?.stop();
 
-        if (wakeCommand?.command) {
-          void submitMessage(wakeCommand.command, { resumeListening: true });
-          return;
-        }
-
-        if (!wakeCommand) {
-          void submitMessage(text, { resumeListening: true });
-          return;
-        }
-
+      if (!command) {
+        setLastHeard('');
         return;
       }
 
-      void submitMessage(wakeCommand?.command || text, { resumeListening: true });
+      void submitMessage(command, { resumeListening: false });
     },
-    [agentStatus, speakWithParticleOutput, submitMessage, voiceAwake],
+    [agentStatus, submitMessage],
   );
 
   const voice = useVoiceControl(handleVoiceCommand, recognitionLanguage);
@@ -1246,41 +1521,27 @@ function JarvisApp() {
     setInputMode('voice');
 
     if (manualVoiceSession || voiceAwake) {
-      speechSessionRef.current += 1;
-      clearSpeechEndTimer();
-      speechOutputActiveRef.current = false;
-      cancelSpeechPlayback();
-      window.speechSynthesis?.cancel();
+      cancelActiveSpeechOutput();
       setManualVoiceSession(false);
       setVoiceAwake(false);
-      setLastAction(null);
       setLastHeard('');
-      setCurrentSpeechText('');
-      setSpeechError('');
       voice.stop();
       micLevel.stop();
       setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
-      speakWithParticleOutput('语音链路已关闭，先生。', {
-        displayText: 'Jarvis 语音链路已关闭。',
-        minimumVisualDurationMs: 900,
-        resumeListening: false,
-      });
       return;
     }
 
+    agentRequestRef.current?.abort();
+    cancelActiveSpeechOutput();
     setManualVoiceSession(true);
     setVoiceAwake(true);
-    setLastAction(null);
     setLastHeard('');
     voice.stop();
     setSettings((current) => ({ ...current, energy: 0.82, mode: 'listening', pulseSeed: current.pulseSeed + 1 }));
-    speakWithParticleOutput('系统上线，先生。语音链路已接入。', {
-      displayText: 'Jarvis 语音链路已接入。',
-      minimumVisualDurationMs: 1200,
-      resumeListening: true,
-    });
+    void micLevel.start();
+    voice.start();
 
-  }, [clearSpeechEndTimer, manualVoiceSession, micLevel, speakWithParticleOutput, voice, voiceAwake]);
+  }, [cancelActiveSpeechOutput, manualVoiceSession, micLevel, voice, voiceAwake]);
 
   const switchInputMode = useCallback(
     (nextMode: InputMode) => {
@@ -1290,22 +1551,45 @@ function JarvisApp() {
         return;
       }
 
-      speechSessionRef.current += 1;
-      clearSpeechEndTimer();
-      speechOutputActiveRef.current = false;
-      cancelSpeechPlayback();
-      window.speechSynthesis?.cancel();
       setManualVoiceSession(false);
       setVoiceAwake(false);
       setLastHeard('');
-      setCurrentSpeechText('');
-      setSpeechError('');
       voice.stop();
       micLevel.stop();
-      setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+      if (!speechOutputActiveRef.current) {
+        setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+      }
     },
-    [clearSpeechEndTimer, micLevel, voice],
+    [micLevel, voice],
   );
+
+  const pauseCurrentResponse = useCallback(() => {
+    cancelHeroHallJump();
+    agentRequestRef.current?.abort();
+    agentCanSubmitRef.current = true;
+    cancelActiveSpeechOutput();
+    voiceControlRef.current?.stop();
+    micLevelRef.current?.stop();
+    setManualVoiceSession(false);
+    setVoiceAwake(false);
+    setLastHeard('');
+    setWorkflowHighlight('none');
+    setMessages((current) => current.filter((message) => message.text !== 'Processing...'));
+    setAgentStatus((current) => (current === 'streaming' ? 'completed' : current));
+    setAgentTurns((current) => {
+      const next = [...current];
+
+      for (let index = next.length - 1; index >= 0; index -= 1) {
+        if (next[index].status === 'streaming') {
+          next[index] = { ...next[index], status: 'completed' };
+          break;
+        }
+      }
+
+      return next;
+    });
+    setSettings((current) => ({ ...current, energy: 0.34, mode: 'idle', pulseSeed: current.pulseSeed + 1 }));
+  }, [cancelActiveSpeechOutput, cancelHeroHallJump]);
 
   const sendDraftMessage = useCallback(
     () => {
@@ -1333,31 +1617,17 @@ function JarvisApp() {
   );
   const snapshotHasManualAgents = snapshotRecommendedAgents.some((agent) => agent.source === 'manual');
   const recommendedAgents =
-    snapshotHasManualAgents || latestDisplayableRecommendedAgents.length === 0
-      ? snapshotRecommendedAgents.length > 0
-        ? snapshotRecommendedAgents
-        : pinnedRecommendedAgents
-      : latestDisplayableRecommendedAgents.length > 0
-      ? latestDisplayableRecommendedAgents
-      : pinnedRecommendedAgents;
+    snapshotHasManualAgents && snapshotRecommendedAgents.length > 0
+      ? snapshotRecommendedAgents
+      : pinnedRecommendedAgents.length > 0
+        ? pinnedRecommendedAgents
+        : latestDisplayableRecommendedAgents;
   const fallbackRoute = getLatestRouteSegments(agentTurns);
   const graphRoute = lastAction?.type === 'focus_graph_path' ? lastAction.route : fallbackRoute;
   const dockRouteSegments = routeDockVisible && graphRoute.length > 0 ? graphRoute : [];
   const dockRecommendedAgents = recommendationDockVisible ? recommendedAgents : [];
-  const recommendedAgentFocusNodes =
-    recommendationDockVisible && recommendedAgents.length > 0
-      ? recommendedAgents.map((agent) => getAgentDisplayName(agent)).filter(Boolean).slice(0, 7)
-      : [];
-  const particleFocusNodes = recommendedAgentFocusNodes.length > 0 ? recommendedAgentFocusNodes : graphRoute;
   const graphFocusKey =
-    particleFocusNodes.length > 0
-      ? recommendedAgentFocusNodes.length > 0
-        ? `agents:${recommendedAgentFocusNodes.join('/')}`
-        : `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}`
-      : '';
-  const heroHallSummary = getLatestRecommendationSummary(agentTurns);
-  const heroHallKey = recommendedAgents.map(getRecommendedAgentKey).join('|');
-  const heroHallReady = agentStatus === 'completed' && recommendedAgents.length > 0 && Boolean(heroHallSummary);
+    graphRoute.length > 0 ? `${lastAction?.type === 'focus_graph_path' ? lastAction.label : graphRoute.at(-1)}:${graphRoute.join('/')}` : '';
   const readoutText =
     settings.mode === 'thinking'
       ? isChineseLanguage(interfaceLanguage)
@@ -1368,29 +1638,26 @@ function JarvisApp() {
         : '';
   const voiceCaptionError = inputMode === 'text' ? '' : speechError || voice.error || micLevel.error;
   const snapshotStatusText = sharedRecommendationError ? `推荐组合读取失败：${sharedRecommendationError}` : '';
+  const voiceInteractionPhase = resolveVoiceInteractionPhase({
+    awake: voiceAwake,
+    listening: voice.listening,
+    status: agentStatus,
+    supported: voice.supported,
+  });
+  const voiceInteractionCopy = getVoiceInteractionCopy(voiceInteractionPhase, interfaceLanguage);
   const captionText =
     voiceCaptionError ||
     snapshotStatusText ||
     (inputMode === 'text'
       ? ''
-      : voice.listening
-        ? voiceAwake
-          ? lastHeard
-            ? isChineseLanguage(interfaceLanguage)
-              ? `语音模式已激活。听到：${lastHeard}`
-              : `Voice mode active. Heard: ${lastHeard}`
-            : isChineseLanguage(interfaceLanguage)
-              ? '语音模式已激活，可以直接说。'
-              : 'Voice mode active. Speak naturally.'
-        : isChineseLanguage(interfaceLanguage)
-          ? '说“贾维斯”唤醒语音模式。'
-          : 'Say "Jarvis" to wake voice mode.'
-      : isChineseLanguage(interfaceLanguage)
-        ? '语音待命。'
-        : 'Voice standby.');
+       : voice.listening && lastHeard
+         ? isChineseLanguage(interfaceLanguage)
+           ? `语音模式已激活。听到：${lastHeard}`
+           : `Voice mode active. Heard: ${lastHeard}`
+         : voiceInteractionCopy.caption);
 
   useEffect(() => {
-    if (latestDisplayableRecommendedAgents.length > 0) {
+    if (recommendationSurfaceUnlockedRef.current && latestDisplayableRecommendedAgents.length > 0) {
       setPinnedRecommendedAgents(latestDisplayableRecommendedAgents);
     }
   }, [latestDisplayableRecommendedAgents]);
@@ -1414,7 +1681,7 @@ function JarvisApp() {
         setSharedRecommendationSnapshot(snapshot);
         setSharedRecommendationError('');
 
-        if (snapshot.agents.length > 0) {
+        if (snapshot.agents.length > 0 && recommendationSurfaceUnlockedRef.current) {
           setRecommendationDockVisible(true);
         }
 
@@ -1441,50 +1708,26 @@ function JarvisApp() {
     };
   }, [currentRecommendationId]);
 
-  useEffect(() => {
-    if (!heroHallReady || !heroHallKey || lastHeroHallAutoKeyRef.current === heroHallKey) {
-      return undefined;
-    }
-
-    lastHeroHallAutoKeyRef.current = heroHallKey;
-    const timer = window.setTimeout(() => setHeroHallOpen(true), 620);
-
-    return () => window.clearTimeout(timer);
-  }, [heroHallKey, heroHallReady]);
-
-  const appendCatalogAgentToRecommendation = useCallback(
-    async (agentId: string) => {
-      if (!currentRecommendationId) {
-        return;
-      }
-
-      const snapshot = await appendAgentToRecommendation(currentRecommendationId, agentId);
-      setSharedRecommendationSnapshot(snapshot);
-      setSharedRecommendationError('');
-      setPinnedRecommendedAgents(snapshotToRecommendedAgents(snapshot));
-      setRecommendationDockVisible(true);
-    },
-    [currentRecommendationId],
-  );
-
   return (
     <main
       className="app-shell"
       data-boot-flash={introBootFlash}
       data-hero-hall="false"
-      data-hero-modal-open={heroHallOpen}
+      data-hero-modal-open="false"
       data-intro={introOpen}
     >
       <div className="space-cruise-backdrop" aria-hidden="true" />
-      <ParticleField
-        audioLevel={micLevel.level}
-        graphFocusKey={graphFocusKey}
-        graphRoute={particleFocusNodes}
-        settings={settings}
-      />
+      <Suspense fallback={<div className="particle-field" aria-hidden="true" />}>
+        <ParticleField
+          audioLevel={micLevel.level}
+          graphFocusKey={graphFocusKey}
+          graphRoute={graphRoute}
+          performanceMode="active"
+          settings={settings}
+        />
+      </Suspense>
       <div className="scene-vignette" />
       <JarvisHelmetHud
-        inputMode={inputMode}
         status={agentStatus}
         voiceAwake={voiceAwake}
         voiceListening={voice.listening}
@@ -1499,21 +1742,9 @@ function JarvisApp() {
         active={agentStatus === 'streaming' || workflowHighlight !== 'none'}
         agents={dockRecommendedAgents}
         highlight={workflowHighlight}
-        onOpenHeroHall={() => setHeroHallOpen(true)}
         recommendationId={currentRecommendationId}
         routeSegments={dockRouteSegments}
       />
-      <div className="hero-hall-style-scope app-shell" data-hero-hall={heroHallOpen}>
-        <AgentHeroHall
-          agents={recommendedAgents}
-          catalogAgents={agentCatalog}
-          open={heroHallOpen}
-          onAppendRecommendedAgent={appendCatalogAgentToRecommendation}
-          onClose={() => setHeroHallOpen(false)}
-          onLineupsChange={setHeroHallLineupState}
-          recommendationId={currentRecommendationId}
-        />
-      </div>
 
       <section className="dialogue-stage" aria-label="AI particle dialogue">
         {captionText ? (
@@ -1554,14 +1785,17 @@ function JarvisApp() {
         inputMode={inputMode}
         onDraftKeyDown={handleDraftKeyDown}
         onModeChange={switchInputMode}
+        onPause={pauseCurrentResponse}
         onSend={sendDraftMessage}
         onToggleVoice={toggleManualVoiceSession}
         setDraft={setDraft}
         speakingText={currentSpeechText}
         status={agentStatus}
+        canPauseResponse={agentStatus === 'streaming' || Boolean(currentSpeechText)}
         turns={agentTurns}
         voiceHeardText={lastHeard}
         voiceAwake={voiceAwake}
+        voiceLanguage={interfaceLanguage}
         voiceListening={voice.listening}
         voiceTranscript={voice.transcript}
         voiceSupported={voice.supported}
@@ -1647,17 +1881,14 @@ function HelmetTypewriterIntel({
 }
 
 function JarvisHelmetHud({
-  inputMode,
   status,
   voiceAwake,
   voiceListening,
 }: {
-  inputMode: InputMode;
   status: AgentStatus;
   voiceAwake: boolean;
   voiceListening: boolean;
 }) {
-  const linkState = status === 'streaming' ? 'AI STREAM' : voiceAwake ? 'VOICE LINK' : 'STANDBY';
   const aiIsResponding = status === 'streaming';
   const [telemetrySnapshot, setTelemetrySnapshot] = useState(() => createHelmetTelemetrySnapshot(status, voiceAwake, voiceListening));
 
@@ -1689,18 +1920,7 @@ function JarvisHelmetHud({
       <div className="helmet-armor-corner helmet-armor-corner-tr" />
       <div className="helmet-armor-corner helmet-armor-corner-bl" />
       <div className="helmet-armor-corner helmet-armor-corner-br" />
-
-      <div className="helmet-hud-topline">
-        <div className="helmet-hud-brand">
-          <ShieldCheck size={16} />
-          <span>JARVIS HELM</span>
-        </div>
-        <div className="helmet-hud-data">
-          <span>{linkState}</span>
-          <span>CORE 97%</span>
-          <span>{inputMode.toUpperCase()}</span>
-        </div>
-      </div>
+      <MechaCockpitFrame status={status} voiceAwake={voiceAwake} />
 
       <div className="helmet-hud-reticle">
         <span className="helmet-reticle-ring helmet-reticle-ring-outer" />
@@ -1750,17 +1970,6 @@ function JarvisHelmetHud({
         <i />
         <i />
         <i />
-      </div>
-
-      <div className="helmet-hud-bottomline">
-        <span>
-          <Activity size={14} />
-          REACTOR STABLE
-        </span>
-        <span>
-          <ScanLine size={14} />
-          VISOR ACTIVE
-        </span>
       </div>
     </div>
   );

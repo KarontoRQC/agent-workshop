@@ -6,7 +6,7 @@
 
 ## 用途
 
-维护前端运行时智能体目录索引，生成可展示、可启动、可匹配数据库头像的智能体数据。它为抽卡浮层、Workflow Dock、Hero Hall 和推荐组合页提供富化后的 agent；只有真实 HTTP/GPT 链接会被视为可打开目标。
+维护前端运行时智能体目录索引，生成可展示、可启动、可匹配数据库头像的智能体数据。它为抽卡浮层、Workflow Dock、Hero Hall 和推荐组合页提供富化后的 agent；只有真实 HTTP/GPT 链接会被视为可打开目标。主页只在推荐结果校验通过后直接打开真实 `agent_combination` URL，不为普通消息预留 `about:blank` 页签。遇到历史快照里的旧 `/api/agents/<id>/avatar` 头像时，优先用目录中的 `/agent-avatars/...` 静态头像覆盖。
 
 ## 导出
 
@@ -20,6 +20,7 @@
 | `getAgentLaunchTargets` | function | ~97 | 从富化 agent 列表提取可打开目标。 |
 | `getCatalogHeroAgents` | function | ~113 | 返回完整 Hero Hall 候选池。 |
 | `openAgentLaunchTargets` | function | ~133 | 打开单个或多个启动目标。 |
+| `openAgentCombinationEntryPage` | function | ~193 | 推荐结果校验通过后，直接在独立页面打开真实 `agent_combination` 入口。 |
 
 ## 依赖
 
@@ -30,7 +31,8 @@
 ## 修改指南
 
 - **改智能体字段名**: 同步 `backend/services/agent_catalog_store.py`、`backend/routes/agents.py`、`frontend/src/types.ts` 和 `frontend/src/lib/agentCatalogClient.ts`。
-- **改启动方式**: 检查 `openAgentLaunchTargets` 和推荐组合页打开逻辑，避免浏览器弹窗被阻止后无 fallback。
+- **改头像来源**: 保持旧 `/api/agents/<id>/avatar` 只作为历史兜底，目录里有静态 `/agent-avatars/...` 时必须优先使用静态地址；头像候选只能接受 `data:image`、静态头像路径或带图片后缀的真实图片 URL，不能把 `chatgpt.com/g/...` 启动链接当作 `<img src>`。
+- **改启动方式**: 检查 `openAgentLaunchTargets`、`openAgentCombinationEntryPage` 和推荐组合页打开逻辑；普通对话不能预开占位页，异步自动打开被浏览器拦截时仍保留 Workflow Dock 的显式入口。
 
 ## 依赖图
 

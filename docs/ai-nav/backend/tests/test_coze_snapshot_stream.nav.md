@@ -4,7 +4,7 @@
 
 ## 用途
 
-验证 `/api/coze/chat/stream` 在流式对话中创建推荐快照、注入 `recommendation_id`，并在 store 或上游异常时返回安全错误。
+验证 `/api/coze/chat/stream` 在流式对话中创建推荐快照、注入 `recommendation_id`、规范并转发参与者身份，并在 store 或上游异常时返回安全错误。
 
 ## 导出
 
@@ -13,6 +13,8 @@
 | `UnavailableStore` | class | ~10 | 模拟快照 store 的受控不可用异常。 |
 | `RawUnavailableStore` | class | ~15 | 模拟快照 store 抛出原始异常。 |
 | `test_stream_chat_creates_snapshot_and_injects_recommendation_id` | test | ~19 | 验证聊天流创建快照并把推荐 ID 注入 SSE。 |
+| `test_stream_chat_forwards_allowlisted_participant_identity` | test | ~44 | 验证厂长白名单身份传给工作流。 |
+| `test_stream_chat_downgrades_unknown_participant_identity_to_guest` | test | ~65 | 验证未知身份降级为普通用户。 |
 | `test_stream_chat_local_config_fallback_creates_snapshot_and_injects_recommendation_id` | test | ~44 | 验证本地配置兜底流也创建快照。 |
 | `test_stream_chat_returns_503_when_snapshot_store_unavailable` | test | ~65 | 验证 store 不可用返回 503。 |
 | `test_stream_chat_returns_503_when_snapshot_store_raises_raw_error` | test | ~80 | 验证原始异常细节不会泄漏给客户端。 |
@@ -34,6 +36,7 @@
 
 - **修改聊天流快照注入**: 同步更新 `recommendation_id` 和快照状态断言。
 - **修改错误处理**: 保持“不泄漏原始异常信息”的断言。
+- **修改身份传参**: 保持白名单值透传、未知值降级的断言。
 
 ## 依赖图
 

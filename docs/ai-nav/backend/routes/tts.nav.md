@@ -16,7 +16,7 @@
 ## 依赖
 
 内部依赖:
-- `backend/services/tts_service.py` — 合成音频并处理 provider 细节。
+- `backend/services/tts_service.py` — 通过 Edge TTS 中文女声合成音频。
 
 外部依赖(仅列包名,不做解释):
 - `flask`

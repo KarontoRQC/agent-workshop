@@ -189,13 +189,14 @@ export function AgentHeroHall({
     });
   }, [catalogDisplayHeroAgents, recommendedHeroAgents]);
   const agentByKey = useMemo(() => new Map(lineupAgents.map((agent) => [agent.key, agent])), [lineupAgents]);
+  const recommendedAgentByKey = useMemo(() => new Map(recommendedHeroAgents.map((agent) => [agent.key, agent])), [recommendedHeroAgents]);
   const recommendationKey = recommendedHeroAgents
     .map((agent) => `${agent.key}:${normalizeHeroHallLineupId(agent.agent.lineup ?? agent.agent.lineup_id ?? agent.agent.lineupId ?? agent.agent.LINEUP) || ''}`)
     .join('|');
   const [recommendationOverrides, setRecommendationOverrides] = useState<Record<number, string>>({});
   const displayedRecommendedHeroAgents = useMemo(
-    () => recommendedHeroAgents.map((agent, index) => agentByKey.get(recommendationOverrides[index]) || agent),
-    [agentByKey, recommendationOverrides, recommendedHeroAgents],
+    () => recommendedHeroAgents.map((agent, index) => recommendedAgentByKey.get(recommendationOverrides[index]) || agent),
+    [recommendationOverrides, recommendedAgentByKey, recommendedHeroAgents],
   );
   const recommendedLaunchTargets = useMemo(
     () => getAgentLaunchTargets(displayedRecommendedHeroAgents.map((agent) => agent.enrichedAgent)),
@@ -389,6 +390,11 @@ export function AgentHeroHall({
         return;
       }
 
+      if (!recommendedAgentByKey.has(agentKey)) {
+        void appendHeroToRecommendation(agentKey);
+        return;
+      }
+
       setReplacePulseIndex(targetIndex);
       if (replacePulseTimerRef.current !== null) {
         window.clearTimeout(replacePulseTimerRef.current);
@@ -418,7 +424,7 @@ export function AgentHeroHall({
         }, {});
       });
     },
-    [agentByKey, recommendedHeroAgents],
+    [agentByKey, appendHeroToRecommendation, recommendedAgentByKey, recommendedHeroAgents],
   );
 
   const handleDragStart = (event: DragEvent<HTMLElement>, agentKey: string, sourceIndex?: number) => {

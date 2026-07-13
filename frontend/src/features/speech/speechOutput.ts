@@ -1,4 +1,5 @@
-import { API_BASE_URL } from '../../lib/agentStreamClient';
+import { API_BASE_URL } from '../../lib/apiBase';
+import { fetchApiMutation } from '../../lib/apiSession';
 import { detectConversationLanguage, isChineseLanguage, type ConversationLanguage } from '../../lib/language';
 
 const preferredVoiceHints = [
@@ -426,7 +427,7 @@ function playCommsFallbackTone(callbacks: SpeechCallbacks = {}) {
 }
 
 export async function requestTtsAudio(text: string) {
-  const response = await fetch(TTS_SPEECH_URL, {
+  const response = await fetchApiMutation(TTS_SPEECH_URL, {
     body: JSON.stringify({ mood: 'neutral', text }),
     headers: {
       'content-type': 'application/json',

@@ -42,7 +42,9 @@ export type EnrichedDrawAgent = RecommendedAgent & {
 };
 
 const GPT_ID_PATTERN = /g-[a-z0-9]+/i;
-const IMAGE_SOURCE_PATTERN = /^(?:data:image\/|https?:\/\/|\/).+/i;
+const IMAGE_FILE_EXTENSION_PATTERN = /\.(?:avif|gif|jpe?g|png|svg|webp)$/i;
+const STATIC_AGENT_AVATAR_PATTERN = /^\/agent-avatars\//i;
+const LEGACY_AGENT_AVATAR_PATTERN = /\/api\/agents\/[^/?#]+\/avatar(?:$|[?#])/i;
 
 let catalogAgents: CatalogAgent[] = [];
 const catalogByStableKey = new Map<string, CatalogAgent>();
@@ -68,13 +70,15 @@ export function enrichDrawAgent(agent: RecommendedAgent): EnrichedDrawAgent {
     catalogAgent?.endpoint,
     catalogAgent?.launch_url,
   );
-  const avatar = getAgentAvatar({
-    ...catalogAgent,
+  const avatar = getAgentAvatar(
+    {
     ...agent,
     agentKey: agentKey || catalogAgent?.agentKey,
     endpoint,
     name: inputName || catalogName || name,
-  });
+    },
+    catalogAgent,
+  );
   const launchTarget = getAgentLaunchTarget(endpoint);
   const catalogFunctionLabel = firstString(catalogAgent?.functionLabel, catalogAgent?.function);
   const catalogTypeLabel = firstString(catalogAgent?.typeLabel, catalogAgent?.type);
@@ -128,21 +132,31 @@ export function getAgentLaunchTargets(agents: EnrichedDrawAgent[]): AgentLaunchT
 
 export function getCatalogHeroAgents(agents?: AgentCatalogItem[]): EnrichedDrawAgent[] {
   const sourceAgents = agents ? agents.map(normalizeCatalogAgent).filter((agent) => Boolean(agent.name)) : catalogAgents;
+  const seenLaunchTargets = new Set<string>();
 
-  return sourceAgents.map((agent, index) =>
-    enrichDrawAgent({
-      ...agent,
-      agent_id: agent.id,
-      agent_index: index,
-      agent_key: agent.agentKey,
-      agent_name: agent.name,
-      endpoint: agent.endpoint,
-      launch_url: agent.launch_url,
-      reason: agent.role,
-      stage: agent.functionLabel || agent.typeLabel,
-      streamStatus: 'completed',
-    }),
-  );
+  return sourceAgents
+    .map((agent, index) =>
+      enrichDrawAgent({
+        ...agent,
+        agent_id: agent.id,
+        agent_index: index,
+        agent_key: agent.agentKey,
+        agent_name: agent.name,
+        endpoint: agent.endpoint,
+        launch_url: agent.launch_url,
+        reason: agent.role,
+        stage: agent.functionLabel || agent.typeLabel,
+        streamStatus: 'completed',
+      }),
+    )
+    .filter((agent) => {
+      if (!agent.launchTarget || seenLaunchTargets.has(agent.launchTarget)) {
+        return false;
+      }
+
+      seenLaunchTargets.add(agent.launchTarget);
+      return true;
+    });
 }
 
 export async function openAgentLaunchTargets(launchTargets: AgentLaunchTarget[], options: OpenAgentLaunchTargetsOptions = {}) {
@@ -184,6 +198,17 @@ export async function openAgentLaunchTargets(launchTargets: AgentLaunchTarget[],
   }
 
   openedEntries.forEach(({ target, tab }) => navigateOpenedTab(tab, target.href));
+}
+
+export function openAgentCombinationEntryPage(recommendationId: string) {
+  const id = firstString(recommendationId);
+
+  if (!id) {
+    return false;
+  }
+
+  const href = getAgentCombinationEntryUrl(id);
+  return Boolean(openDetachedPage(href));
 }
 
 export function getAgentCombinationEntryUrl(recommendationId: string) {
@@ -241,16 +266,21 @@ function rebuildCatalogIndexes(agents: CatalogAgent[]) {
   }
 }
 
-function getAgentAvatar(agent: Record<string, unknown>) {
+function getAgentAvatar(agent: Record<string, unknown>, catalogAgent?: CatalogAgent | null) {
   const directAvatar = getAvatarFromValues(getAgentLookupValues(agent));
+  const catalogAvatar = catalogAgent ? getAvatarFromValues(getAgentLookupValues(catalogAgent)) : '';
+
+  if (catalogAvatar && (!directAvatar || isLegacyAgentAvatarUrl(directAvatar))) {
+    return catalogAvatar;
+  }
 
   if (directAvatar) {
     return directAvatar;
   }
 
-  const catalogAgent = findCatalogAgent(agent);
+  const matchedCatalogAgent = catalogAgent || findCatalogAgent(agent);
 
-  return catalogAgent ? getAvatarFromValues(getAgentLookupValues(catalogAgent)) : '';
+  return matchedCatalogAgent ? getAvatarFromValues(getAgentLookupValues(matchedCatalogAgent)) : '';
 }
 
 function findCatalogAgent(agent: Record<string, unknown>): CatalogAgent | null {
@@ -368,19 +398,39 @@ function navigateOpenedTab(tab: Window, href: string) {
   try {
     tab.opener = null;
     tab.location.replace(href);
+    return true;
   } catch {
     openDetachedPage(href);
+    return false;
   }
 }
 
 function openDetachedPage(href: string) {
-  window.open(href, '_blank', 'noopener,noreferrer');
+  return window.open(href, '_blank', 'noopener,noreferrer');
 }
 
 function getDirectImageSource(value: unknown) {
   const source = firstString(value);
 
-  return IMAGE_SOURCE_PATTERN.test(source) ? source : '';
+  if (!source) {
+    return '';
+  }
+
+  if (/^data:image\//i.test(source) || STATIC_AGENT_AVATAR_PATTERN.test(source) || isLegacyAgentAvatarUrl(source)) {
+    return source;
+  }
+
+  if (!/^(?:https?:\/\/|\/)/i.test(source)) {
+    return '';
+  }
+
+  const pathWithoutQuery = source.split(/[?#]/, 1)[0] || '';
+
+  return IMAGE_FILE_EXTENSION_PATTERN.test(pathWithoutQuery) ? source : '';
+}
+
+function isLegacyAgentAvatarUrl(value: unknown) {
+  return LEGACY_AGENT_AVATAR_PATTERN.test(firstString(value));
 }
 
 function extractGptId(value: unknown) {

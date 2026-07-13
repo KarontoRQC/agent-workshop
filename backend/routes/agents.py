@@ -12,7 +12,9 @@ def list_agents():
         current_app.logger.exception("Agent catalog store unavailable")
         return jsonify({"error": "agent catalog store unavailable"}), 503
 
-    return jsonify({"agents": [_agent_response(agent) for agent in agents]})
+    response = jsonify({"agents": [_agent_response(agent) for agent in agents]})
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return response
 
 
 @agents_bp.get("/agents/<agent_id>/avatar")
@@ -41,9 +43,24 @@ def _agent_response(agent):
         "function": str(agent.get("function") or ""),
         "type": str(agent.get("type") or ""),
         "launch_url": str(agent.get("launch_url") or ""),
-        "avatar_url": url_for("agents.get_agent_avatar", agent_id=agent_id) if agent_id and has_avatar else "",
+        "avatar_url": get_agent_avatar_url(agent_id, has_avatar),
         "description": str(agent.get("description") or ""),
         "tags": agent.get("tags") if isinstance(agent.get("tags"), list) else [],
         "knowledge": agent.get("knowledge") if isinstance(agent.get("knowledge"), list) else [],
         "has_avatar": has_avatar,
     }
+
+
+def get_agent_avatar_url(agent_id, has_avatar):
+    if not agent_id or not has_avatar:
+        return ""
+
+    store = current_app.config["AGENT_CATALOG_STORE"]
+    get_static_avatar_url = getattr(store, "get_static_avatar_url", None)
+
+    if callable(get_static_avatar_url):
+        static_url = get_static_avatar_url(agent_id)
+        if static_url:
+            return static_url
+
+    return url_for("agents.get_agent_avatar", agent_id=agent_id)

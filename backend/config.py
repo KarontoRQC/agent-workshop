@@ -21,6 +21,15 @@ DEFAULT_LONGCAT_MODEL = "LongCat-2.0"
 DEFAULT_ROUTE_PLANNER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "knowledge_graph_agent.txt")
 DEFAULT_RECOMMENDER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "recommended_agent.txt")
 DEFAULT_UNIFIED_ORCHESTRATOR_PROMPT_PATH = os.path.join(PROMPTS_DIR, "unified_orchestration_agent.txt")
+DEFAULT_EDGE_TTS_VOICE = "zh-CN-XiaoxiaoNeural"
+EDGE_TTS_FEMALE_VOICES = frozenset(
+    (
+        DEFAULT_EDGE_TTS_VOICE,
+        "zh-CN-XiaoyiNeural",
+        "zh-CN-liaoning-XiaobeiNeural",
+        "zh-CN-shaanxi-XiaoniNeural",
+    )
+)
 
 if load_dotenv:
     load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -60,6 +69,19 @@ def get_agent_avatar_dir():
     return os.path.join(ROOT_DIR, "frontend", "src", "assets", "agent-avatars")
 
 
+def get_agent_static_avatar_dir():
+    configured_path = os.getenv("AGENT_STATIC_AVATAR_DIR", "").strip()
+
+    if configured_path:
+        return configured_path
+
+    return os.path.join(ROOT_DIR, "frontend", "public", "agent-avatars")
+
+
+def get_agent_static_avatar_base_url():
+    return os.getenv("AGENT_STATIC_AVATAR_BASE_URL", "/agent-avatars").strip().rstrip("/")
+
+
 def _get_float_env(name, default):
     value = os.getenv(name, default)
 
@@ -78,6 +100,11 @@ def _get_int_env(name, default):
         return int(default)
 
 
+def _get_choice_env(name, default, allowed):
+    value = os.getenv(name, default).strip().lower()
+    return value if value in allowed else default
+
+
 @dataclass(frozen=True)
 class CozeSettings:
     chat_provider: str
@@ -92,6 +119,13 @@ class CozeSettings:
     longcat_base_url: str
     longcat_model: str
     longcat_max_tokens: int
+    longcat_thinking: str
+    longcat_temperature: float
+    longcat_sse_chunk_size: int
+    longcat_stream_read_timeout: float
+    longcat_request_retries: int
+    longcat_retry_backoff: float
+    longcat_circuit_breaker_seconds: float
     route_planner_prompt_path: str
     recommender_prompt_path: str
     unified_orchestrator_prompt_path: str
@@ -102,20 +136,20 @@ class CozeSettings:
 
 @dataclass(frozen=True)
 class TtsSettings:
-    provider: str
     edge_tts_exe: str
     edge_tts_voice: str
     edge_tts_rate: str
     edge_tts_volume: str
     edge_tts_pitch: str
     edge_tts_timeout: float
-    piper_exe: str
-    piper_voice: str
-    piper_config: str
-    piper_length_scale: float
-    piper_noise_scale: float
-    piper_noise_w: float
-    piper_timeout: float
+
+
+@dataclass(frozen=True)
+class ApiSecuritySettings:
+    signing_secret: str
+    session_ttl_seconds: int
+    chat_message_max_chars: int
+    echo_enabled: bool
 
 
 def get_coze_settings():
@@ -137,6 +171,16 @@ def get_coze_settings():
         longcat_base_url=os.getenv("LONGCAT_BASE_URL", DEFAULT_LONGCAT_BASE_URL),
         longcat_model=os.getenv("LONGCAT_MODEL", DEFAULT_LONGCAT_MODEL),
         longcat_max_tokens=_get_int_env("LONGCAT_MAX_TOKENS", "3000"),
+        longcat_thinking=_get_choice_env("LONGCAT_THINKING", "disabled", {"enabled", "disabled"}),
+        longcat_temperature=_get_float_env("LONGCAT_TEMPERATURE", "0.2"),
+        longcat_sse_chunk_size=max(1, _get_int_env("LONGCAT_SSE_CHUNK_SIZE", "64")),
+        longcat_stream_read_timeout=max(1.0, _get_float_env("LONGCAT_STREAM_READ_TIMEOUT", "4")),
+        longcat_request_retries=min(2, max(0, _get_int_env("LONGCAT_REQUEST_RETRIES", "0"))),
+        longcat_retry_backoff=max(0.0, _get_float_env("LONGCAT_RETRY_BACKOFF", "0.25")),
+        longcat_circuit_breaker_seconds=min(
+            120.0,
+            max(0.0, _get_float_env("LONGCAT_CIRCUIT_BREAKER_SECONDS", "20")),
+        ),
         route_planner_prompt_path=os.getenv("ROUTE_PLANNER_PROMPT_PATH", DEFAULT_ROUTE_PLANNER_PROMPT_PATH),
         recommender_prompt_path=os.getenv("RECOMMENDER_PROMPT_PATH", DEFAULT_RECOMMENDER_PROMPT_PATH),
         unified_orchestrator_prompt_path=os.getenv(
@@ -163,21 +207,31 @@ def _get_chat_provider(longcat_api_key="", coze_api_token=""):
 
 def get_tts_settings():
     return TtsSettings(
-        provider=os.getenv("TTS_PROVIDER", "auto").strip().lower(),
         edge_tts_exe=os.getenv("EDGE_TTS_EXE", "edge-tts").strip(),
-        edge_tts_voice=os.getenv("EDGE_TTS_VOICE", "zh-CN-XiaoxiaoNeural").strip(),
+        edge_tts_voice=_get_edge_tts_voice(),
         edge_tts_rate=os.getenv("EDGE_TTS_RATE", "+0%").strip(),
         edge_tts_volume=os.getenv("EDGE_TTS_VOLUME", "+0%").strip(),
         edge_tts_pitch=os.getenv("EDGE_TTS_PITCH", "+0Hz").strip(),
         edge_tts_timeout=_get_float_env("EDGE_TTS_TIMEOUT", "25"),
-        piper_exe=os.getenv("PIPER_EXE", "").strip(),
-        piper_voice=os.getenv("PIPER_VOICE", "").strip(),
-        piper_config=os.getenv("PIPER_CONFIG", "").strip(),
-        piper_timeout=_get_float_env("PIPER_TIMEOUT", "18"),
-        piper_length_scale=_get_float_env("PIPER_LENGTH_SCALE", "1.0"),
-        piper_noise_scale=_get_float_env("PIPER_NOISE_SCALE", "0.667"),
-        piper_noise_w=_get_float_env("PIPER_NOISE_W", "0.8"),
     )
+
+
+def get_api_security_settings():
+    return ApiSecuritySettings(
+        signing_secret=os.getenv("APP_SIGNING_SECRET", "").strip(),
+        session_ttl_seconds=min(86400, max(300, _get_int_env("API_SESSION_TTL_SECONDS", "43200"))),
+        chat_message_max_chars=min(32000, max(256, _get_int_env("CHAT_MESSAGE_MAX_CHARS", "8000"))),
+        echo_enabled=os.getenv("ENABLE_ECHO_ENDPOINT", "0").strip().lower() in {"1", "true", "yes", "on"},
+    )
+
+
+def _get_edge_tts_voice():
+    voice = os.getenv("EDGE_TTS_VOICE", DEFAULT_EDGE_TTS_VOICE).strip()
+
+    if voice in EDGE_TTS_FEMALE_VOICES:
+        return voice
+
+    return DEFAULT_EDGE_TTS_VOICE
 
 
 def _get_agent_names_env():
@@ -192,7 +246,7 @@ def _get_agent_names_env():
 @lru_cache(maxsize=1)
 def _load_default_agent_names():
     for path in _source_agent_paths():
-        names = _read_agent_names(path, "智能体名称")
+        names = _read_agent_names(path, "智能体名称", required_link_key="智能体链接")
         if names:
             return names
 
@@ -209,7 +263,7 @@ def _source_agent_paths():
     return tuple(path for path in candidates if path)
 
 
-def _read_agent_names(path, key):
+def _read_agent_names(path, key, required_link_key=None):
     try:
         with open(path, "r", encoding="utf-8") as file:
             data = json.load(file)
@@ -225,10 +279,17 @@ def _read_agent_names(path, key):
 
     names = []
     seen = set()
+    seen_links = set()
 
     for record in records:
         if not isinstance(record, dict):
             continue
+
+        normalized_link = ""
+        if required_link_key:
+            normalized_link = str(record.get(required_link_key) or "").strip()
+            if not normalized_link or normalized_link in seen_links:
+                continue
 
         name = str(record.get(key, "")).strip()
 
@@ -236,6 +297,8 @@ def _read_agent_names(path, key):
             continue
 
         seen.add(name)
+        if normalized_link:
+            seen_links.add(normalized_link)
         names.append(name)
 
     return tuple(names)

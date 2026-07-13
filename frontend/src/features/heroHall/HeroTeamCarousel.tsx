@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, Plus, Shield, Sparkles } from 'lucide-react';
 import type { EnrichedDrawAgent } from '../../lib/agentLaunchCatalog';
 import type { RecommendedAgent } from '../../types';
@@ -26,30 +26,6 @@ type HeroTeamCarouselProps = {
   replacePulseIndex?: number | null;
 };
 
-function getCarouselPosition(index: number, focusIndex: number, total: number) {
-  if (total <= 0) {
-    return 'is-hidden';
-  }
-
-  let offset = index - focusIndex;
-
-  while (offset > 2) {
-    offset -= total;
-  }
-
-  while (offset < -2) {
-    offset += total;
-  }
-
-  if (offset === -2) return 'is-far-left';
-  if (offset === -1) return 'is-left';
-  if (offset === 0) return 'is-center';
-  if (offset === 1) return 'is-right';
-  if (offset === 2) return 'is-far-right';
-
-  return 'is-hidden';
-}
-
 export function HeroTeamCarousel({
   agents,
   draggingAgentKey = '',
@@ -64,6 +40,7 @@ export function HeroTeamCarousel({
   replacePulseIndex = null,
 }: HeroTeamCarouselProps) {
   const [focusIndex, setFocusIndex] = useState(0);
+  const trackRef = useRef<HTMLOListElement | null>(null);
   const agentKeySignature = useMemo(() => agents.map((agent) => agent.key).join('|'), [agents]);
 
   useEffect(() => {
@@ -90,6 +67,18 @@ export function HeroTeamCarousel({
     });
   };
 
+  useEffect(() => {
+    const track = trackRef.current;
+    const card = track?.querySelector<HTMLElement>(`[data-recommendation-index="${focusIndex}"]`);
+
+    if (!track || !card) {
+      return;
+    }
+
+    const targetLeft = card.offsetLeft - (track.clientWidth - card.clientWidth) / 2;
+    track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+  }, [focusIndex]);
+
   return (
     <section className="hero-hall-ranking hero-hall-recommendations hero-hall-deployment" aria-label="智能体推荐战队">
       <div className="hero-hall-section-title">
@@ -111,11 +100,10 @@ export function HeroTeamCarousel({
         </div>
         {agents.length > 0 ? (
           <>
-            <ol className="hero-recommendation-deck hero-deploy-grid hero-team-carousel-track">
+            <ol className="hero-recommendation-deck hero-deploy-grid hero-team-carousel-track is-all-visible" ref={trackRef}>
               {agents.map((agent, index) => {
                 const displayName = agent.name;
-                const positionClass = getCarouselPosition(index, focusIndex, agents.length);
-                const isFocused = positionClass === 'is-center';
+                const isFocused = index === focusIndex;
                 const isDropTarget = draggingAgentKey && dropTargetIndex === index;
                 const isDragSource = draggingAgentKey === agent.key;
                 const isReplacing = replacePulseIndex === index;
@@ -124,7 +112,7 @@ export function HeroTeamCarousel({
                 return (
                   <li
                     aria-current={isFocused ? 'true' : undefined}
-                    className={`hero-recommendation-card hero-deploy-card hero-team-card ${positionClass} ${isDropTarget ? 'is-drop-target' : ''} ${isDragSource ? 'is-drag-source' : ''} ${isReplacing ? 'is-replacing' : ''}`}
+                    className={`hero-recommendation-card hero-deploy-card hero-team-card is-all-visible-card ${isFocused ? 'is-focused' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isDragSource ? 'is-drag-source' : ''} ${isReplacing ? 'is-replacing' : ''}`}
                     data-lineup={presentation.lineupLabel}
                     data-recommendation-index={index}
                     data-replace-active={isDropTarget ? 'true' : 'false'}

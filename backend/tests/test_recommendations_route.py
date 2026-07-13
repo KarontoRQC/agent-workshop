@@ -1,3 +1,5 @@
+import hashlib
+
 from app import create_app
 from datetime import datetime, timedelta, timezone
 from services.agent_catalog_store import InMemoryAgentCatalogStore
@@ -15,6 +17,11 @@ class UnavailableRecommendationSnapshotStore(InMemoryRecommendationSnapshotStore
 class RawUnavailableRecommendationSnapshotStore(InMemoryRecommendationSnapshotStore):
     def get_snapshot(self, recommendation_id):
         raise RuntimeError("raw database secret")
+
+
+class UnavailableLineupSaveStore(InMemoryRecommendationSnapshotStore):
+    def update_saved_lineup(self, recommendation_id, saved_lineup, score=None):
+        raise RecommendationSnapshotStoreError("database unavailable")
 
 
 def _client_with_store(store, catalog_store=None):
@@ -37,6 +44,31 @@ def test_get_recommendation_snapshot_returns_snapshot():
 
     assert response.status_code == 200
     assert response.get_json() == snapshot
+
+
+def test_get_recommendation_snapshot_rewrites_legacy_avatar_url_to_static_url():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("need agents")
+    store.merge_agent(
+        "rec_test",
+        {
+            "agent_id": "agent-001",
+            "agent_index": 0,
+            "agent_name": "战略专家",
+            "avatar_url": "/api/agents/agent-001/avatar",
+        },
+    )
+    catalog_store = InMemoryAgentCatalogStore(
+        agents=[{"id": "agent-001", "name": "战略专家", "has_avatar": True}],
+        avatars={"agent-001": {"content": b"static-png", "mime_type": "image/png"}},
+    )
+    client = _client_with_store(store, catalog_store)
+    avatar_digest = hashlib.sha256(b"static-png").hexdigest()[:12]
+
+    response = client.get("/api/recommendations/rec_test")
+
+    assert response.status_code == 200
+    assert response.get_json()["agents"][0]["avatar_url"] == f"/agent-avatars/agent-001-{avatar_digest}.png"
 
 
 def test_get_recommendation_snapshot_returns_404_for_missing_id():
@@ -93,14 +125,15 @@ def test_append_agent_to_recommendation_snapshot_persists_manual_agent():
                 "function": "管理",
                 "type": "智能体",
                 "launch_url": "https://chatgpt.com/g/g-profile",
-                "avatar_url": "/api/agents/agent-030/avatar",
                 "description": "分析用户特征与购买动机。",
                 "tags": ["画像识别", "销售沟通"],
                 "has_avatar": True,
             }
-        ]
+        ],
+        avatars={"agent-030": {"content": b"png-data", "mime_type": "image/png"}},
     )
     client = _client_with_store(snapshot_store, catalog_store)
+    avatar_digest = hashlib.sha256(b"png-data").hexdigest()[:12]
 
     response = client.post("/api/recommendations/rec_test/agents", json={"agent_id": "agent-030"})
 
@@ -112,7 +145,7 @@ def test_append_agent_to_recommendation_snapshot_persists_manual_agent():
             "agent_index": 1,
             "agent_id": "agent-030",
             "agent_name": "用户画像大师",
-            "avatar_url": "/api/agents/agent-030/avatar",
+            "avatar_url": f"/agent-avatars/agent-030-{avatar_digest}.png",
             "description": "分析用户特征与购买动机。",
             "endpoint": "https://chatgpt.com/g/g-profile",
             "function": "管理",
@@ -194,3 +227,94 @@ def test_append_agent_to_recommendation_snapshot_keeps_agent_without_launch_url_
     assert agent["endpoint"] == ""
     assert agent["url"] == ""
     assert "detail_url" not in agent
+
+
+def test_save_recommendation_lineup_persists_adjusted_agents():
+    snapshot_store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    snapshot_store.create_snapshot("need agents")
+    catalog_store = InMemoryAgentCatalogStore(
+        agents=[{"id": "agent-030", "name": "用户画像大师", "launch_url": "https://chatgpt.com/g/g-profile", "has_avatar": True}],
+        avatars={"agent-030": {"content": b"png-data", "mime_type": "image/png"}},
+    )
+    client = _client_with_store(snapshot_store, catalog_store)
+    avatar_digest = hashlib.sha256(b"png-data").hexdigest()[:12]
+
+    response = client.put(
+        "/api/recommendations/rec_test/lineup",
+        json={
+            "lineup": [
+                {
+                    "agent_id": "agent-030",
+                    "agent_name": "用户画像大师",
+                    "avatar_url": "/api/agents/agent-030/avatar",
+                    "launch_url": "https://chatgpt.com/g/g-profile",
+                    "reason": "识别客户画像。",
+                    "stage": "管理",
+                    "tags": ["画像识别"],
+                },
+                None,
+                {"agent_name": "成交教练", "stage": "成交转化"},
+            ],
+            "score": {"total": 86, "grade": "S"},
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["saved_lineup"][0] == {
+        "agent_id": "agent-030",
+        "agent_name": "用户画像大师",
+        "avatar_url": f"/agent-avatars/agent-030-{avatar_digest}.png",
+        "endpoint": "https://chatgpt.com/g/g-profile",
+        "id": "agent-030",
+        "launch_url": "https://chatgpt.com/g/g-profile",
+        "link": "https://chatgpt.com/g/g-profile",
+        "name": "用户画像大师",
+        "rank": 1,
+        "reason": "识别客户画像。",
+        "slot_index": 0,
+        "stage": "管理",
+        "streamStatus": "completed",
+        "tags": ["画像识别"],
+        "url": "https://chatgpt.com/g/g-profile",
+    }
+    assert body["saved_lineup"][1] is None
+    assert body["saved_lineup"][2]["agent_name"] == "成交教练"
+    assert body["saved_lineup"][2]["rank"] == 3
+    assert len(body["saved_lineup"]) == 5
+    assert body["saved_lineup_score"] == {"total": 86, "grade": "S"}
+    assert body["saved_lineup_updated_at"]
+
+
+def test_save_recommendation_lineup_requires_lineup_list():
+    snapshot_store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    snapshot_store.create_snapshot("need agents")
+    client = _client_with_store(snapshot_store)
+
+    response = client.put("/api/recommendations/rec_test/lineup", json={})
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "lineup is required"}
+
+
+def test_save_recommendation_lineup_returns_404_after_three_days():
+    snapshot_store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    snapshot_store.create_snapshot("need agents")
+    snapshot_store._snapshots["rec_test"]["created_at"] = (
+        datetime.now(timezone.utc) - timedelta(days=3, seconds=1)
+    ).isoformat()
+    client = _client_with_store(snapshot_store)
+
+    response = client.put("/api/recommendations/rec_test/lineup", json={"lineup": [{"agent_name": "成交教练"}]})
+
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "recommendation snapshot not found"}
+
+
+def test_save_recommendation_lineup_returns_503_when_store_unavailable():
+    client = _client_with_store(UnavailableLineupSaveStore())
+
+    response = client.put("/api/recommendations/rec_test/lineup", json={"lineup": [{"agent_name": "成交教练"}]})
+
+    assert response.status_code == 503
+    assert response.get_json() == {"error": "recommendation snapshot store unavailable"}

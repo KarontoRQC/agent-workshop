@@ -9,10 +9,10 @@
 
 ## 子模块
 
-- `agentConsole/` — 左下/左侧 JARVIS 对话控制台。
+- `agentConsole/` — 左下/左侧 JARVIS 对话控制台，包含语音模块、打字切换和文本输入。
 - `workflow/` — 知识路径、推荐智能体、用户状态和 Workflow Dock。
 - `speech/` — TTS 请求、浏览器语音、唤醒词和 fallback 音。
-- `heroHall/` — Agent Hero Hall 弹层、英雄池、推荐战队轮播和阵容模型。
+- `heroHall/` — Agent Hero Hall 弹层、英雄池、推荐战队轮播、组合入口页阵容搭建、保存到组合智能体服务和阵容模型。
 - `agents/` — 推荐智能体显示名、阶段和 key 工具函数。
 
 ## 开发模式

@@ -30,6 +30,10 @@ SNAPSHOT_COLUMNS = (
     "message",
     "agents_json",
     "summary",
+    "entry_title",
+    "saved_lineup_json",
+    "saved_lineup_score_json",
+    "saved_lineup_updated_at",
     "graph_path_json",
     "conversation_ids_json",
     "error",
@@ -87,8 +91,20 @@ def _normalize_summary(summary: str | None) -> str:
     return summary or ""
 
 
+def _normalize_entry_title(entry_title: str | None) -> str:
+    return (entry_title or "").strip()
+
+
 def _normalize_conversation_ids(conversation_ids: Any) -> dict[str, Any]:
     return conversation_ids or {}
+
+
+def _normalize_saved_lineup(saved_lineup: Any) -> list[Any]:
+    return saved_lineup if isinstance(saved_lineup, list) else []
+
+
+def _normalize_saved_lineup_score(score: Any) -> dict[str, Any]:
+    return score if isinstance(score, dict) else {}
 
 
 def _normalize_error(error: str | None) -> str:
@@ -113,6 +129,10 @@ class InMemoryRecommendationSnapshotStore:
             "message": message,
             "agents": [],
             "summary": "",
+            "entry_title": "",
+            "saved_lineup": [],
+            "saved_lineup_score": {},
+            "saved_lineup_updated_at": "",
             "graph_path": None,
             "conversation_ids": {},
             "error": "",
@@ -155,6 +175,19 @@ class InMemoryRecommendationSnapshotStore:
 
     def update_summary(self, recommendation_id: str, summary: str | None) -> Snapshot | None:
         return self._update_field(recommendation_id, "summary", _normalize_summary(summary))
+
+    def update_entry_title(self, recommendation_id: str, entry_title: str | None) -> Snapshot | None:
+        return self._update_field(recommendation_id, "entry_title", _normalize_entry_title(entry_title))
+
+    def update_saved_lineup(self, recommendation_id: str, saved_lineup: Any, score: Any = None) -> Snapshot | None:
+        snapshot = self._get_active_snapshot(recommendation_id)
+        if snapshot is None:
+            return None
+        snapshot["saved_lineup"] = deepcopy(_normalize_saved_lineup(saved_lineup))
+        snapshot["saved_lineup_score"] = deepcopy(_normalize_saved_lineup_score(score))
+        snapshot["saved_lineup_updated_at"] = _now_iso()
+        self._touch(snapshot)
+        return _public_snapshot(snapshot)
 
     def update_graph_path(self, recommendation_id: str, graph_path: Any) -> Snapshot | None:
         return self._update_field(recommendation_id, "graph_path", graph_path)
@@ -226,6 +259,10 @@ class PostgresRecommendationSnapshotStore:
                 message TEXT NOT NULL,
                 agents_json JSONB NOT NULL DEFAULT '[]'::jsonb,
                 summary TEXT NOT NULL DEFAULT '',
+                entry_title TEXT NOT NULL DEFAULT '',
+                saved_lineup_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                saved_lineup_score_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                saved_lineup_updated_at TIMESTAMPTZ,
                 graph_path_json JSONB,
                 conversation_ids_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
                 error TEXT NOT NULL DEFAULT '',
@@ -233,6 +270,22 @@ class PostgresRecommendationSnapshotStore:
                 updated_at TIMESTAMPTZ NOT NULL
             )
             """,
+            (),
+        )
+        self._execute_write(
+            f"ALTER TABLE {self._table_name} ADD COLUMN IF NOT EXISTS entry_title TEXT NOT NULL DEFAULT ''",
+            (),
+        )
+        self._execute_write(
+            f"ALTER TABLE {self._table_name} ADD COLUMN IF NOT EXISTS saved_lineup_json JSONB NOT NULL DEFAULT '[]'::jsonb",
+            (),
+        )
+        self._execute_write(
+            f"ALTER TABLE {self._table_name} ADD COLUMN IF NOT EXISTS saved_lineup_score_json JSONB NOT NULL DEFAULT '{{}}'::jsonb",
+            (),
+        )
+        self._execute_write(
+            f"ALTER TABLE {self._table_name} ADD COLUMN IF NOT EXISTS saved_lineup_updated_at TIMESTAMPTZ",
             (),
         )
         self.delete_expired_snapshots()
@@ -244,9 +297,10 @@ class PostgresRecommendationSnapshotStore:
         return self._execute_write_returning(
             f"""
             INSERT INTO {self._table_name}
-                (id, status, message, agents_json, summary, graph_path_json,
+                (id, status, message, agents_json, summary, entry_title, saved_lineup_json,
+                 saved_lineup_score_json, saved_lineup_updated_at, graph_path_json,
                  conversation_ids_json, error, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING {", ".join(SNAPSHOT_COLUMNS)}
             """,
             (
@@ -255,6 +309,10 @@ class PostgresRecommendationSnapshotStore:
                 message,
                 self._jsonb([]),
                 "",
+                "",
+                self._jsonb([]),
+                self._jsonb({}),
+                None,
                 None,
                 self._jsonb({}),
                 "",
@@ -297,6 +355,32 @@ class PostgresRecommendationSnapshotStore:
 
     def update_summary(self, recommendation_id: str, summary: str | None) -> Snapshot | None:
         return self._update_field(recommendation_id, "summary", _normalize_summary(summary))
+
+    def update_entry_title(self, recommendation_id: str, entry_title: str | None) -> Snapshot | None:
+        return self._update_field(recommendation_id, "entry_title", _normalize_entry_title(entry_title))
+
+    def update_saved_lineup(self, recommendation_id: str, saved_lineup: Any, score: Any = None) -> Snapshot | None:
+        now = _now()
+
+        return self._execute_write_returning_optional(
+            f"""
+            UPDATE {self._table_name}
+            SET saved_lineup_json = %s,
+                saved_lineup_score_json = %s,
+                saved_lineup_updated_at = %s,
+                updated_at = %s
+            WHERE id = %s AND created_at >= %s
+            RETURNING {", ".join(SNAPSHOT_COLUMNS)}
+            """,
+            (
+                self._jsonb(_normalize_saved_lineup(saved_lineup)),
+                self._jsonb(_normalize_saved_lineup_score(score)),
+                now,
+                now,
+                recommendation_id,
+                _expires_before(),
+            ),
+        )
 
     def update_graph_path(self, recommendation_id: str, graph_path: Any) -> Snapshot | None:
         return self._update_json_field(recommendation_id, "graph_path_json", graph_path)
@@ -405,6 +489,10 @@ class PostgresRecommendationSnapshotStore:
             "message": row["message"],
             "agents": deepcopy(row["agents_json"] or []),
             "summary": row["summary"] or "",
+            "entry_title": row.get("entry_title") or "",
+            "saved_lineup": deepcopy(row.get("saved_lineup_json") or []),
+            "saved_lineup_score": deepcopy(row.get("saved_lineup_score_json") or {}),
+            "saved_lineup_updated_at": _format_datetime(row.get("saved_lineup_updated_at")) or "",
             "graph_path": deepcopy(row["graph_path_json"]),
             "conversation_ids": deepcopy(row["conversation_ids_json"] or {}),
             "error": row["error"] or "",

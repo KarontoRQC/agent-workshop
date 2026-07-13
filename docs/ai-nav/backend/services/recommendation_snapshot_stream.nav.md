@@ -4,7 +4,7 @@
 
 ## 用途
 
-在转发后端 SSE 帧的同时，把推荐组合生成过程写入快照存储。它会补充 `recommendation_id`，并根据推荐、总结、图谱和完成事件更新快照。
+在转发后端 SSE 帧的同时，把推荐组合生成过程写入快照存储。它会补充 `recommendation_id`，并根据推荐、入口标题、总结、图谱和完成事件更新快照。
 
 ## 导出
 
@@ -22,6 +22,7 @@
 ## 修改指南
 
 - **改 SSE 事件名**: 同步这里的 `_persist_event` 分支、`docs/coze-chat-stream-api.md` 和前端 `agentStreamClient.ts`。
+- **改入口标题**: `ENTRY_TITLE` 的 `content.delta` 会累积写入快照 `entry_title`，前端组合入口页优先展示该字段。
 - **改完成时机**: 不要把 `workflow.stage.completed` 当作整条流结束；最终完成仍以 `workflow.completed` 为准。
 
 ## 依赖图

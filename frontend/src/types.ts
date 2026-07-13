@@ -29,6 +29,11 @@ export type Message = {
   text: string;
 };
 
+export type RecentDialogueEntry = {
+  content: string;
+  role: 'user' | 'assistant';
+};
+
 export type RecommendedAgent = {
   activeField?: string | null;
   agent_id?: string;
@@ -126,12 +131,39 @@ export type RecommendationSnapshot = {
   agents: RecommendedAgent[];
   conversation_ids: Record<string, string>;
   created_at: string;
+  entry_title?: string;
   error?: string;
   graph_path: AgentGraphPath | null;
   id: string;
   message: string;
+  saved_lineup?: Array<RecommendedAgent | null>;
+  saved_lineup_score?: Record<string, unknown>;
+  saved_lineup_updated_at?: string;
   status: RecommendationSnapshotStatus;
   summary: string;
+  updated_at: string;
+};
+
+export type CombinationAgentStatus = 'saved';
+
+export type CombinationAgent = {
+  created_at: string;
+  id: string;
+  lineup: Array<RecommendedAgent | null>;
+  recommendation_id: string;
+  score: Record<string, unknown>;
+  source_snapshot?: {
+    agents?: RecommendedAgent[];
+    entry_title?: string;
+    graph_path?: AgentGraphPath | null;
+    id?: string;
+    message?: string;
+    status?: RecommendationSnapshotStatus | string;
+    summary?: string;
+    [key: string]: unknown;
+  };
+  status: CombinationAgentStatus | string;
+  title: string;
   updated_at: string;
 };
 

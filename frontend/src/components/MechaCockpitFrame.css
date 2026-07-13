@@ -1,0 +1,554 @@
+.mecha-cockpit-frame {
+  --mecha-cyan: 112 222 255;
+  --mecha-gold: 231 185 91;
+  --mecha-steel: 160 177 188;
+  --mecha-alert: 234 84 68;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mecha-cockpit-frame,
+.mecha-cockpit-frame * {
+  box-sizing: border-box;
+}
+
+.mecha-cockpit-crown,
+.mecha-cockpit-pillar,
+.mecha-cockpit-chin,
+.mecha-visor-glass {
+  position: absolute;
+}
+
+.mecha-cockpit-crown {
+  top: 0;
+  left: 50%;
+  width: min(980px, 72vw);
+  height: clamp(72px, 10.5vh, 104px);
+  transform: translateX(-50%);
+}
+
+.mecha-cockpit-crown::before {
+  position: absolute;
+  inset: 0;
+  border-bottom: 1px solid rgba(var(--mecha-cyan), 0.28);
+  background:
+    linear-gradient(180deg, rgba(196, 211, 220, 0.22), transparent 9% 68%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(90deg, rgba(1, 4, 8, 0.98), rgba(55, 68, 79, 0.96) 18%, rgba(13, 22, 31, 0.92) 50%, rgba(55, 68, 79, 0.96) 82%, rgba(1, 4, 8, 0.98)),
+    linear-gradient(180deg, rgba(var(--mecha-steel), 0.42), transparent 22% 68%, rgba(var(--mecha-gold), 0.2));
+  box-shadow:
+    inset 0 -18px 28px rgba(0, 0, 0, 0.76),
+    inset 0 -1px 0 rgba(var(--mecha-gold), 0.52),
+    0 18px 36px rgba(0, 0, 0, 0.42),
+    0 0 24px rgba(var(--mecha-cyan), 0.08);
+  clip-path: polygon(0 0, 100% 0, 94% 72%, 72% 100%, 28% 100%, 6% 72%);
+  content: "";
+}
+
+.mecha-cockpit-crown::after {
+  position: absolute;
+  right: 10%;
+  bottom: 14px;
+  left: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--mecha-gold), 0.74), rgba(var(--mecha-cyan), 0.72), transparent);
+  box-shadow: 0 0 14px rgba(var(--mecha-cyan), 0.24);
+  content: "";
+}
+
+.mecha-crown-wing {
+  position: absolute;
+  top: 8px;
+  z-index: 1;
+  width: 31%;
+  height: 42px;
+  border-top: 1px solid rgba(var(--mecha-steel), 0.42);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 28px, rgba(var(--mecha-steel), 0.14) 29px 31px, transparent 32px 58px),
+    linear-gradient(180deg, rgba(104, 119, 131, 0.74), rgba(29, 39, 49, 0.96) 34%, rgba(7, 13, 21, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -10px 16px rgba(0, 0, 0, 0.58);
+}
+
+.mecha-crown-wing-left {
+  left: 4%;
+  clip-path: polygon(0 0, 100% 0, 86% 100%, 12% 72%);
+}
+
+.mecha-crown-wing-right {
+  right: 4%;
+  clip-path: polygon(0 0, 100% 0, 88% 72%, 14% 100%);
+}
+
+.mecha-crown-socket {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: clamp(5px, 0.6vw, 9px);
+  align-items: center;
+  justify-content: center;
+  width: clamp(150px, 16vw, 228px);
+  height: clamp(42px, 5.7vh, 58px);
+  border-right: 1px solid rgba(var(--mecha-cyan), 0.28);
+  border-left: 1px solid rgba(var(--mecha-gold), 0.32);
+  background:
+    linear-gradient(180deg, rgba(74, 86, 96, 0.56), transparent 22%),
+    linear-gradient(135deg, rgba(var(--mecha-gold), 0.11), transparent 38%, rgba(var(--mecha-cyan), 0.09)),
+    rgba(6, 12, 19, 0.96);
+  box-shadow:
+    inset 0 -14px 22px rgba(0, 0, 0, 0.66),
+    0 10px 20px rgba(0, 0, 0, 0.34);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 72%, 82% 100%, 18% 100%, 0 72%);
+  transform: translateX(-50%);
+}
+
+.mecha-crown-socket i {
+  width: clamp(13px, 1.35vw, 20px);
+  height: 3px;
+  background: linear-gradient(90deg, rgba(var(--mecha-gold), 0.26), rgba(var(--mecha-cyan), 0.86));
+  box-shadow: 0 0 8px rgba(var(--mecha-cyan), 0.24);
+  transform: skewX(-24deg);
+}
+
+.mecha-crown-energy {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  z-index: 2;
+  width: 34%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(var(--mecha-gold), 0.82), #e9fbff, rgba(var(--mecha-cyan), 0.88), transparent);
+  box-shadow:
+    0 0 8px rgba(var(--mecha-cyan), 0.42),
+    0 0 18px rgba(var(--mecha-gold), 0.18);
+  transform: translateX(-50%);
+}
+
+.mecha-cockpit-pillar {
+  top: clamp(72px, 9.5vh, 104px);
+  bottom: clamp(70px, 9vh, 98px);
+  z-index: 2;
+  width: clamp(104px, 8.7vw, 142px);
+}
+
+.mecha-cockpit-pillar-left {
+  left: 0;
+}
+
+.mecha-cockpit-pillar-right {
+  right: 0;
+  transform: scaleX(-1);
+}
+
+.mecha-cockpit-pillar::before {
+  position: absolute;
+  inset: 0;
+  border-right: 1px solid rgba(var(--mecha-cyan), 0.28);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 38px, rgba(var(--mecha-steel), 0.12) 39px 41px, transparent 42px 78px),
+    linear-gradient(90deg, rgba(1, 4, 8, 0.99), rgba(66, 79, 90, 0.96) 48%, rgba(15, 25, 35, 0.94) 78%, rgba(5, 12, 20, 0.92)),
+    linear-gradient(180deg, rgba(var(--mecha-steel), 0.42), transparent 24% 72%, rgba(var(--mecha-gold), 0.2));
+  box-shadow:
+    inset -18px 0 28px rgba(0, 0, 0, 0.64),
+    inset -1px 0 0 rgba(var(--mecha-gold), 0.4),
+    inset 1px 0 0 rgba(var(--mecha-steel), 0.28),
+    12px 0 30px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(var(--mecha-cyan), 0.07);
+  clip-path: polygon(0 0, 74% 0, 100% 8%, 82% 24%, 96% 38%, 82% 50%, 96% 62%, 82% 76%, 100% 92%, 74% 100%, 0 100%);
+  content: "";
+}
+
+.mecha-pillar-cap,
+.mecha-pillar-spine,
+.mecha-pillar-beacon,
+.mecha-cheek-plate,
+.mecha-pillar-hinge,
+.mecha-pillar-fastener,
+.mecha-pillar-energy-rail {
+  position: absolute;
+  z-index: 1;
+}
+
+.mecha-pillar-cap {
+  top: 2%;
+  left: 10%;
+  width: 68%;
+  height: 15%;
+  border-top: 1px solid rgba(var(--mecha-steel), 0.46);
+  background: linear-gradient(135deg, rgba(151, 168, 180, 0.5), rgba(51, 64, 75, 0.84) 34%, rgba(8, 15, 24, 0.94) 70%);
+  box-shadow: inset 0 -12px 18px rgba(0, 0, 0, 0.52);
+  clip-path: polygon(0 0, 100% 12%, 74% 100%, 12% 82%);
+}
+
+.mecha-pillar-spine {
+  top: 19%;
+  bottom: 18%;
+  left: 14%;
+  width: 26%;
+  border-left: 1px solid rgba(var(--mecha-gold), 0.28);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.88), rgba(126, 143, 155, 0.58), rgba(24, 34, 43, 0.9), rgba(0, 0, 0, 0.82));
+  box-shadow:
+    inset 1px 0 rgba(255, 255, 255, 0.06),
+    6px 0 14px rgba(0, 0, 0, 0.32);
+  clip-path: polygon(18% 0, 100% 4%, 78% 46%, 100% 96%, 18% 100%, 0 84%, 12% 50%, 0 16%);
+}
+
+.mecha-pillar-spine i {
+  position: absolute;
+  left: 24%;
+  width: 54%;
+  height: 2px;
+  background: rgba(var(--mecha-steel), 0.38);
+}
+
+.mecha-pillar-spine i:nth-child(1) {
+  top: 20%;
+}
+
+.mecha-pillar-spine i:nth-child(2) {
+  top: 50%;
+}
+
+.mecha-pillar-spine i:nth-child(3) {
+  top: 80%;
+}
+
+.mecha-pillar-beacon {
+  top: 21%;
+  left: 51%;
+  width: 13px;
+  height: 5px;
+  background: rgb(var(--mecha-gold));
+  box-shadow: 0 0 9px rgba(var(--mecha-gold), 0.58);
+  clip-path: polygon(2px 0, 100% 0, calc(100% - 2px) 100%, 0 100%);
+}
+
+.mecha-cheek-plate {
+  top: 32%;
+  left: 24%;
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  width: clamp(112px, 10vw, 160px);
+  height: 36%;
+  padding-left: 30%;
+  border-top: 1px solid rgba(var(--mecha-steel), 0.4);
+  border-bottom: 1px solid rgba(var(--mecha-gold), 0.24);
+  background:
+    linear-gradient(145deg, rgba(199, 213, 220, 0.18), transparent 22% 48%, rgba(var(--mecha-gold), 0.08)),
+    linear-gradient(90deg, rgba(74, 88, 99, 0.94), rgba(27, 38, 48, 0.98) 46%, rgba(6, 13, 21, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -18px 28px rgba(0, 0, 0, 0.58),
+    12px 8px 30px rgba(0, 0, 0, 0.42),
+    0 0 16px rgba(var(--mecha-cyan), 0.08);
+  clip-path: polygon(0 12%, 56% 0, 100% 18%, 82% 50%, 100% 82%, 56% 100%, 0 88%, 18% 50%);
+}
+
+.mecha-cheek-plate i {
+  display: block;
+  width: 54%;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(var(--mecha-gold), 0.4), rgba(var(--mecha-cyan), 0.7));
+  box-shadow: 0 0 7px rgba(var(--mecha-cyan), 0.16);
+  transform: skewX(-18deg);
+}
+
+.mecha-pillar-hinge {
+  top: 50%;
+  left: 46%;
+  display: grid;
+  width: clamp(34px, 3.2vw, 48px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(var(--mecha-steel), 0.76);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(var(--mecha-cyan), 0.36) 0 8%, transparent 9% 30%, rgba(var(--mecha-steel), 0.22) 31% 42%, transparent 43%),
+    rgba(5, 11, 18, 0.96);
+  box-shadow:
+    inset 0 0 0 5px rgba(68, 82, 93, 0.72),
+    inset 0 0 14px rgba(0, 0, 0, 0.72),
+    0 0 16px rgba(var(--mecha-cyan), 0.2);
+  transform: translateY(-50%);
+}
+
+.mecha-pillar-hinge i {
+  width: 30%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(var(--mecha-gold), 0.52);
+  border-radius: 50%;
+  background: rgba(var(--mecha-gold), 0.16);
+}
+
+.mecha-pillar-fastener {
+  left: 23%;
+  width: 7px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(var(--mecha-steel), 0.56);
+  border-radius: 50%;
+  background: #070b10;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.mecha-pillar-fastener-top {
+  top: 13%;
+}
+
+.mecha-pillar-fastener-bottom {
+  bottom: 13%;
+}
+
+.mecha-pillar-energy-rail {
+  top: 9%;
+  right: 8px;
+  bottom: 9%;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, rgba(var(--mecha-gold), 0.72) 16%, rgba(var(--mecha-cyan), 0.88) 50%, rgba(var(--mecha-gold), 0.58) 84%, transparent);
+  box-shadow:
+    0 0 8px rgba(var(--mecha-cyan), 0.42),
+    0 0 18px rgba(var(--mecha-gold), 0.12);
+  opacity: 0.78;
+}
+
+.mecha-cockpit-chin {
+  bottom: 0;
+  left: 50%;
+  width: min(900px, 64vw);
+  height: clamp(68px, 9vh, 92px);
+  transform: translateX(-50%);
+}
+
+.mecha-chin-wing,
+.mecha-chin-core,
+.mecha-chin-energy {
+  position: absolute;
+}
+
+.mecha-chin-wing {
+  bottom: 0;
+  width: 48%;
+  height: 100%;
+  border-top: 1px solid rgba(var(--mecha-steel), 0.34);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(var(--mecha-steel), 0.12) 39px 41px, transparent 42px 78px),
+    linear-gradient(180deg, rgba(105, 120, 132, 0.58), rgba(38, 49, 59, 0.96) 32%, rgba(4, 9, 15, 0.99));
+  box-shadow:
+    inset 0 16px 22px rgba(var(--mecha-steel), 0.05),
+    inset 0 -22px 28px rgba(0, 0, 0, 0.62);
+}
+
+.mecha-chin-wing-left {
+  left: 0;
+  clip-path: polygon(0 58%, 18% 16%, 100% 0, 84% 100%, 12% 100%);
+}
+
+.mecha-chin-wing-right {
+  right: 0;
+  clip-path: polygon(0 0, 82% 16%, 100% 58%, 88% 100%, 16% 100%);
+}
+
+.mecha-chin-core {
+  bottom: 0;
+  left: 50%;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  width: clamp(152px, 17vw, 230px);
+  height: 66%;
+  background:
+    linear-gradient(180deg, rgba(70, 84, 95, 0.38), transparent 20%),
+    rgba(4, 10, 17, 0.98);
+  box-shadow:
+    inset 0 0 22px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(var(--mecha-gold), 0.3);
+  clip-path: polygon(12% 0, 88% 0, 100% 48%, 84% 100%, 16% 100%, 0 48%);
+  transform: translateX(-50%);
+}
+
+.mecha-chin-core i {
+  width: 22%;
+  height: 3px;
+  background: rgba(var(--mecha-steel), 0.42);
+  transform: skewX(-18deg);
+}
+
+.mecha-chin-energy {
+  top: 10px;
+  left: 50%;
+  width: 56%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(var(--mecha-gold), 0.74), rgba(var(--mecha-cyan), 0.84), transparent);
+  box-shadow: 0 0 9px rgba(var(--mecha-cyan), 0.28);
+  transform: translateX(-50%);
+}
+
+.mecha-visor-glass {
+  inset: clamp(18px, 2vw, 30px);
+  z-index: -1;
+  border: 1px solid rgba(var(--mecha-steel), 0.14);
+  background:
+    linear-gradient(118deg, transparent 14%, rgba(255, 255, 255, 0.035) 26%, transparent 37%),
+    linear-gradient(242deg, transparent 62%, rgba(var(--mecha-cyan), 0.03) 74%, transparent 82%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    inset 0 0 86px rgba(0, 0, 0, 0.24);
+  clip-path: polygon(2% 0, 98% 0, 100% 4%, 100% 96%, 98% 100%, 2% 100%, 0 96%, 0 4%);
+}
+
+.mecha-cockpit-frame[data-frame-state='engaged'] .mecha-crown-energy,
+.mecha-cockpit-frame[data-frame-state='engaged'] .mecha-chin-energy,
+.mecha-cockpit-frame[data-frame-state='engaged'] .mecha-pillar-energy-rail {
+  animation: mecha-energy-breathe 4.6s ease-in-out infinite;
+}
+
+.mecha-cockpit-frame[data-frame-state='linked'] .mecha-pillar-beacon,
+.mecha-cockpit-frame[data-frame-state='engaged'] .mecha-pillar-beacon {
+  background: rgb(var(--mecha-cyan));
+  box-shadow: 0 0 10px rgba(var(--mecha-cyan), 0.66);
+}
+
+.mecha-cockpit-frame[data-frame-state='alert'] .mecha-pillar-beacon,
+.mecha-cockpit-frame[data-frame-state='alert'] .mecha-crown-energy,
+.mecha-cockpit-frame[data-frame-state='alert'] .mecha-chin-energy {
+  background: rgb(var(--mecha-alert));
+  box-shadow: 0 0 12px rgba(var(--mecha-alert), 0.56);
+}
+
+.jarvis-helmet-hud .helmet-visor-shell-left,
+.jarvis-helmet-hud .helmet-visor-shell-right {
+  width: clamp(100px, 13vw, 192px);
+  opacity: 0.36;
+}
+
+.jarvis-helmet-hud .helmet-visor-shell-top,
+.jarvis-helmet-hud .helmet-visor-shell-bottom {
+  left: clamp(126px, 16vw, 250px);
+  right: clamp(126px, 16vw, 250px);
+  opacity: 0.42;
+}
+
+.jarvis-helmet-hud .helmet-armor-corner {
+  opacity: 0.48;
+}
+
+.jarvis-helmet-hud .helmet-hud-reticle,
+.jarvis-helmet-hud .helmet-hud-stack {
+  z-index: 3;
+}
+
+@keyframes mecha-energy-breathe {
+  0%,
+  100% {
+    opacity: 0.58;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .mecha-cockpit-crown {
+    width: calc(100vw - 28px);
+    height: 54px;
+  }
+
+  .mecha-crown-wing {
+    top: 4px;
+    height: 28px;
+  }
+
+  .mecha-crown-socket {
+    width: 126px;
+    height: 34px;
+  }
+
+  .mecha-crown-socket i {
+    width: 12px;
+    height: 2px;
+  }
+
+  .mecha-cockpit-pillar {
+    top: 44px;
+    bottom: 46px;
+    width: 34px;
+  }
+
+  .mecha-cheek-plate,
+  .mecha-pillar-hinge,
+  .mecha-pillar-beacon,
+  .mecha-pillar-fastener,
+  .mecha-pillar-spine {
+    display: none;
+  }
+
+  .mecha-pillar-energy-rail {
+    right: 4px;
+  }
+
+  .mecha-cockpit-chin {
+    width: calc(100vw - 30px);
+    height: 44px;
+  }
+
+  .mecha-chin-core {
+    width: 112px;
+  }
+
+  .mecha-chin-energy {
+    top: 7px;
+  }
+
+  .mecha-visor-glass {
+    inset: 14px;
+  }
+
+  .jarvis-helmet-hud .helmet-visor-shell-left,
+  .jarvis-helmet-hud .helmet-visor-shell-right {
+    width: 52px;
+    opacity: 0.58;
+  }
+
+  .jarvis-helmet-hud .helmet-visor-shell-top,
+  .jarvis-helmet-hud .helmet-visor-shell-bottom {
+    left: 40px;
+    right: 40px;
+    height: 48px;
+  }
+
+}
+
+@media (max-width: 560px) {
+  .mecha-cockpit-crown::after,
+  .mecha-crown-energy,
+  .mecha-chin-core i:nth-child(2) {
+    display: none;
+  }
+
+  .mecha-cockpit-pillar {
+    width: 26px;
+  }
+
+  .mecha-cockpit-chin {
+    height: 34px;
+  }
+
+  .mecha-chin-energy {
+    width: 42%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mecha-cockpit-frame[data-frame-state='engaged'] .mecha-crown-energy,
+  .mecha-cockpit-frame[data-frame-state='engaged'] .mecha-chin-energy,
+  .mecha-cockpit-frame[data-frame-state='engaged'] .mecha-pillar-energy-rail {
+    animation: none;
+  }
+}

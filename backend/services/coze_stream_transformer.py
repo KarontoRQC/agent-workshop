@@ -21,6 +21,7 @@ TAG_CLOSE_ALIASES = {
 RECOMMENDER_TAGS = {
     "THINKING_PROCESS": ("<THINKING_PROCESS>", "</THINKING_PROCESS>"),
     "ACK": ("<ACK>", "</ACK>"),
+    "ENTRY_TITLE": ("<ENTRY_TITLE>", "</ENTRY_TITLE>"),
     "RECOMMENDED_AGENTS": ("<RECOMMENDED_AGENTS>", "</RECOMMENDED_AGENTS>"),
     "SUMMARY": ("<SUMMARY>", "</SUMMARY>"),
 }
@@ -31,6 +32,7 @@ UNIFIED_WORKFLOW_TAGS = {
     "KG_PATH": ("<KG_PATH>", "</KG_PATH>"),
     "EXPLANATION": ("<EXPLANATION>", "</EXPLANATION>"),
     "EXPLANATION_MISSPELLED": ("<EXPLATION>", "</EXPLATION>"),
+    "ENTRY_TITLE": ("<ENTRY_TITLE>", "</ENTRY_TITLE>"),
     "RECOMMENDED_AGENTS": ("<RECOMMENDED_AGENTS>", "</RECOMMENDED_AGENTS>"),
     "SUMMARY": ("<SUMMARY>", "</SUMMARY>"),
 }
@@ -84,14 +86,18 @@ class TaggedContentParser:
                 yield content_event("content.started", {"type": canonical_type})
                 continue
 
-            close_tag_match = self._find_next_close_tag()
+            boundary_match = self._find_next_current_boundary()
 
-            if close_tag_match is not None:
-                close_index, close_tag = close_tag_match
-                content = self.buffer[:close_index].rstrip()
+            if boundary_match is not None:
+                boundary_index, boundary_kind, boundary_tag = boundary_match
+                content = self.buffer[:boundary_index].rstrip()
                 yield from self._content_delta(content)
                 yield from self._finish_current_section()
-                self.buffer = self.buffer[close_index + len(close_tag) :]
+                self.buffer = (
+                    self.buffer[boundary_index:]
+                    if boundary_kind == "opening"
+                    else self.buffer[boundary_index + len(boundary_tag) :]
+                )
                 continue
 
             if final:
@@ -100,7 +106,7 @@ class TaggedContentParser:
                 self.buffer = ""
                 return
 
-            keep_length = _longest_suffix_that_starts_tag(self.buffer, self._current_close_tags())
+            keep_length = _longest_suffix_that_starts_tag(self.buffer, self._all_boundary_tags())
             content = self.buffer[:-keep_length] if keep_length else self.buffer
             yield from self._content_delta(content)
             self.buffer = self.buffer[-keep_length:] if keep_length else ""
@@ -125,8 +131,7 @@ class TaggedContentParser:
             self.buffer = ""
             return
 
-        opening_tags = [open_tag for open_tag, _ in self.section_tags.values()]
-        keep_length = _longest_suffix_that_starts_tag(self.buffer, opening_tags)
+        keep_length = _longest_suffix_that_starts_tag(self.buffer, self._all_boundary_tags())
         self.buffer = self.buffer[-keep_length:] if keep_length else ""
 
     def _emit_untagged_or_keep_possible_tag(self, final):
@@ -136,13 +141,14 @@ class TaggedContentParser:
             yield from self._untagged_delta(content)
             return
 
-        opening_tags = [open_tag for open_tag, _ in self.section_tags.values()]
-        keep_length = _longest_suffix_that_starts_tag(self.buffer, opening_tags)
+        keep_length = _longest_suffix_that_starts_tag(self.buffer, self._all_boundary_tags())
         content = self.buffer[:-keep_length] if keep_length else self.buffer
         self.buffer = self.buffer[-keep_length:] if keep_length else ""
         yield from self._untagged_delta(content)
 
     def _untagged_delta(self, content):
+        content = self._remove_known_close_tags(content)
+
         if not self.untagged_type or not content or not content.strip():
             return
 
@@ -214,6 +220,60 @@ class TaggedContentParser:
 
             if close_index >= 0:
                 matches.append((close_index, close_tag))
+
+        return min(matches, default=None, key=lambda match: match[0])
+
+    def _find_next_stray_close_tag(self):
+        expected_close_tags = set(self._current_close_tags())
+        matches = []
+
+        for close_tag in self._all_close_tags():
+            if close_tag in expected_close_tags:
+                continue
+
+            close_index = self.buffer.find(close_tag)
+
+            if close_index >= 0:
+                matches.append((close_index, close_tag))
+
+        return min(matches, default=None, key=lambda match: match[0])
+
+    def _all_opening_tags(self):
+        return tuple(dict.fromkeys(open_tag for open_tag, _ in self.section_tags.values()))
+
+    def _all_close_tags(self):
+        close_tags = []
+
+        for section_type, (_, close_tag) in self.section_tags.items():
+            close_tags.extend(TAG_CLOSE_ALIASES.get(section_type, (close_tag,)))
+
+        return tuple(dict.fromkeys(close_tags))
+
+    def _all_boundary_tags(self):
+        return (*self._all_opening_tags(), *self._all_close_tags())
+
+    def _remove_known_close_tags(self, content):
+        for close_tag in sorted(self._all_close_tags(), key=len, reverse=True):
+            content = content.replace(close_tag, "")
+
+        return content
+
+    def _find_next_current_boundary(self):
+        matches = []
+        expected_close = self._find_next_close_tag()
+
+        if expected_close is not None:
+            matches.append((expected_close[0], "expected_close", expected_close[1]))
+
+        opening = self._find_next_opening_tag()
+
+        if opening is not None:
+            matches.append((opening[0], "opening", opening[2]))
+
+        stray_close = self._find_next_stray_close_tag()
+
+        if stray_close is not None:
+            matches.append((stray_close[0], "stray_close", stray_close[1]))
 
         return min(matches, default=None, key=lambda match: match[0])
 

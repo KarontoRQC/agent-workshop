@@ -1,48 +1,48 @@
 # AgentCombinationEntryPage.tsx
 
-> `frontend/src/features/heroHall/AgentCombinationEntryPage.tsx` · TSX · 约 840 行
+> `frontend/src/features/heroHall/AgentCombinationEntryPage.tsx` · TypeScript React · 约 559 行
 
 ## 用途
 
-渲染 `?agent_combination=1&id=<recommendation_id>` 对应的推荐组合入口页。页面读取推荐快照和数据库智能体目录，用深色蓝金 cockpit HUD 风格的场景卡/智能体卡展示推荐智能体与更多可浏览智能体，并在页面自身容器内滚动；没有真实 GPT 链接的智能体只展示，不显示“打开”。
+渲染 `?agent_combination=1&id=<recommendation_id>` 对应的推荐组合入口页。该文件负责推荐快照、组合智能体服务对象、目录拉取、轮询、推荐智能体展示编排、组合智能体阵容的本地选择/拖拽/换位/实时评分，以及保存状态和保存接口调用；保存按钮由 `AgentLineupBuilder` 渲染在“重置阵容”左侧。页面通过 `getAgentCombinationEntryUrl` 生成规范分享地址，并把独立 `AgentCombinationShare` 控件注入顶部标题区。保存成功后会把后端返回的 `CombinationAgent.lineup` 写回页面状态，刷新时优先恢复组合智能体服务中的阵容。页面内容包在 `.agent-combination-entry-frame` 内滚动，避免滑动时越过殿堂背景框。
 
 ## 导出
 
 | 名称 | 类型 | 行号 | 作用 |
 |------|------|------|------|
-| `AgentCombinationEntryPage` | component | ~18 | 组合入口页主组件，负责拉取快照、目录和轮询。 |
-| `AgentCardSection` | function | ~170 | 渲染推荐智能体或更多智能体卡片网格。 |
-| `createSceneCards` | function | ~224 | 按功能分类生成顶部精选场景卡。 |
-| `getSnapshotStatusText` | function | ~257 | 根据快照和目录加载状态生成顶部状态文案。 |
+| `AgentCombinationEntryPage` | component | ~118 | 组合入口页主组件，负责拉取快照/组合智能体/目录、恢复保存阵容、本地阵容编辑、保存组合智能体和轮询状态。 |
 
 ## 依赖
 
 内部依赖:
-- `frontend/src/lib/agentCatalogClient.ts` — 读取数据库目录。
+- `frontend/src/lib/agentCatalogClient.ts` — 读取数据库智能体目录。
+- `frontend/src/lib/combinationAgentClient.ts` — 读取和保存组合智能体服务对象。
 - `frontend/src/lib/recommendationSnapshotClient.ts` — 读取推荐快照。
 - `frontend/src/lib/agentLaunchCatalog.ts` — 富化头像、启动链接和展示字段。
 - `frontend/src/features/workflow/recommendationSnapshotModel.ts` — 判断轮询和映射快照 agents。
-- `frontend/assets/space-cruise-bg.png` — 组合入口页深空背景。
+- `AgentCombinationEntrySections.tsx` — 渲染 hero、场景、智能体卡片、组合阵容、保存按钮、评分表和状态面板。
+- `AgentCombinationShare.tsx` — 渲染顶部分享入口、二维码、复制链接和保存 PNG 弹层。
+- `agentCombinationEntryModel.ts` — 生成场景卡、入口标题、快照状态文案、阵容 key、初始阵容、候选类目和实时评分模型。
+- `AgentCombinationEntryPage.css` — 组合入口页蓝金 HUD 样式与组合阵容操作按钮。
 
-外部依赖(仅列包名, 不做解释):
+外部依赖(仅列包名,不做解释):
 - `react`
-- `lucide-react`
 
 ## 修改指南
 
-- **改推荐页视觉**: 保持深色 Jarvis cockpit HUD 风格、桌面和移动端无横向溢出，并用真实 `avatar_url` 图片展示卡片。
-- **改页面滚动**: 滚动必须保留在 `.agent-combination-entry-page` 自身，不依赖全局 `body`，因为主应用全局锁定 `overflow: hidden`。
-- **改轮询逻辑**: 先检查 `recommendationSnapshotModel.ts`，避免已完成快照仍持续请求。
-- **改打开按钮**: 同步 `agentLaunchCatalog.ts` 的启动目标提取逻辑；无 `launch_url` 时不显示“打开”。
+- **改数据流/轮询**: 修改本文件，并同步检查 `recommendationSnapshotModel.ts`。
+- **改组合智能体交互**: 修改本文件的 `lineupKeys`、pointer drag 和 drop 提交逻辑，保持点击加入、拖拽入槽和槽内换位都可用。
+- **改保存阵容**: 修改 `saveCurrentLineup`、`createSavedLineupAgent` 和 `savedLineupAgents` 初始化逻辑；按钮位置在 `AgentCombinationEntrySections.tsx` 的 `AgentLineupBuilder`，并同步 `combinationAgentClient.ts`、后端 `routes/combination_agents.py` 与接口文档。
+- **改滚动容器**: 保持内容在 `.agent-combination-entry-frame` 内滚动；不要让 `main` 本身恢复页面级滚动。
+- **改页面视觉或间距**: 优先修改 `AgentCombinationEntryPage.css`，不要重新把样式塞回 TSX。
+- **改殿堂分享**: 保持 `getAgentCombinationEntryUrl(recommendationId)` 生成规范 URL，分享交互和弹层视觉分别维护在 `AgentCombinationShare.tsx` 与 `AgentCombinationShare.css`。
+- **改卡片 DOM 结构**: 修改 `AgentCombinationEntrySections.tsx`，保持真实推荐字段优先。
+- **改入口标题、状态文案或评分权重**: 修改 `agentCombinationEntryModel.ts`；传入 `recommendedAgentKeys` 让评分表能判断用户组合是否保留推荐核心。
 
 ## 依赖图
 
 ```text
 AgentCombinationEntryPage.tsx
-→ 依赖: agentCatalogClient, recommendationSnapshotClient, agentLaunchCatalog, recommendationSnapshotModel
+← 引入: agentCatalogClient, combinationAgentClient, recommendationSnapshotClient, agentLaunchCatalog, recommendationSnapshotModel
 → 被引用: App.tsx 根据 URL 参数切换入口页
 ```
-
-## 本次交互补充
-
-- 顶部“精选场景”里的智能体条目复用 `launchTarget`：有真实 GPT 链接时整行可点击跳转；没有链接时只展示头像和名称，不提供无效跳转。

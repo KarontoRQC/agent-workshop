@@ -8,6 +8,7 @@ import {
   Keyboard,
   Mic,
   MicOff,
+  Pause,
   RadioTower,
   Send,
   Sparkles,
@@ -27,15 +28,30 @@ import {
   splitRouteText,
   stripSpeechTagSyntax,
 } from '../workflow/workflowModel';
+import {
+  getVoiceInteractionCopy,
+  resolveVoiceInteractionPhase,
+  type VoiceInteractionLanguage,
+} from './voiceInteractionModel';
 
 export type InputMode = 'text' | 'voice';
 
+type AgentSubtitleSegment =
+  | 'fallback'
+  | 'knowledge-ack'
+  | 'knowledge-direct-reply'
+  | 'knowledge-explanation'
+  | 'recommendation-ack'
+  | 'recommendation-summary';
+
 type AgentConsoleProps = {
+  canPauseResponse: boolean;
   draft: string;
   helmetVoice: boolean;
   inputMode: InputMode;
   onDraftKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onModeChange: (mode: InputMode) => void;
+  onPause: () => void;
   onSend: () => void;
   onToggleVoice: () => void;
   setDraft: (value: string) => void;
@@ -44,17 +60,20 @@ type AgentConsoleProps = {
   turns: AgentTurn[];
   voiceAwake: boolean;
   voiceHeardText: string;
+  voiceLanguage: VoiceInteractionLanguage;
   voiceListening: boolean;
   voiceTranscript: string;
   voiceSupported: boolean;
 };
 
 export function AgentConsole({
+  canPauseResponse,
   draft,
   helmetVoice,
   inputMode,
   onDraftKeyDown,
   onModeChange,
+  onPause,
   onSend,
   onToggleVoice,
   setDraft,
@@ -63,6 +82,7 @@ export function AgentConsole({
   turns,
   voiceAwake,
   voiceHeardText,
+  voiceLanguage,
   voiceListening,
   voiceTranscript,
   voiceSupported,
@@ -70,22 +90,24 @@ export function AgentConsole({
   const threadRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const isStreaming = status === 'streaming';
-  const visibleVoiceText = voiceHeardText || voiceTranscript;
   const latestTurn = turns.at(-1) ?? null;
   const latestTurnId = latestTurn?.id ?? '';
   const hasTurns = turns.length > 0;
+  const visibleVoiceText = voiceHeardText || voiceTranscript;
   const pendingVoiceText = inputMode === 'voice' && !hasTurns ? visibleVoiceText : '';
-  const voiceActivityLabel = !voiceSupported
-    ? '语音链路不可用'
-    : isStreaming
-      ? 'AI 正在分析并回应'
-      : voiceAwake
-        ? voiceListening
-          ? '正在监听驾驶员指令'
-          : '语音链路已接入'
-        : '待命，等待唤醒';
-  const voiceBadgeLabel = !voiceSupported ? 'OFFLINE' : isStreaming ? 'PROCESSING' : voiceAwake ? 'LINKED' : 'STANDBY';
-  const voicePrompt = visibleVoiceText || speakingText || (voiceAwake ? '座舱收音已打开，可以直接下达指令。' : '座舱 AI 待命，等待驾驶员指令。');
+  const hasDraft = Boolean(draft.trim());
+  const isPauseAction = canPauseResponse && !hasDraft;
+  const voiceInteractionPhase = resolveVoiceInteractionPhase({
+    awake: voiceAwake,
+    listening: voiceListening,
+    status,
+    supported: voiceSupported,
+  });
+  const voiceInteractionCopy = getVoiceInteractionCopy(voiceInteractionPhase, voiceLanguage);
+  const voicePrompt =
+    speakingText ||
+    (voiceListening ? visibleVoiceText : '') ||
+    voiceInteractionCopy.prompt;
 
   const scrollThreadToBottom = useCallback(() => {
     const thread = threadRef.current;
@@ -205,9 +227,9 @@ export function AgentConsole({
               </span>
               <div>
                 <strong>JARVIS VOICE AI</strong>
-                <em>{voiceActivityLabel}</em>
+                <em>{voiceInteractionCopy.activityLabel}</em>
               </div>
-              <span className="voice-ai-badge">{voiceBadgeLabel}</span>
+              <span className="voice-ai-badge">{voiceInteractionCopy.badgeLabel}</span>
             </div>
 
             <div className="voice-ai-wave" aria-hidden="true">
@@ -219,13 +241,13 @@ export function AgentConsole({
             <div className="voice-ai-control-row">
               <div className="voice-presence" aria-hidden="true" data-active={voiceListening} data-awake={voiceAwake} />
             <button
-                aria-label={voiceAwake ? '关闭机甲语音链路' : '唤醒机甲语音链路'}
+                aria-label={voiceAwake ? '结束本轮收音' : '开始本轮语音提问'}
               aria-pressed={voiceAwake}
               className="voice-toggle"
               data-active={voiceAwake}
               disabled={!voiceSupported || isStreaming}
               onClick={onToggleVoice}
-                title={voiceAwake ? '关闭语音链路' : '唤醒语音链路'}
+                title={voiceAwake ? '结束本轮收音' : '开始本轮语音提问'}
               type="button"
             >
                 {voiceAwake ? <MicOff size={17} /> : <Mic size={17} />}
@@ -262,7 +284,7 @@ export function AgentConsole({
             >
               {voiceAwake ? <MicOff size={17} /> : <Mic size={17} />}
             </button>
-            <em>{voiceSupported ? (voiceAwake ? '语音已激活' : '语音待命') : '语音不可用'}</em>
+            <em>{voiceSupported ? (voiceListening ? '正在监听' : voiceAwake ? '正在连接' : '点击麦克风开始') : '语音不可用'}</em>
           </div>
         ) : (
           <form className="agent-composer" onSubmit={handleComposerSubmit}>
@@ -274,8 +296,15 @@ export function AgentConsole({
               placeholder={isStreaming ? 'Agent 正在生成...' : '问你的 agent...'}
               rows={1}
             />
-            <button type="submit" disabled={!draft.trim() || isStreaming} aria-label="发送给 agent">
-              <Send size={16} />
+            <button
+              aria-label={isPauseAction ? '暂停当前回答' : '发送给 agent'}
+              data-action={isPauseAction ? 'pause' : 'send'}
+              disabled={!isPauseAction && !hasDraft}
+              onClick={isPauseAction ? onPause : undefined}
+              title={isPauseAction ? '暂停当前回答' : '发送'}
+              type={isPauseAction ? 'button' : 'submit'}
+            >
+              {isPauseAction ? <Pause size={16} /> : <Send size={16} />}
             </button>
           </form>
         )}
@@ -303,16 +332,16 @@ function AgentResponse({ active, speakingText, turn }: { active: boolean; speaki
   return (
     <article className="agent-response">
       {renderThinkingText('思考过程', knowledgeGraph.THINKING_PROCESS, active && !knowledgeGraph.ACK)}
-      {renderAgentSubtitle(knowledgeGraph.DIRECT_REPLY, speakingText)}
-      {renderAgentSubtitle(knowledgeGraph.ACK, speakingText)}
+      {renderAgentSubtitle(knowledgeGraph.DIRECT_REPLY, speakingText, 'knowledge-direct-reply')}
+      {renderAgentSubtitle(knowledgeGraph.ACK, speakingText, 'knowledge-ack')}
       {renderToolCallDivider('route', routeSegments.length)}
-      {renderAgentSubtitle(knowledgeGraph.EXPLANATION, speakingText)}
+      {renderAgentSubtitle(knowledgeGraph.EXPLANATION, speakingText, 'knowledge-explanation')}
       {renderThinkingText('推荐思考', recommendation.THINKING_PROCESS, active && !recommendation.ACK)}
-      {renderAgentSubtitle(recommendation.ACK, speakingText)}
+      {renderAgentSubtitle(recommendation.ACK, speakingText, 'recommendation-ack')}
       {renderToolCallDivider('lineup', lineupAgentCount, lineupIntent)}
       {renderToolCallDivider('agents', recommendation.agents.length)}
-      {renderAgentSubtitle(recommendation.SUMMARY, speakingText)}
-      {renderAgentSubtitle(turn.fallbackText, speakingText)}
+      {renderAgentSubtitle(recommendation.SUMMARY, speakingText, 'recommendation-summary')}
+      {renderAgentSubtitle(turn.fallbackText, speakingText, 'fallback')}
       {turn.error && <p className="agent-error-text">{turn.error}</p>}
       {active && <TypingLine />}
     </article>
@@ -373,7 +402,7 @@ function renderThinkingText(label: string, text: string, active: boolean) {
   );
 }
 
-function renderAgentSubtitle(text: string, speakingText: string) {
+function renderAgentSubtitle(text: string, speakingText: string, segment: AgentSubtitleSegment) {
   const visibleText = stripSpeechTagSyntax(text);
   const normalizedVisibleText = normalizeSubtitleText(visibleText);
   const normalizedSpeakingText = normalizeSubtitleText(speakingText);
@@ -386,7 +415,7 @@ function renderAgentSubtitle(text: string, speakingText: string) {
   );
 
   return visibleText ? (
-    <section className="agent-subtitle-line" data-speaking={isSpeaking}>
+    <section className="agent-subtitle-line" data-segment={segment} data-speaking={isSpeaking}>
       <p>{visibleText}</p>
     </section>
   ) : null;

@@ -2,7 +2,7 @@
 
 A standalone Vite + React + Three.js prototype for a JARVIS-like AI dialogue surface.
 
-The first screen is the actual experience: a central 3D particle orb, natural density rings, voice/text input, server/browser speech output, and a placeholder model endpoint for later integration.
+The first screen is the actual experience: a central 3D particle orb, natural density rings, voice/text input, server Edge TTS speech output, and a placeholder model endpoint for later integration.
 
 ## What It Tests
 
@@ -10,7 +10,7 @@ The first screen is the actual experience: a central 3D particle orb, natural de
 - A natural orbital particle stream where brightness comes from particle density and lighting rather than hard white lines.
 - Voice input through the browser Web Speech API.
 - Microphone energy driving particle pulse, radius, brightness, and point size.
-- Server `/api/tts/speech` output first, with browser `speechSynthesis` fallback tuned toward a mature English male voice when the OS/browser provides a matching voice.
+- Server `/api/tts/speech` output through Edge TTS, using the backend's Chinese female voice by default.
 - A one-click voice preview control in the bottom hint row, useful for testing the current voice profile without waiting for a model reply.
 - A blank AI model slot through `VITE_AI_CHAT_ENDPOINT`, with local English placeholder replies as the fallback.
 - A stable orb that keeps its main form; voice output drives whole-orb breathing, brightness, and particle size instead of ending in a small-sphere recomposition.
@@ -28,11 +28,27 @@ Open:
 http://127.0.0.1:5178/
 ```
 
+## Participant Identity
+
+The page stays visually identical for every participant. Use the query parameter only to select the server-side conversation persona:
+
+```text
+Ordinary user: http://127.0.0.1:5178/
+Factory director: http://127.0.0.1:5178/?identity=changzhang
+Production: https://agent.xtznai.com/?identity=changzhang
+```
+
+Unknown values fall back to the ordinary-user persona. This parameter is not authentication and must never control permissions.
+
 ## Runtime Defaults
 
-The committed `.env` is intentional for this private prototype. It keeps Vite proxying `/api` to the shared Agent Workshop API and keeps speech output in `auto` mode, so the app requests `/api/tts/speech` first and falls back to browser `speechSynthesis` or a local comms tone when backend audio is unavailable.
+The committed `.env` is intentional for this private prototype. It keeps Vite proxying `/api` to `https://agent.xtznai.com` and keeps speech output in `server` mode, so the app requests `/api/tts/speech` and does not auto-fallback to browser `speechSynthesis`.
 
-Use `.env.local` for machine-specific overrides. For example, set `VITE_TTS_BROWSER_FALLBACK=browser` only when you want to skip backend audio synthesis entirely.
+Production builds use the same-origin `/api` path by default, so HTTP and HTTPS pages automatically use the matching protocol without mixed-content requests. If you override `VITE_AGENT_API_BASE_URL` or `VITE_API_BASE_URL` with a bare origin such as `https://agent.xtznai.com`, the frontend normalizes it to the `/api` base automatically; HTTPS deployments must use an HTTPS override.
+
+Protected mutations use `src/lib/apiSession.ts`: the browser lazily creates `/api/session`, keeps the CSRF token in `sessionStorage`, and sends the HttpOnly session cookie with same-origin requests. A generated recommendation's edit token is stored locally by recommendation ID and is never added to the share URL, so a Hero Hall opened on another browser remains read-only.
+
+Use `.env.local` for machine-specific overrides. Keep `VITE_TTS_BROWSER_FALLBACK=server` for the Edge TTS path.
 
 ## Build
 
@@ -40,13 +56,11 @@ Use `.env.local` for machine-specific overrides. For example, set `VITE_TTS_BROW
 npm run build
 ```
 
-Vite may warn that the Three.js chunk is larger than 500 kB. That is expected for this prototype.
+Vite may warn that the isolated Three.js vendor chunk is slightly larger than 500 kB. The application and Hero Hall chunks are split separately; verify gzip and HTTP/2 in production rather than merging Three.js back into the main bundle.
 
 ## Voice Notes
 
-The app scores available English voices and prefers mature male-leaning candidates such as `Microsoft George`, `Google UK English Male`, `Daniel`, `George`, `Guy`, `David`, `Mark`, `Ryan`, `William`, `Brian`, or `Alex`. It avoids common female voice names when possible, then lowers pitch and slows the speech rate to create a steadier AI-butler feel.
-
-Voice quality still depends on the user's OS and browser voice packs. If no matching voice is available, the app falls back to the browser's default English voice.
+Default speech quality depends on the backend Edge TTS service and the configured female voice `zh-CN-XiaoxiaoNeural`, not on the user's OS/browser voice packs.
 
 Click the bottom `Preview voice profile` control to trigger a short spoken line and confirm the browser is allowing speech output. During speech, the whole particle orb pulses with simulated output energy and speech boundary events.
 

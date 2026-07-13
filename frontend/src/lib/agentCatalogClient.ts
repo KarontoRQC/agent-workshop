@@ -1,5 +1,6 @@
 import type { AgentCatalogItem, RecommendationSnapshot } from '../types';
 import { API_BASE_URL } from './agentStreamClient';
+import { fetchApiMutation } from './apiSession';
 
 export class AgentCatalogError extends Error {
   status: number;
@@ -30,14 +31,18 @@ export async function appendAgentToRecommendation(
   agentId: string,
   signal?: AbortSignal,
 ): Promise<RecommendationSnapshot> {
-  const response = await fetch(`${API_BASE_URL}/recommendations/${encodeURIComponent(recommendationId)}/agents`, {
-    body: JSON.stringify({ agent_id: agentId }),
-    headers: {
-      'content-type': 'application/json',
+  const response = await fetchApiMutation(
+    `${API_BASE_URL}/recommendations/${encodeURIComponent(recommendationId)}/agents`,
+    {
+      body: JSON.stringify({ agent_id: agentId }),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+      signal,
     },
-    method: 'POST',
-    signal,
-  });
+    { recommendationId },
+  );
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {

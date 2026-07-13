@@ -21,6 +21,7 @@
 - `react-dom`
 - `three`
 - `lucide-react`
+- `qrcode.react`
 - `vite`
 - `typescript`
 - `playwright`

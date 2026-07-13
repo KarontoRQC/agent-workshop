@@ -36,10 +36,16 @@ LINEUP_ALIASES = {
     "私域": "conversion",
     "私域承接": "conversion",
 }
+DEFAULT_STAGE_BY_LINEUP = {
+    "core": "策略规划",
+    "growth": "增长执行",
+    "conversion": "成交转化",
+}
+DEFAULT_FILL_LINEUPS = ("core", "growth", "growth", "conversion", "conversion")
 
 
 class RecommendedAgentsStreamEmitter:
-    def __init__(self):
+    def __init__(self, allowed_agent_names=None, max_agents=6, default_lineup="", minimum_agents=0):
         self.buffer = ""
         self.in_agent = False
         self.current_field_tag = None
@@ -47,6 +53,13 @@ class RecommendedAgentsStreamEmitter:
         self.current_agent = None
         self.current_agent_index = -1
         self.agents = []
+        self.allowed_agent_names = _build_allowed_agent_name_map(allowed_agent_names)
+        self.allowed_agent_order = tuple(self.allowed_agent_names.values())
+        self.enforce_allowed_agent_names = allowed_agent_names is not None
+        self.max_agents = _normalize_max_agents(max_agents)
+        self.minimum_agents = _normalize_minimum_agents(minimum_agents, self.max_agents)
+        self.default_lineup = _normalize_lineup_value(default_lineup)
+        self.seen_agent_names = set()
 
     def feed(self, content):
         self.buffer += content
@@ -57,6 +70,8 @@ class RecommendedAgentsStreamEmitter:
 
         if self.in_agent:
             yield from self._finish_agent()
+
+        yield from self._fill_missing_agents()
 
         yield content_event(
             "recommended_agents.completed",
@@ -208,8 +223,94 @@ class RecommendedAgentsStreamEmitter:
 
     def _finish_agent(self):
         if self.current_agent:
-            agent = dict(self.current_agent)
+            agent = self._validated_agent(self.current_agent)
+
+            if agent is not None:
+                self.agents.append(agent)
+                yield content_event(
+                    "recommended_agent.completed",
+                    {
+                        "type": "RECOMMENDED_AGENTS",
+                        "content_type": "json",
+                        "agent": agent,
+                    },
+                )
+
+        self.in_agent = False
+        self.current_agent = None
+        self.current_field_tag = None
+        self.current_field_name = None
+
+    def _validated_agent(self, raw_agent):
+        if len(self.agents) >= self.max_agents:
+            return None
+
+        raw_name = str(raw_agent.get("agent_name") or "").strip()
+
+        if not raw_name:
+            return None
+
+        canonical_name = self.allowed_agent_names.get(raw_name.casefold())
+
+        if self.enforce_allowed_agent_names and not canonical_name:
+            return None
+
+        agent_name = canonical_name or raw_name
+        dedupe_key = agent_name.casefold()
+
+        if dedupe_key in self.seen_agent_names:
+            return None
+
+        self.seen_agent_names.add(dedupe_key)
+        agent_index = len(self.agents)
+        lineup = self.default_lineup or _normalize_lineup_value(raw_agent.get("lineup")) or "core"
+        stage = str(raw_agent.get("stage") or "").strip() or DEFAULT_STAGE_BY_LINEUP[lineup]
+        reason = str(raw_agent.get("reason") or "").strip() or f"匹配当前知识路径，负责{stage}阶段的执行与交付。"
+        agent = {
+            **raw_agent,
+            "agent_index": agent_index,
+            "rank": agent_index + 1,
+            "agent_name": agent_name,
+            "lineup": lineup,
+            "stage": stage,
+            "reason": reason,
+        }
+        return agent
+
+    def _fill_missing_agents(self):
+        if len(self.agents) >= self.minimum_agents or not self.allowed_agent_order:
+            return
+
+        for agent_name in self.allowed_agent_order:
+            if len(self.agents) >= self.minimum_agents or len(self.agents) >= self.max_agents:
+                return
+
+            dedupe_key = agent_name.casefold()
+
+            if dedupe_key in self.seen_agent_names:
+                continue
+
+            agent_index = len(self.agents)
+            lineup = self.default_lineup or DEFAULT_FILL_LINEUPS[agent_index % len(DEFAULT_FILL_LINEUPS)]
+            stage = DEFAULT_STAGE_BY_LINEUP[lineup]
+            agent = {
+                "agent_index": agent_index,
+                "rank": agent_index + 1,
+                "agent_name": agent_name,
+                "lineup": lineup,
+                "stage": stage,
+                "reason": f"匹配当前知识路径，负责{stage}阶段的执行与交付。",
+            }
+            self.seen_agent_names.add(dedupe_key)
             self.agents.append(agent)
+            yield content_event(
+                "recommended_agent.started",
+                {
+                    "type": "RECOMMENDED_AGENTS",
+                    "content_type": "json",
+                    "agent_index": agent_index,
+                },
+            )
             yield content_event(
                 "recommended_agent.completed",
                 {
@@ -218,11 +319,6 @@ class RecommendedAgentsStreamEmitter:
                     "agent": agent,
                 },
             )
-
-        self.in_agent = False
-        self.current_agent = None
-        self.current_field_tag = None
-        self.current_field_name = None
 
 
 def _normalize_field_value(field_name, value):
@@ -256,6 +352,39 @@ def _normalize_lineup_value(value):
             return lineup
 
     return ""
+
+
+def _build_allowed_agent_name_map(agent_names):
+    if agent_names is None:
+        return {}
+
+    allowed = {}
+
+    for name in agent_names:
+        canonical_name = str(name or "").strip()
+
+        if canonical_name:
+            allowed.setdefault(canonical_name.casefold(), canonical_name)
+
+    return allowed
+
+
+def _normalize_max_agents(value):
+    try:
+        max_agents = int(value)
+    except (TypeError, ValueError):
+        return 6
+
+    return min(10, max(1, max_agents))
+
+
+def _normalize_minimum_agents(value, max_agents):
+    try:
+        minimum_agents = int(value)
+    except (TypeError, ValueError):
+        return 0
+
+    return min(max_agents, max(0, minimum_agents))
 
 
 def _strip_nested_tags(value):

@@ -13,3 +13,10 @@ backend/*.py[cod]
 backend/.env.local
 backend/.env.*
 !backend/.env.example
+
+# Codex local tooling and generated verification/deployment artifacts
+.agents/
+outputs/
+frontend/outputs/
+frontend/voice-particle-jarvis/outputs/
+docs/test-reports/

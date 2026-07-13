@@ -228,6 +228,37 @@ def test_summary_content_delta_accumulates_and_updates_summary():
     assert store.get_snapshot(snapshot["id"])["summary"] == "First second"
 
 
+def test_entry_title_content_delta_accumulates_and_updates_snapshot_title():
+    store = InMemoryRecommendationSnapshotStore()
+    snapshot = store.create_snapshot("need agents")
+    frames = [
+        format_sse_event(
+            content_event(
+                "content.delta",
+                {
+                    "stage": "agent_recommendation",
+                    "type": "ENTRY_TITLE",
+                    "content": "白酒招商",
+                },
+            )
+        ),
+        format_sse_event(
+            content_event(
+                "content.delta",
+                {
+                    "stage": "agent_recommendation",
+                    "type": "ENTRY_TITLE",
+                    "content": "英雄殿堂",
+                },
+            )
+        ),
+    ]
+
+    _read_events(persist_recommendation_snapshot_stream(frames, store, snapshot["id"]))
+
+    assert store.get_snapshot(snapshot["id"])["entry_title"] == "白酒招商英雄殿堂"
+
+
 def test_workflow_stage_completed_updates_agent_recommendation_summary():
     store = InMemoryRecommendationSnapshotStore()
     snapshot = store.create_snapshot("need agents")

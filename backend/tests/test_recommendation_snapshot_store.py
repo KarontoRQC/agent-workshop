@@ -34,6 +34,10 @@ def test_create_snapshot_uses_empty_api_fields():
     snapshot = store.create_snapshot("message")
 
     assert snapshot["summary"] == ""
+    assert snapshot["entry_title"] == ""
+    assert snapshot["saved_lineup"] == []
+    assert snapshot["saved_lineup_score"] == {}
+    assert snapshot["saved_lineup_updated_at"] == ""
     assert snapshot["conversation_ids"] == {}
     assert snapshot["error"] == ""
 
@@ -66,12 +70,31 @@ def test_replace_agents_update_summary_and_complete_snapshot():
     ]
 
     store.replace_agents("rec_test", agents)
+    store.update_entry_title("rec_test", "白酒招商英雄殿堂")
     store.update_summary("rec_test", "Handle objections first, then promote repurchase.")
     snapshot = store.complete_snapshot("rec_test")
 
     assert snapshot["status"] == "completed"
+    assert snapshot["entry_title"] == "白酒招商英雄殿堂"
     assert snapshot["summary"] == "Handle objections first, then promote repurchase."
     assert snapshot["agents"] == agents
+
+
+def test_update_saved_lineup_persists_agent_slots_and_score():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+    lineup = [
+        {"agent_id": "agent-001", "agent_name": "策略专家", "slot_index": 0},
+        None,
+        {"agent_id": "agent-003", "agent_name": "成交教练", "slot_index": 2},
+    ]
+    score = {"total": 82, "grade": "S"}
+
+    snapshot = store.update_saved_lineup("rec_test", lineup, score)
+
+    assert snapshot["saved_lineup"] == lineup
+    assert snapshot["saved_lineup_score"] == score
+    assert snapshot["saved_lineup_updated_at"]
 
 
 def test_get_snapshot_returns_none_when_missing():
@@ -88,6 +111,8 @@ def test_postgres_store_exposes_planned_api_methods():
         "merge_agent",
         "replace_agents",
         "update_summary",
+        "update_entry_title",
+        "update_saved_lineup",
         "update_graph_path",
         "update_conversation_ids",
         "complete_snapshot",
@@ -113,6 +138,24 @@ def test_in_memory_update_summary_none_normalizes_to_empty_string():
     assert snapshot["summary"] == ""
 
 
+def test_in_memory_update_entry_title_none_normalizes_to_empty_string():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+
+    snapshot = store.update_entry_title("rec_test", None)
+
+    assert snapshot["entry_title"] == ""
+
+
+def test_in_memory_update_entry_title_strips_whitespace():
+    store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
+    store.create_snapshot("message")
+
+    snapshot = store.update_entry_title("rec_test", " 白酒招商英雄殿堂\n")
+
+    assert snapshot["entry_title"] == "白酒招商英雄殿堂"
+
+
 def test_in_memory_update_conversation_ids_none_normalizes_to_empty_dict():
     store = InMemoryRecommendationSnapshotStore(id_factory=lambda: "rec_test")
     store.create_snapshot("message")
@@ -132,6 +175,16 @@ def test_postgres_update_summary_none_normalizes_before_write():
     assert captured_params[0][0] == ""
 
 
+def test_postgres_update_entry_title_none_normalizes_before_write():
+    store = PostgresRecommendationSnapshotStore(connection=object())
+    captured_params = []
+    store._execute_write_returning_optional = lambda query, params: captured_params.append(params) or None
+
+    store.update_entry_title("rec_test", None)
+
+    assert captured_params[0][0] == ""
+
+
 def test_postgres_update_conversation_ids_none_normalizes_before_write():
     store = PostgresRecommendationSnapshotStore(connection=object())
     captured_params = []
@@ -141,6 +194,18 @@ def test_postgres_update_conversation_ids_none_normalizes_before_write():
     store.update_conversation_ids("rec_test", None)
 
     assert captured_params[0][0] == {}
+
+
+def test_postgres_update_saved_lineup_normalizes_before_write():
+    store = PostgresRecommendationSnapshotStore(connection=object())
+    captured_params = []
+    store._jsonb = lambda value: value
+    store._execute_write_returning_optional = lambda query, params: captured_params.append(params) or None
+
+    store.update_saved_lineup("rec_test", "bad-lineup", "bad-score")
+
+    assert captured_params[0][0] == []
+    assert captured_params[0][1] == {}
 
 
 def test_postgres_row_to_snapshot_formats_datetime_fields_as_iso_strings():
@@ -155,6 +220,10 @@ def test_postgres_row_to_snapshot_formats_datetime_fields_as_iso_strings():
             "message": "message",
             "agents_json": [],
             "summary": "",
+            "entry_title": "白酒招商英雄殿堂",
+            "saved_lineup_json": [{"agent_id": "agent-001", "agent_name": "策略专家"}],
+            "saved_lineup_score_json": {"total": 88},
+            "saved_lineup_updated_at": updated_at,
             "graph_path_json": None,
             "conversation_ids_json": {},
             "error": "",
@@ -163,6 +232,10 @@ def test_postgres_row_to_snapshot_formats_datetime_fields_as_iso_strings():
         }
     )
 
+    assert snapshot["entry_title"] == "白酒招商英雄殿堂"
+    assert snapshot["saved_lineup"] == [{"agent_id": "agent-001", "agent_name": "策略专家"}]
+    assert snapshot["saved_lineup_score"] == {"total": 88}
+    assert snapshot["saved_lineup_updated_at"] == updated_at.isoformat()
     assert snapshot["created_at"] == created_at.isoformat()
     assert snapshot["updated_at"] == updated_at.isoformat()
 

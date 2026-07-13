@@ -30,8 +30,10 @@ def persist_recommendation_snapshot_stream(
     stream: Iterable[str],
     store: Any,
     snapshot_id: str,
+    recommendation_edit_token: str = "",
 ) -> Iterator[str]:
     summary = ""
+    entry_title = ""
     started_emitted = False
 
     try:
@@ -42,8 +44,8 @@ def persist_recommendation_snapshot_stream(
                 started_emitted = True
 
                 if event is None or event.get("event") != "workflow.started":
-                    started_event = {"event": "workflow.started", "recommendation_id": snapshot_id}
-                    _persist_event(started_event, store, snapshot_id, summary)
+                    started_event = _started_event(snapshot_id, recommendation_edit_token)
+                    _persist_event(started_event, store, snapshot_id, summary, entry_title)
                     yield format_sse_event(started_event)
 
             if event is None:
@@ -51,9 +53,11 @@ def persist_recommendation_snapshot_stream(
                 continue
 
             if event.get("event") == "workflow.started":
-                event = {**event, "recommendation_id": snapshot_id}
+                event = {**event, **_started_event(snapshot_id, recommendation_edit_token)}
 
-            _persist_event(event, store, snapshot_id, summary)
+            _persist_event(event, store, snapshot_id, summary, entry_title)
+            if _is_entry_title_delta(event):
+                entry_title += event.get("content", "")
             if _is_summary_delta(event):
                 summary += event.get("content", "")
 
@@ -63,7 +67,16 @@ def persist_recommendation_snapshot_stream(
         raise
 
 
-def _persist_event(event: dict[str, Any], store: Any, snapshot_id: str, summary: str) -> None:
+def _started_event(snapshot_id: str, recommendation_edit_token: str) -> dict[str, Any]:
+    event = {"event": "workflow.started", "recommendation_id": snapshot_id}
+
+    if recommendation_edit_token:
+        event["recommendation_edit_token"] = recommendation_edit_token
+
+    return event
+
+
+def _persist_event(event: dict[str, Any], store: Any, snapshot_id: str, summary: str, entry_title: str) -> None:
     event_name = event.get("event")
 
     if "conversation_ids" in event:
@@ -103,7 +116,13 @@ def _persist_event(event: dict[str, Any], store: Any, snapshot_id: str, summary:
         store.update_summary(snapshot_id, summary + event.get("content", ""))
         return
 
+    if _is_entry_title_delta(event):
+        store.update_entry_title(snapshot_id, entry_title + event.get("content", ""))
+        return
+
     if event_name == "workflow.stage.completed":
+        if event.get("stage") == "agent_recommendation" and event.get("entry_title"):
+            store.update_entry_title(snapshot_id, event.get("entry_title"))
         if event.get("stage") == "agent_recommendation" and event.get("summary"):
             store.update_summary(snapshot_id, event.get("summary"))
         return
@@ -121,6 +140,15 @@ def _is_summary_delta(event: dict[str, Any]) -> bool:
         event.get("event") == "content.delta"
         and event.get("stage") == "agent_recommendation"
         and event.get("type") == "SUMMARY"
+        and isinstance(event.get("content"), str)
+    )
+
+
+def _is_entry_title_delta(event: dict[str, Any]) -> bool:
+    return (
+        event.get("event") == "content.delta"
+        and event.get("stage") == "agent_recommendation"
+        and event.get("type") == "ENTRY_TITLE"
         and isinstance(event.get("content"), str)
     )
 

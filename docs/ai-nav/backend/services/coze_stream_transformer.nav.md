@@ -4,7 +4,7 @@
 
 ## 用途
 
-解析模型输出中的 XML 风格标签，把文本段、推荐智能体段和通用 Coze/LongCat SSE 帧转换为前端可消费的结构化事件。
+解析模型输出中的 XML 风格标签，把文本段、推荐智能体段和通用 Coze/LongCat SSE 帧转换为前端可消费的结构化事件。遇到孤立闭合标签、错误闭合类型或缺失闭合后直接进入下一个合法一级标签时，会结束当前段并从合法标签恢复，禁止把原始 XML 泄漏到可见文本。
 
 ## 导出
 
@@ -25,8 +25,9 @@
 
 ## 修改指南
 
-- **新增标签**: 在对应 TAGS 常量中加入开闭标签，并同步前端 `workflowModel.ts` 的 section 判断。
+- **新增标签**: 在对应 TAGS 常量中加入开闭标签，并同步前端 `workflowModel.ts` 的 section 判断；推荐入口标题使用 `ENTRY_TITLE`，由快照流写入 `entry_title`。
 - **兼容拼写错误**: 使用 `TAG_TYPE_ALIASES` 和 `TAG_CLOSE_ALIASES`，不要在前端分散兼容。
+- **改结构容错**: 同步覆盖标签跨 chunk、错误闭合、孤立闭合和后续 `RECOMMENDED_AGENTS` 恢复；不能把 `<AGENT>` 子标签误当一级边界。
 - **改 JSON 序列化**: 保持 `ensure_ascii=False`，避免中文 SSE 变成不可读转义。
 
 ## 依赖图

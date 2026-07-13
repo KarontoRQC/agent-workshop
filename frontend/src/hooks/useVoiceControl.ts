@@ -44,7 +44,9 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 };
 
-const COMMAND_SILENCE_MS = 2800;
+const FINAL_RESULT_SILENCE_MS = 360;
+const INTERIM_RESULT_SILENCE_MS = 850;
+const RECOGNITION_END_EMIT_MS = 120;
 const NON_SECURE_VOICE_MESSAGE = '语音识别在非安全连接下不可用，请使用 HTTPS 或 localhost / 127.0.0.1 访问。';
 
 function isSecureForVoice() {
@@ -73,6 +75,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const commandTimerRef = useRef(0);
   const finalTranscriptRef = useRef('');
+  const interimTranscriptRef = useRef('');
   const restartTimerRef = useRef(0);
   const sessionRef = useRef(0);
   const onCommandRef = useRef(onCommand);
@@ -105,26 +108,29 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
   const resetTranscriptState = useCallback(() => {
     clearCommandTimer();
     finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
     setTranscript('');
   }, [clearCommandTimer]);
 
   const scheduleCommandEmit = useCallback(
-    (sessionId: number) => {
+    (sessionId: number, delayMs: number) => {
       clearCommandTimer();
       commandTimerRef.current = window.setTimeout(() => {
         if (sessionId !== sessionRef.current) {
           return;
         }
 
-        const command = finalTranscriptRef.current.trim();
+        const command = [finalTranscriptRef.current, interimTranscriptRef.current].filter(Boolean).join(' ').trim();
         commandTimerRef.current = 0;
         finalTranscriptRef.current = '';
+        interimTranscriptRef.current = '';
 
         if (command) {
+          keepAliveRef.current = false;
           setTranscript(command);
           onCommandRef.current(command);
         }
-      }, COMMAND_SILENCE_MS);
+      }, delayMs);
     },
     [clearCommandTimer],
   );
@@ -204,6 +210,11 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
         recognitionRef.current = null;
         setListening(false);
 
+        if (finalTranscriptRef.current.trim() || interimTranscriptRef.current.trim()) {
+          scheduleCommandEmit(sessionId, RECOGNITION_END_EMIT_MS);
+          return;
+        }
+
         if (keepAliveRef.current) {
           restartTimerRef.current = window.setTimeout(beginRecognition, 220);
         }
@@ -246,6 +257,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
         if (finalTextForBuffer) {
           finalTranscriptRef.current = [finalTranscriptRef.current, finalTextForBuffer].filter(Boolean).join(' ');
         }
+        interimTranscriptRef.current = interimTextForDisplay;
 
         const displayTranscript = [finalTranscriptRef.current, interimTextForDisplay].filter(Boolean).join(' ').trim();
 
@@ -254,12 +266,12 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
         }
 
         if (interimTextForDisplay) {
-          clearCommandTimer();
+          scheduleCommandEmit(sessionId, INTERIM_RESULT_SILENCE_MS);
           return;
         }
 
         if (finalTranscriptRef.current.trim()) {
-          scheduleCommandEmit(sessionId);
+          scheduleCommandEmit(sessionId, FINAL_RESULT_SILENCE_MS);
         }
       };
 
@@ -283,7 +295,7 @@ export function useVoiceControl(onCommand: (command: string) => void, language =
     };
 
     beginRecognition();
-  }, [Recognition, canUseVoice, clearCommandTimer, clearRestartTimer, scheduleCommandEmit]);
+  }, [Recognition, canUseVoice, clearRestartTimer, scheduleCommandEmit]);
 
   useEffect(() => {
     if (!canUseVoice) {

@@ -10,14 +10,12 @@ export function WorkflowDock({
   active,
   agents,
   highlight,
-  onOpenHeroHall,
   recommendationId,
   routeSegments,
 }: {
   active: boolean;
   agents: RecommendedAgent[];
   highlight: WorkflowHighlight;
-  onOpenHeroHall: () => void;
   recommendationId?: string;
   routeSegments: string[];
 }) {
@@ -59,7 +57,7 @@ export function WorkflowDock({
               <RecommendedAgentCard agent={agent} index={index} key={getRecommendedAgentKey(agent)} />
             ))}
           </div>
-          <RecommendedAgentLaunchBar agents={agents} onOpenHeroHall={onOpenHeroHall} recommendationId={recommendationId} />
+          <RecommendedAgentLaunchBar agents={agents} recommendationId={recommendationId} />
         </section>
       ) : null}
     </aside>
@@ -149,16 +147,15 @@ function RecommendedAgentCard({ agent, index }: { agent: RecommendedAgent; index
 
 function RecommendedAgentLaunchBar({
   agents,
-  onOpenHeroHall,
   recommendationId,
 }: {
   agents: RecommendedAgent[];
-  onOpenHeroHall: () => void;
   recommendationId?: string;
 }) {
   const enrichedAgents = agents.map(enrichDrawAgent);
   const launchTargets = getAgentLaunchTargets(enrichedAgents);
   const combinationEntryUrl = recommendationId ? getAgentCombinationEntryUrl(recommendationId) : '';
+  const canOpenHall = Boolean(combinationEntryUrl);
   const canOpen = launchTargets.length > 0 && Boolean(combinationEntryUrl);
 
   return (
@@ -168,10 +165,17 @@ function RecommendedAgentLaunchBar({
         <strong>{agents.length} 个智能体已生成</strong>
       </div>
       <div className="recommended-agent-package-actions">
-        <button aria-label="进入智能体英雄殿堂" className="recommended-agent-package-hall" onClick={onOpenHeroHall} type="button">
-          <Crown size={14} />
-          <span>殿堂</span>
-        </button>
+        {canOpenHall ? (
+          <a aria-label="打开你的智能体英雄殿堂" className="recommended-agent-package-hall" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
+            <Crown size={14} />
+            <span>打开你的殿堂</span>
+          </a>
+        ) : (
+          <button aria-label="等待智能体英雄殿堂生成" className="recommended-agent-package-hall" disabled type="button">
+            <Crown size={14} />
+            <span>等待殿堂</span>
+          </button>
+        )}
         {canOpen ? (
           <a className="recommended-agent-package-open" href={combinationEntryUrl} rel="noopener noreferrer" target="_blank">
             <PackageOpen size={15} />

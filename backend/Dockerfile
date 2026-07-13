@@ -6,6 +6,7 @@ ENV PIP_NO_CACHE_DIR=1 \
     FLASK_HOST=0.0.0.0 \
     FLASK_PORT=5000 \
     FLASK_DEBUG=0 \
+    LOG_LEVEL=INFO \
     CHAT_PROVIDER=longcat \
     CHAT_CONFIG_FALLBACK=local \
     WORKFLOW_MODE=unified \
@@ -16,9 +17,18 @@ ENV PIP_NO_CACHE_DIR=1 \
     LONGCAT_BASE_URL=https://api.longcat.chat/openai/v1 \
     LONGCAT_MODEL=LongCat-2.0 \
     LONGCAT_MAX_TOKENS=3000 \
+    LONGCAT_THINKING=disabled \
+    LONGCAT_TEMPERATURE=0.2 \
+    LONGCAT_SSE_CHUNK_SIZE=64 \
+    LONGCAT_STREAM_READ_TIMEOUT=4 \
+    LONGCAT_REQUEST_RETRIES=0 \
+    LONGCAT_RETRY_BACKOFF=0.25 \
+    LONGCAT_CIRCUIT_BREAKER_SECONDS=20 \
     SOURCE_AGENTS_PATH=/app/data/source_agents_full.json \
     AGENT_AVATAR_DIR=/app/frontend/src/assets/agent-avatars \
-    TTS_PROVIDER=browser
+    AGENT_STATIC_AVATAR_DIR=/app/static/agent-avatars \
+    AGENT_STATIC_AVATAR_BASE_URL=/agent-avatars \
+    EDGE_TTS_VOICE=zh-CN-XiaoxiaoNeural
 
 WORKDIR /app/backend
 

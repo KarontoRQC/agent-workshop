@@ -17,18 +17,7 @@ class TtsSynthesisError(RuntimeError):
 
 def synthesize_speech(text, mood="neutral"):
     settings = get_tts_settings()
-    provider = settings.provider
-
-    if provider == "browser":
-        raise TtsConfigurationError("TTS_PROVIDER=browser disables server-side synthesis; use browser speech fallback.")
-
-    if provider in {"auto", "edge"}:
-        return synthesize_with_edge_tts(text, mood, settings), "audio/mpeg"
-
-    if provider != "piper":
-        raise TtsConfigurationError("Unsupported TTS_PROVIDER. Use edge, piper, auto, or browser.")
-
-    return synthesize_with_piper(text, mood, settings), "audio/wav"
+    return synthesize_with_edge_tts(text, mood, settings), "audio/mpeg"
 
 
 def synthesize_with_edge_tts(text, mood, settings):
@@ -96,82 +85,6 @@ def get_edge_command(edge_exe):
         return [resolved]
 
     return [sys.executable, "-m", "edge_tts"]
-
-
-def synthesize_with_piper(text, mood, settings):
-    if not settings.piper_exe:
-        raise TtsConfigurationError("PIPER_EXE is required when TTS_PROVIDER=piper.")
-
-    if not settings.piper_voice:
-        raise TtsConfigurationError("PIPER_VOICE is required when TTS_PROVIDER=piper.")
-
-    if not os.path.exists(settings.piper_exe):
-        raise TtsConfigurationError(f"Piper executable was not found: {settings.piper_exe}")
-
-    if not os.path.exists(settings.piper_voice):
-        raise TtsConfigurationError(f"Piper voice model was not found: {settings.piper_voice}")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as output_file:
-        output_path = output_file.name
-
-    try:
-        command = [
-            settings.piper_exe,
-            "--model",
-            settings.piper_voice,
-            "--output_file",
-            output_path,
-            "--length_scale",
-            str(get_mood_length_scale(mood, settings.piper_length_scale)),
-            "--noise_scale",
-            str(settings.piper_noise_scale),
-            "--noise_w",
-            str(settings.piper_noise_w),
-        ]
-
-        if settings.piper_config:
-            command.extend(["--config", settings.piper_config])
-
-        result = subprocess.run(
-            command,
-            input=text,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=settings.piper_timeout,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "").strip()
-            raise TtsSynthesisError(detail or f"Piper exited with code {result.returncode}.")
-
-        with open(output_path, "rb") as audio_file:
-            audio = audio_file.read()
-
-        if not audio:
-            raise TtsSynthesisError("Piper produced an empty audio file.")
-
-        return audio
-    except subprocess.TimeoutExpired as exc:
-        raise TtsSynthesisError("Piper synthesis timed out.") from exc
-    finally:
-        try:
-            os.remove(output_path)
-        except OSError:
-            pass
-
-
-def get_mood_length_scale(mood, base_length_scale):
-    mood_scale = {
-        "explaining": 1.08,
-        "neutral": 1.0,
-        "recommending": 0.94,
-        "summary": 1.04,
-        "warm": 1.1,
-    }.get(mood, 1.0)
-
-    return max(0.65, min(1.45, base_length_scale * mood_scale))
 
 
 def get_edge_mood_rate(mood, base_rate):

@@ -49,6 +49,7 @@ cd backend && .\.venv\Scripts\python -m pytest tests
 
 - 禁止把 `frontend/AGENTS.md` 中的设计决策删除、搬空或改写为根级长文档；视觉和交互改动前必须先读取该文件。
 - 禁止在没有依赖变更时修改 `frontend/package-lock.json`；如确需更新依赖，必须同步说明触发原因。
+- 禁止新增绕过 `apiSession.ts` / `routes/access_control.py` 的聊天、TTS 或推荐写入口；分享 URL 不得携带推荐编辑令牌。
 - 禁止把 `backend/.env`、`backend/.env.local`、`frontend/.env.local` 或任何真实 token 写入文档、日志和提交内容。
 - 禁止让前端在 `workflow.stage.completed` 后停止读取 Coze/LongCat 流；完整结束信号以 `workflow.completed` 或 `chat.completed` 为准。
 - 禁止把 `frontend/src/features/heroHall/HeroTeamCarousel.tsx` 的轮播实现内联回 `AgentHeroHall.tsx` 或追加到全局 `App.css`。

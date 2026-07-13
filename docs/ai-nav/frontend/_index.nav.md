@@ -5,7 +5,7 @@
 
 ## 职责
 
-前端承载 JARVIS 语音粒子体验、机甲 HUD、知识路径、推荐智能体、Agent Hero Hall、TTS 播放和后端 SSE 消费。根目录包含构建配置、运行说明、设计记录和环境代理配置。
+前端承载 JARVIS 语音粒子体验、机甲 HUD、知识路径、推荐智能体、Agent Hero Hall、URL 参与者人格入口、TTS 播放和后端 SSE 消费。根目录包含构建配置、运行说明、设计记录和环境代理配置。
 
 ## 文件列表
 
@@ -15,7 +15,7 @@
 | `vite.config.ts` | Vite React 插件和 `/api`、`/api/tts` 代理。 | `defineConfig` |
 | `AGENTS.md` | 前端长期视觉和交互决策。 | 设计约束 |
 | `README.md` | 前端运行、语音和模型端点说明。 | 运行说明 |
-| `index.html` | Vite 应用 HTML 宿主。 | `root` |
+| `index.html` | Vite 应用 HTML 宿主，声明首页默认浏览器标题与 favicon。 | `root` |
 
 ## 子模块
 
@@ -26,5 +26,6 @@
 ## 开发模式
 
 - **改可见体验**: 先读 `frontend/AGENTS.md`，再读对应 `src/` 模块导航。
+- **改动画节奏**: 保持课堂视觉低频、连续、低反差；同步运行 `verify-motion-tempo.mjs` 并检查真实工作流激活态。
 - **改代理或环境变量**: 修改 `vite.config.ts` 后同步检查 `frontend/README.md` 和根级 `README.md`。
 - **改依赖**: 修改 `package.json` 后才允许更新 `package-lock.json`。
